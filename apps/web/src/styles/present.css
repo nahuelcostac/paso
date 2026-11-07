@@ -1,0 +1,23 @@
+/* Presentar: the drawing and a step indicator, on paper. No other chrome, no glass and no markers: see docs/design/direction.md. */
+.present { position: fixed; inset: 0; z-index: 40; overflow: hidden; isolation: isolate; background: var(--paper); user-select: none; -webkit-user-select: none; }
+.present[data-idle='true'] { cursor: none; }
+/* Focus lives here only so that keys arrive. A ring around the whole screen would be chrome. */
+.present:focus-visible { box-shadow: none !important; }
+
+/* Pages are stacked and opaque. The current one fades in over the previous one, so whatever both draw does not move or dim.
+   --motion-fast is 0ms under prefers-reduced-motion. */
+.present__page { position: absolute; inset: 0; z-index: 0; background: var(--paper); }
+.present__page[data-state='previous'] { z-index: 1; }
+.present__page[data-state='current'] { z-index: 2; animation: present-fade var(--motion-fast); }
+@keyframes present-fade { from { opacity: 0; } }
+/* The step's own canvas colour, across the whole screen. In dark theme it goes through the filter its drawing went through, so white comes out as --paper. */
+.present__paper { position: absolute; inset: 0; filter: var(--thumb-filter); }
+.present__page img { position: absolute; display: block; max-width: none; pointer-events: none; }
+.present__message { position: absolute; inset: 0; display: grid; place-content: center; color: var(--ink-3); font-size: var(--text-15); }
+
+.indicator { position: absolute; z-index: 3; right: var(--space-5); bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); color: var(--ink-3); font: var(--text-12) var(--font-mono); }
+.indicator__ticks { display: flex; gap: 4px; }
+.indicator__ticks i { width: 12px; height: 3px; border-radius: var(--radius-pill); background: var(--line-control); }
+.indicator__ticks i.on { background: var(--ink); }
+/* A narrow window: the numbers alone. */
+@media (max-width: 479px) { .indicator__ticks { display: none; } }
