@@ -56,7 +56,7 @@ Excalidraw stays the star because its canvas is the largest sheet of paper on sc
 
 **Selector (Storyboard/Lienzo).** A glass capsule with two text buttons, `role="radiogroup"`, arrow keys to move. The selected one is an inverted pill.
 
-**Projects.** Each project is an object, not a line of text: a 36px icon tile, its name, and its size (`4 escenas · 17 pasos`). The tile is a small sheet of paper holding a Lucide icon; the current project's tile is lime. Clicking the tile opens the icon picker (`storyboard-icon-picker.html`): a search field and a grid of Lucide icons. Agents can set the icon too. The project needs a stored icon name; that field is not in `packages/shared` yet.
+**Projects.** Each project is an object, not a line of text: a 36px icon tile, its name, and its size (`4 escenas · 17 pasos`). The tile is a small sheet of paper holding a Lucide icon; the current project's tile is lime. Clicking the tile opens the icon picker (`storyboard-icon-picker.html`): a search field and a grid of Lucide icons. Agents can set the icon too. This needs an optional icon name on the project, which `docs/data-format.md` and `packages/shared` do not have yet; with none set, the tile shows Lucide's `folder`.
 
 **Panels.** Projects 232px, agent 360px. Canvas, carousel and panels all use `--radius-panel`, 8px apart and 8px from the window edge.
 
@@ -65,6 +65,7 @@ Excalidraw stays the star because its canvas is the largest sheet of paper on sc
 - Every step of a scene exports with the same bounds. The thumbnails are a sequence, so content must not jump when the bounding box changes. The mockups put a transparent 1000×625 rectangle in every step to fix the camera.
 - Render with `exportToSvg` and `exportWithDarkMode` set to the current theme. That applies the same filter as `--thumb-filter`, and it also keeps embedded images from inverting, which the CSS filter alone cannot do. Never recolour a thumbnail by hand.
 - The number sits below the frame, not on it. Current step: 2px `--ink` edge and a lime number. Agent changed it: an `agente` chip. Agent is changing it now: 2px `--agent` edge and a chip reading `cambiando…`, or `agente…` in the carousel, where the longer word does not fit. Current and agent states can coexist.
+- Steps have an optional `title` in the data model, and the mockups show untitled steps. On the storyboard a title follows the number on the same line, truncated, in `--ink-3`. In the carousel, which has no room for it, the number stays alone and the title goes in the tooltip.
 
 **Storyboard.** Scenes sit directly on the table, separated by space alone: no rules and no cards. Scene number, title and step count on one line, then four frames per row. The dashed add-step slot in the mockup is the hover or focus state of a scene.
 
