@@ -1,6 +1,5 @@
 import { FolderOpen, FolderX, Plus, ServerOff, TriangleAlert } from 'lucide-react';
-import type { View } from '../lib/route';
-import { explainProjectError, formatSize } from '../lib/format';
+import { explainProjectError } from '../lib/format';
 import type { ProjectRow, StoreState } from '../state/projects-store';
 
 type Props = {
@@ -8,7 +7,6 @@ type Props = {
   row: ProjectRow | undefined;
   /** The project the address names, whether or not it exists. */
   requestedId: string | null;
-  view: View;
   onCreate: () => void;
   onRetry: () => void;
 };
@@ -23,8 +21,8 @@ function Message({ icon, title, children }: { icon: React.ReactNode; title: stri
   );
 }
 
-/** What fills the window beside the projects panel. The Storyboard and the Lienzo are built in later tasks. */
-export function MainView({ state, row, requestedId, view, onCreate, onRetry }: Props) {
+/** What fills the window when there is no project to draw: loading, no connection, none yet, or one that cannot open. */
+export function MainView({ state, row, requestedId, onCreate, onRetry }: Props) {
   if (state.phase === 'loading') return <main className="main-message" aria-busy="true" aria-label="Cargando" />;
 
   if (state.phase === 'unavailable') {
@@ -70,25 +68,6 @@ export function MainView({ state, row, requestedId, view, onCreate, onRetry }: P
     );
   }
 
-  const size = formatSize(row.scenes, row.steps);
-  if (view === 'lienzo') {
-    return (
-      <main className="canvas" aria-label="Lienzo">
-        <div className="canvas__placeholder">
-          <h1>{row.project.name}</h1>
-          <p className="meta">{size}</p>
-          <p>El lienzo de dibujo aparecerá aquí.</p>
-        </div>
-      </main>
-    );
-  }
-  return (
-    <main className="board" aria-label="Storyboard">
-      <div className="board__head">
-        <h1 className="board__title">{row.project.name}</h1>
-        <p className="board__meta">{size}</p>
-      </div>
-      <p className="board__placeholder">Las escenas y sus pasos aparecerán aquí.</p>
-    </main>
-  );
+  // A project that opens is drawn by the Storyboard or the Lienzo, which the app mounts itself.
+  return null;
 }

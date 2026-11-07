@@ -26,6 +26,16 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
   grid-template: var(--topbar-h) minmax(0, 1fr) / var(--panel-projects) minmax(0, 1fr);
 }
 .app--panel-closed { grid-template-columns: minmax(0, 1fr); }
+/* The Storyboard keeps the agent panel's column free, 360px on the right. The panel itself is built with the agent task:
+   it mounts in column -2 / -1 of row 2. Below 1100px there would be no room for both, so the column is released. */
+.app--agent { grid-template-columns: var(--panel-projects) minmax(0, 1fr) var(--panel-agent); }
+.app--agent.app--panel-closed { grid-template-columns: minmax(0, 1fr) var(--panel-agent); }
+.app--agent .board, .app--agent .main-message { grid-column: -3 / -2; }
+@media (max-width: 1099px) {
+  .app--agent { grid-template-columns: var(--panel-projects) minmax(0, 1fr); }
+  .app--agent.app--panel-closed { grid-template-columns: minmax(0, 1fr); }
+  .app--agent .board, .app--agent .main-message { grid-column: -2 / -1; }
+}
 
 /* Top bar: spans the window, so the selector sits on its true centre in both views. */
 .topbar { grid-column: 1 / -1; grid-row: 1; z-index: 3; pointer-events: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-3); }
@@ -140,7 +150,6 @@ button.project__tile:hover { color: var(--ink); }
 .board__head { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-5); }
 .board__title { font-size: var(--text-22); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: -0.015em; overflow-wrap: anywhere; }
 .board__meta { color: var(--ink-3); font-size: var(--text-12); white-space: nowrap; }
-.board__placeholder { color: var(--ink-3); }
 .canvas { grid-column: -2 / -1; grid-row: 2; position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; padding: var(--space-5); background: var(--paper); border-radius: var(--radius-panel); box-shadow: var(--shadow-paper); overflow: hidden; }
 .canvas__placeholder { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; color: var(--ink-3); }
 .canvas__placeholder h1 { color: var(--ink); font-size: var(--text-22); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: -0.015em; overflow-wrap: anywhere; }

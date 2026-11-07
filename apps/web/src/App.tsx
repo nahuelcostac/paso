@@ -5,9 +5,12 @@ import { BrowserRecovery } from './editor/recovery';
 import { bindStepLifecycle } from './editor/lifecycle';
 import { useRoute } from './lib/route';
 import { MainView } from './components/MainView';
+import { Storyboard } from './components/Storyboard';
+import { ThumbnailCache } from './editor/thumbnails';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { TopBar } from './components/TopBar';
 import { ProjectsStore, useProjects } from './state/projects-store';
+import { formatSize } from './lib/format';
 
 const Lienzo = lazy(() => import('./editor/Lienzo'));
 
@@ -29,6 +32,8 @@ function usePanelOpen() {
 export function App({ config }: { config: ClientConfig }) {
   const api = useMemo(() => new ApiClient(config), [config]);
   const store = useMemo(() => new ProjectsStore(api), [api]);
+  // One cache of drawn thumbnails for the whole window, so a scene is not drawn twice for the same revisions.
+  const thumbnails = useMemo(() => new ThumbnailCache(48), []);
   const steps = useMemo(() => new StepStore(api, new BrowserRecovery(config.baseUrl)), [api, config.baseUrl]);
   useEffect(() => bindStepLifecycle(steps), [steps]);
   useEffect(() => store.subscribeEvents((event) => {
@@ -61,7 +66,7 @@ export function App({ config }: { config: ClientConfig }) {
   const startCreating = () => { setPanelOpen(true); setCreating(true); };
 
   return (
-    <div className={`app${panelOpen ? '' : ' app--panel-closed'}`}>
+    <div className={`app${panelOpen ? '' : ' app--panel-closed'}${route.view === 'storyboard' ? ' app--agent' : ''}`}>
       <TopBar
         view={route.view}
         onViewChange={(view) => navigate({ ...route, view })}
@@ -84,9 +89,11 @@ export function App({ config }: { config: ClientConfig }) {
           }}
         />
       )}
-      {route.view === 'lienzo' && row?.kind === 'ok' ? <Suspense fallback={<main className="main-message" aria-label="Lienzo">Cargando…</main>}>
+      {row?.kind === 'ok' && route.view === 'lienzo' ? <Suspense fallback={<main className="main-message" aria-label="Lienzo">Cargando…</main>}>
         <Lienzo key={row.id} api={api} store={steps} projectId={row.id} projectName={row.project.name} structureRevision={row.revision} route={route} navigate={navigate} />
-      </Suspense> : <MainView state={state} row={row} requestedId={route.projectId} view={route.view} onCreate={startCreating} onRetry={() => store.retry()} />}
+      </Suspense> : row?.kind === 'ok' ? (
+        <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} listedSize={formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} />
+      ) : <MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} />}
     </div>
   );
 }

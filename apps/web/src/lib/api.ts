@@ -82,6 +82,18 @@ export class ApiClient {
   createScene(projectId: string, name: string) {
     return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'POST', body: { name } });
   }
+  private scenePath(projectId: string, sceneId: string) { return `/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}`; }
+  getScene(projectId: string, sceneId: string) { return this.request<{ document: Scene; revision: string }>(this.scenePath(projectId, sceneId)); }
+  renameScene(projectId: string, sceneId: string, revision: string, name: string) {
+    return this.request<{ document: Scene; revision: string }>(this.scenePath(projectId, sceneId), { method: 'PATCH', body: { name }, revision });
+  }
+  deleteScene(projectId: string, sceneId: string, revision: string) {
+    return this.request<void>(this.scenePath(projectId, sceneId), { method: 'DELETE', revision });
+  }
+  /** Scene order lives in the project document, so this is guarded by the project's revision. */
+  reorderScenes(projectId: string, revision: string, ids: string[]) {
+    return this.request<ProjectEnvelope>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'PUT', body: { ids }, revision });
+  }
   createStep(projectId: string, sceneId: string) {
     return this.request<{ document: Step; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`, { method: 'POST', body: {} });
   }
