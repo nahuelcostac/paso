@@ -1,14 +1,168 @@
-import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
-import type { HealthResponse } from '@paso/shared';
+import { randomBytes } from 'node:crypto';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { idSchema } from '@paso/shared';
+import { WebSocketServer, WebSocket } from 'ws';
+import { assetName } from './disk.js';
+import { ApiError, errorResponse } from './errors.js';
+import { authorize } from './security.js';
+import { Store } from './store.js';
 
-export const app = new Hono();
+export type StartServerOptions = {
+  dataDir: string; port?: number; sessionToken?: string; allowedOrigins?: string[];
+  maxJsonBytes?: number; maxAssetBytes?: number; pollIntervalMs?: number;
+};
 
-app.get('/api/health', (context) => {
-  const response: HealthResponse = { status: 'ok' };
-  return context.json(response);
-});
+async function body(request: IncomingMessage, limit: number) {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > limit) throw new ApiError(413, 'BODY_TOO_LARGE', 'Request body exceeds the configured limit.');
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+function send(response: ServerResponse, status: number, data?: unknown, revision?: string) {
+  response.statusCode = status;
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  if (revision) response.setHeader('ETag', `"${revision}"`);
+  if (data === undefined || data === null) { response.end(); return; }
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+  response.end(JSON.stringify(data));
+}
 
-export function startServer({ port }: { port: number }) {
-  return serve({ fetch: app.fetch, hostname: '127.0.0.1', port });
+/** Starts an independent loopback-only service. The caller owns its lifecycle and token delivery. */
+export async function startServer(options: StartServerOptions) {
+  const sessionToken = options.sessionToken ?? randomBytes(32).toString('base64url');
+  if (!/^[A-Za-z0-9_-]{32,256}$/.test(sessionToken)) throw new Error('Session token must contain 32 to 256 base64url characters.');
+  const store = await Store.create(options.dataDir, options.pollIntervalMs);
+  let port = options.port ?? 3001;
+  const allowedOrigins = new Set(options.allowedOrigins ?? []);
+  const server = createServer((request, response) => {
+    void (async () => {
+      authorize(request, sessionToken, port, allowedOrigins);
+      // Inspect the raw target before URL parsing can normalize dot segments.
+      const rawPath = (request.url ?? '').split('?')[0];
+      let parts: string[];
+      try { parts = rawPath.split('/').slice(1).map(decodeURIComponent); }
+      catch { throw new ApiError(400, 'INVALID_PATH', 'Invalid path encoding.'); }
+      const method = request.method;
+      const revision = typeof request.headers['if-match'] === 'string' ? request.headers['if-match'] : undefined;
+      const json = async () => {
+        if (!request.headers['content-type']?.startsWith('application/json')) throw new ApiError(415, 'CONTENT_TYPE', 'Use application/json.');
+        return JSON.parse((await body(request, options.maxJsonBytes ?? 10 * 1024 * 1024)).toString('utf8')) as unknown;
+      };
+      if (rawPath === '/api/health' && method === 'GET') { send(response, 200, { status: 'ok' }); return; }
+      if (parts[0] !== 'api' || parts[1] !== 'projects') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+      if (parts.length === 2) {
+        if (method === 'GET') { send(response, 200, await store.list()); return; }
+        if (method === 'POST') { const result = await store.create(await json()); send(response, 201, result, result.revision); return; }
+      }
+      const projectId = idSchema.parse(parts[2]);
+      let result: unknown;
+      let status = 200;
+      if (parts.length === 3) {
+        if (method === 'GET') result = await store.read(projectId);
+        else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision);
+        else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision); status = 204; }
+        else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+      } else if (parts[3] === 'assets' && parts.length === 5) {
+        assetName(parts[4]);
+        if (method !== 'GET' && method !== 'PUT' && method !== 'DELETE') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+        const asset = await store.asset(projectId, parts[4], method,
+          method === 'PUT' ? await body(request, options.maxAssetBytes ?? 50 * 1024 * 1024) : undefined, revision);
+        if (method === 'GET' && asset && 'bytes' in asset) {
+          response.setHeader('Content-Type', 'application/octet-stream');
+          response.setHeader('Content-Disposition', 'attachment');
+          response.setHeader('X-Content-Type-Options', 'nosniff');
+          response.setHeader('Cache-Control', 'no-store');
+          response.setHeader('ETag', `"${asset.revision}"`);
+          response.end(asset.bytes); return;
+        }
+        result = asset; status = method === 'DELETE' ? 204 : 200;
+      } else if (parts[3] === 'scenes') {
+        if (parts.length === 4) {
+          if (method === 'GET') result = await store.read(projectId, undefined, undefined, 'scenes');
+          else if (method === 'POST') { result = await store.mutate(projectId, 'createScene', await json()); status = 201; }
+          else if (method === 'PUT') result = await store.mutate(projectId, 'orderScenes', await json(), revision);
+          else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+        } else {
+          const sceneId = idSchema.parse(parts[4]);
+          if (parts.length === 5) {
+            if (method === 'GET') result = await store.read(projectId, sceneId);
+            else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision, sceneId);
+            else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId); status = 204; }
+            else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+          } else if (parts[5] === 'steps') {
+            if (parts.length === 6) {
+              if (method === 'GET') result = await store.read(projectId, sceneId, undefined, 'steps');
+              else if (method === 'POST') { result = await store.mutate(projectId, 'createStep', await json(), undefined, sceneId); status = 201; }
+              else if (method === 'PUT') result = await store.mutate(projectId, 'orderSteps', await json(), revision, sceneId);
+              else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+            } else {
+              const stepId = idSchema.parse(parts[6]);
+              if (parts.length === 8 && parts[7] === 'duplicate' && method === 'POST') {
+                result = await store.mutate(projectId, 'duplicate', await json(), revision, sceneId, stepId); status = 201;
+              } else if (parts.length === 7) {
+                if (method === 'GET') result = await store.read(projectId, sceneId, stepId);
+                else if (method === 'PUT') result = await store.mutate(projectId, 'updateStep', await json(), revision, sceneId, stepId);
+                else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId, stepId); status = 204; }
+                else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+              } else throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+            }
+          } else throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+        }
+      } else throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+      send(response, status, result, (result as { revision?: string } | null)?.revision);
+    })().catch((error: unknown) => {
+      const failure = errorResponse(error);
+      send(response, failure.status, { error: failure.error });
+    });
+  });
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 10_000;
+  const websocket = new WebSocketServer({ noServer: true, maxPayload: 1024, handleProtocols: (protocols) => protocols.has('paso') ? 'paso' : false });
+  server.on('upgrade', (request, socket, head) => {
+    try {
+      authorize(request, sessionToken, port, allowedOrigins, true);
+      if (request.url !== '/api/events') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+      if (!request.headers['sec-websocket-protocol']?.split(',').some((p) => p.trim() === 'paso')) throw new ApiError(400, 'PROTOCOL_REQUIRED', 'Use the paso protocol.');
+      websocket.handleUpgrade(request, socket, head, (client) => {
+        client.on('error', () => {});
+        // A subscribe-before-read protocol lets clients avoid a startup race.
+        client.send(JSON.stringify({ type: 'ready' }));
+      });
+    } catch (error) {
+      const failure = errorResponse(error);
+      socket.end(`HTTP/1.1 ${failure.status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    }
+  });
+  const unsubscribe = store.subscribe((event) => {
+    const message = JSON.stringify(event);
+    for (const client of websocket.clients) {
+      if (client.bufferedAmount > 1024 * 1024) client.terminate();
+      else if (client.readyState === WebSocket.OPEN) client.send(message);
+    }
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
+    });
+  } catch (error) { unsubscribe(); websocket.close(); await store.close(); throw error; }
+  port = (server.address() as { port: number }).port;
+  allowedOrigins.add(`http://127.0.0.1:${port}`);
+  allowedOrigins.add(`http://localhost:${port}`);
+  return {
+    server, port, url: `http://127.0.0.1:${port}`, sessionToken,
+    async close() {
+      unsubscribe();
+      for (const client of websocket.clients) client.terminate();
+      websocket.close();
+      const closed = new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      server.closeAllConnections();
+      await Promise.all([closed, store.close()]);
+    },
+  };
 }

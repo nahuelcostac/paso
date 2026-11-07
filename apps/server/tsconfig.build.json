@@ -5,7 +5,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "moduleResolution": "NodeNext",
+    "declaration": true
   },
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
 }
