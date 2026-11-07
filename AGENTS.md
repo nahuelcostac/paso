@@ -33,8 +33,9 @@ Each task has one owner at each stage:
 4. The **orchestrator** runs `kanvas finish` and gives the human the link to the subagent's thread.
 5. The **human** asks the subagent directly for any changes. The subagent applies them on the same branch, and the task stays in review.
 6. The **human** accepts the task on the board and says so in the subagent's thread.
-7. The **subagent** updates its branch from `main`, reruns the checks, pushes, opens a PR and merges it. If a conflict is not trivial, it asks the human instead of merging. It then reports the merge.
-8. The **orchestrator** tells the human which tasks are ready. Tasks that depend on this one start only after the merge.
+7. The **subagent** updates its branch from `main`, reruns the checks, pushes and opens a PR. If a conflict is not trivial, it asks the human. Agents never merge.
+8. The **human** merges the PR on GitHub.
+9. The **orchestrator** tells the human which tasks are ready. Tasks that depend on this one start only after the merge.
 
 Task branches are named `<task-id>/<slug>`, such as `fn-03/data-service`. Rename an auto-generated branch before pushing. PR titles start with the task ID.
 
