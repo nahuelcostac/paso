@@ -1,0 +1,270 @@
+{
+  "kanvas": 1,
+  "title": "paso",
+  "groups": [
+    {
+      "id": "FN",
+      "name": "Fundamentos"
+    },
+    {
+      "id": "IN",
+      "name": "Interfaz"
+    },
+    {
+      "id": "LYP",
+      "name": "Lienzo y presentación"
+    },
+    {
+      "id": "AG",
+      "name": "Agentes"
+    },
+    {
+      "id": "CYE",
+      "name": "Calidad y entrega"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "FN-01",
+      "title": "Crear el repositorio y la base del proyecto",
+      "state": "doing",
+      "group": "FN",
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Un solo comando (`pnpm dev`) levanta la webapp y el servidor local.\n\nIncluye git, monorepo TypeScript (web con Vite y React, servidor Node, paquete compartido), lint y tests.\n\nTerminado: arranca desde un clon limpio, y lint y tests pasan.\n\nAsignación: Codex · gpt-6.1-terra · medium (trabajo mecánico).",
+      "notes": [
+        {
+          "at": "2026-11-07T11:56:12Z",
+          "by": "claude-code",
+          "text": "Modo de trabajo confirmado por el usuario: aprobación y revisión tarea a tarea, sin YOLO."
+        },
+        {
+          "at": "2026-11-07T11:56:25Z",
+          "by": "claude-code",
+          "text": "Plan: delegar en un hilo de Codex (gpt-6.1-terra, medium) la creación del monorepo; después verifico yo el arranque desde un clon limpio y creo el commit inicial."
+        }
+      ]
+    },
+    {
+      "id": "FN-02",
+      "title": "Definir el modelo de proyectos, escenas y pasos",
+      "state": "todo",
+      "group": "FN",
+      "deps": ["FN-01"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Fija cómo se guarda una pizarra; web, servidor y agentes compartirán esta definición.\n\n- Proyecto > escenas > pasos, en una carpeta legible por proyecto con un JSON por paso.\n- Cada paso es una foto completa. Duplicar un paso conserva los ID de sus elementos, lo que permitirá animar transiciones más adelante.\n- Las imágenes van en una carpeta común del proyecto, para que duplicar pasos no las multiplique.\n- El formato lleva número de versión.\n\nTerminado: esquema validado, formato documentado y un proyecto de ejemplo que pasa la validación.\n\nAsignación: Codex · gpt-6.1-sol · high (de esto depende todo lo demás)."
+    },
+    {
+      "id": "FN-03",
+      "title": "Crear el servicio local de datos",
+      "state": "todo",
+      "group": "FN",
+      "deps": ["FN-02"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Un servidor local guarda los proyectos y avisa de cada cambio en tiempo real a la web y a los agentes.\n\n- Crear, leer, modificar y borrar proyectos, escenas y pasos, con escritura atómica y número de revisión.\n- Detecta cambios hechos en los archivos desde fuera de la app.\n- Solo escucha en localhost y exige un token de sesión, porque más adelante lanzará agentes en tu máquina.\n- Arranca como `startServer({dataDir, port})`, sin depender del navegador, para poder integrarlo después en Electron o Tauri.\n\nTerminado: tests de operaciones básicas, escrituras simultáneas, cambios externos y rechazo de peticiones sin token.\n\nAsignación: Codex · gpt-6.1-sol · high."
+    },
+    {
+      "id": "IN-01",
+      "title": "Definir la dirección visual",
+      "state": "todo",
+      "group": "IN",
+      "deps": ["FN-01"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Decide el aspecto de la app antes de construir pantallas, dejando el protagonismo al lienzo de Excalidraw.\n\nIncluye color, tipografía, densidad y modos claro y oscuro, aplicados a maquetas de Storyboard, Lienzo y Presentar.\n\nTerminado: tokens de diseño en el código y capturas de las tres pantallas.\n\nA revisar por ti: si te convence la dirección, porque todas las tareas de interfaz la heredan.\n\nAsignación: Claude · claude-fable-5-1 · high (decisión creativa)."
+    },
+    {
+      "id": "IN-02",
+      "title": "Construir el panel de proyectos y el selector Storyboard/Lienzo",
+      "state": "todo",
+      "group": "IN",
+      "deps": ["IN-01", "FN-03"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "La estructura principal de la app ya se puede usar.\n\n- Panel izquierdo para crear, abrir, renombrar y borrar proyectos (el borrado pide confirmación).\n- Selector superior Storyboard/Lienzo.\n- Al recargar, vuelves al mismo proyecto y a la misma vista.\n\nTerminado: todo lo anterior funciona contra el servicio local, sin datos simulados.\n\nAsignación: Claude · claude-sonnet-5-5 · high."
+    },
+    {
+      "id": "LYP-01",
+      "title": "Editar cada paso con Excalidraw",
+      "state": "todo",
+      "group": "LYP",
+      "deps": ["IN-02"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "El lienzo muestra Excalidraw (`@excalidraw/excalidraw`, licencia MIT) y cada paso se guarda solo.\n\n- Carga y autoguardado por paso, incluidas las imágenes.\n- Generación de miniaturas para Storyboard y carrusel.\n\nTerminado: dibujas, cambias de paso, recargas y todo sigue intacto. Un test comprueba que cambiar rápido de paso no pierde ni mezcla contenido, que es el principal riesgo de esta integración.\n\nAsignación: Codex · gpt-6.1-sol · high."
+    },
+    {
+      "id": "IN-03",
+      "title": "Construir la vista Storyboard",
+      "state": "todo",
+      "group": "IN",
+      "deps": ["LYP-01"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Ves el proyecto completo de un vistazo: sus escenas, cada una con las miniaturas de sus pasos.\n\n- Crear, renombrar, reordenar y borrar escenas.\n- Abrir cualquier paso en el Lienzo con un clic.\n- Espacio reservado a la derecha para el panel de agentes.\n\nTerminado: se puede organizar un proyecto de varias escenas solo desde esta vista.\n\nAsignación: Claude · claude-sonnet-5-5 · high."
+    },
+    {
+      "id": "LYP-02",
+      "title": "Añadir el selector de escena y el carrusel de pasos",
+      "state": "todo",
+      "group": "LYP",
+      "deps": ["LYP-01"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Navegas por la escena desde el Lienzo.\n\n- Selector de escena en la parte superior.\n- Carrusel inferior con miniaturas para saltar a cualquier paso, con atajos de teclado.\n- Añadir, duplicar, reordenar y borrar pasos. Un paso nuevo parte de una copia del paso actual.\n\nTerminado: se monta una escena de varios pasos sin salir del Lienzo.\n\nAsignación: Claude · claude-sonnet-5-5 · high."
+    },
+    {
+      "id": "LYP-03",
+      "title": "Crear el modo Presentar a pantalla completa",
+      "state": "todo",
+      "group": "LYP",
+      "deps": ["LYP-02"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Un botón superior presenta la escena a pantalla completa, sin controles de edición.\n\n- Avanzas y retrocedes con flechas o espacio, y sales con Esc.\n- Encuadre común para toda la escena, de modo que el contenido no salte ni cambie de zoom entre pasos.\n- Sin animaciones entre pasos en este MVP, salvo un fundido simple.\n\nTerminado: una escena de varios pasos se presenta de principio a fin en distintos tamaños de pantalla.\n\nAsignación: Claude · claude-opus-5-5 · high (el encuadre es lo delicado)."
+    },
+    {
+      "id": "AG-01",
+      "title": "Crear el servidor MCP de la pizarra",
+      "state": "todo",
+      "group": "AG",
+      "deps": ["FN-03", "LYP-01"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Da a cualquier harness las mismas capacidades sobre la pizarra, mediante herramientas MCP.\n\n- Consultar proyectos, escenas y pasos.\n- Crear y duplicar pasos.\n- Añadir, cambiar y borrar elementos con un formato sencillo y validado, para que el agente no tenga que escribir JSON interno de Excalidraw.\n- Obtener una imagen de un paso, para que el agente revise lo que ha dibujado.\n\nTerminado: un cliente MCP de prueba construye una escena de tres pasos y se ve correctamente en la app.\n\nRiesgo a resolver: partes de Excalidraw necesitan navegador, lo que afecta a la conversión de elementos y a la imagen cuando la app no está abierta.\n\nAsignación: Codex · gpt-6.1-sol · high."
+    },
+    {
+      "id": "AG-02",
+      "title": "Mostrar en vivo los cambios del agente sin perder los tuyos",
+      "state": "todo",
+      "group": "AG",
+      "deps": ["LYP-01", "AG-01"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Si un agente edita el paso que tienes abierto, ves sus cambios al momento y tu trabajo sigue intacto.\n\nLos cambios se combinan elemento a elemento según su versión, y se conservan tu selección y tu cámara.\n\nTerminado: tests de edición simultánea humano-agente, sin pérdidas ni parpadeos en el lienzo.\n\nAsignación: Codex · gpt-6.1-sol · xhigh, con revisión cruzada de Antigravity · gemini-4-argon-high (es el punto con más riesgo de perder datos)."
+    },
+    {
+      "id": "AG-03",
+      "title": "Deshacer de un clic lo que hizo un agente",
+      "state": "todo",
+      "group": "AG",
+      "deps": ["AG-01"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Antes de cada ejecución de un agente se guarda un punto de restauración, y un botón revierte todo lo que hizo en esa ejecución.\n\nSi has editado algo manualmente después, la app avisa antes de sobrescribirlo.\n\nTerminado: tests de restauración con y sin ediciones posteriores.\n\nAsignación: Codex · gpt-6.1-terra · high."
+    },
+    {
+      "id": "AG-04",
+      "title": "Detectar y añadir los harnesses instalados",
+      "state": "todo",
+      "group": "AG",
+      "deps": ["FN-03"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "La app encuentra los agentes que ya tienes y los añades con un clic: Claude Code (`claude`), Codex (`codex`) y Antigravity (`agy`).\n\n- Muestra versión y estado de sesión. Si falta alguno, indica qué hacer.\n- La app nunca pide ni guarda claves de API.\n- Funciona también sin heredar el PATH de la terminal, como ocurrirá al empaquetarla en macOS.\n\nTerminado: en esta máquina detecta los tres, y un harness ausente se muestra correctamente.\n\nAsignación: Codex · gpt-6.1-terra · medium."
+    },
+    {
+      "id": "AG-05",
+      "title": "Conversar con Claude Code desde la app",
+      "state": "todo",
+      "group": "AG",
+      "deps": ["AG-01", "AG-04"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Primer agente real. Define además la interfaz común de todos los harnesses: enviar, recibir en streaming, cancelar y continuar una sesión.\n\nUsa `claude -p` con `stream-json` y `--strict-mcp-config`, con tu sesión de Claude Code.\n\nDecisión de seguridad a revisar: por defecto el agente solo tiene las herramientas de la pizarra, sin terminal ni edición de archivos.\n\nTerminado: tests con un harness simulado y una petición real que modifica un paso.\n\nAsignación: Codex · gpt-6.1-sol · high.",
+      "notes": [
+        {
+          "at": "2026-11-07T11:56:12Z",
+          "by": "claude-code",
+          "text": "Confirmado por el usuario: por defecto el agente solo tiene las herramientas de la pizarra, sin terminal ni edición de archivos. Aplica también a AG-06 y AG-07."
+        }
+      ]
+    },
+    {
+      "id": "AG-06",
+      "title": "Conversar con Codex desde la app",
+      "state": "todo",
+      "group": "AG",
+      "deps": ["AG-05"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Codex funciona con la misma interfaz y las mismas restricciones que Claude Code, usando tu sesión.\n\nHay que elegir entre `codex app-server`, más completo pero experimental, y `codex exec`.\n\nTerminado: tests con harness simulado y una petición real que modifica un paso.\n\nAsignación: Codex · gpt-6.1-sol · medium."
+    },
+    {
+      "id": "AG-07",
+      "title": "Conversar con Antigravity (agy) desde la app",
+      "state": "todo",
+      "group": "AG",
+      "deps": ["AG-05"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Da acceso a los modelos de Google mediante `agy`, con la misma interfaz y restricciones que los demás.\n\nHay que elegir entre `agy acp` y `agy -p` con `stream-json`.\n\nDecisión para ti: no estaba en tu selección inicial. La propongo porque `agy` es tu vía para los modelos de Google. Recházala si prefieres dos harnesses en el MVP.\n\nTerminado: tests con harness simulado y una petición real que modifica un paso.\n\nAsignación: Codex · gpt-6.1-terra · high.",
+      "notes": [
+        {
+          "at": "2026-11-07T11:56:12Z",
+          "by": "claude-code",
+          "text": "Confirmado por el usuario: Antigravity (agy) entra en el MVP."
+        }
+      ]
+    },
+    {
+      "id": "IN-04",
+      "title": "Construir el panel de agentes en el Storyboard",
+      "state": "todo",
+      "group": "IN",
+      "deps": ["IN-03", "AG-05", "AG-03"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "El menú lateral derecho permite trabajar con un agente sobre la escena elegida.\n\n- Elegir agente y modelo.\n- Conversación en streaming, indicando qué proyecto y escena recibe el agente.\n- Actividad visible: qué herramientas usa y qué pasos ha cambiado.\n- Botones de detener y deshacer ejecución.\n- Las miniaturas se actualizan mientras el agente trabaja.\n\nTerminado: pides una explicación en varios pasos y ves cómo aparece en el Storyboard.\n\nAsignación: Claude · claude-opus-5-5 · high (la interacción más compleja de la app)."
+    },
+    {
+      "id": "CYE-01",
+      "title": "Automatizar la prueba del flujo completo",
+      "state": "todo",
+      "group": "CYE",
+      "deps": ["LYP-03", "IN-04", "AG-02"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Una prueba en navegador recorre el MVP con un harness simulado: crear proyecto y escena, dibujar, añadir pasos, editar con el agente, deshacer y presentar.\n\nTerminado: pasa de forma estable con un solo comando, sin gastar cuota de ningún agente.\n\nAsignación: Codex · gpt-6.1-terra · medium."
+    },
+    {
+      "id": "CYE-02",
+      "title": "Validar el MVP con tus harnesses reales",
+      "state": "todo",
+      "group": "CYE",
+      "deps": ["CYE-01", "AG-06", "AG-07"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Comprueba el resultado real: se pide a cada harness que explique un concepto en una escena de cuatro pasos y luego se presenta.\n\nA tener en cuenta: usa tus sesiones reales y consume cuota.\n\nTerminado: capturas de cada resultado y lista de fallos, con los bloqueantes corregidos.\n\nAsignación: orquestador (Claude · claude-opus-5-5) con exploración de Antigravity · gemini-4-argon-high; las correcciones de código van a Codex."
+    },
+    {
+      "id": "CYE-03",
+      "title": "Escribir la guía de instalación y uso",
+      "state": "todo",
+      "group": "CYE",
+      "deps": ["CYE-02"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Un README permite instalar la app, añadir un agente y crear la primera presentación, y explica dónde se guardan los datos.\n\nTerminado: alguien que no conoce el proyecto puede seguirlo desde cero.\n\nAsignación: Antigravity · gemini-3.8-flash-medium (redacción acotada)."
+    },
+    {
+      "id": "CYE-04",
+      "title": "Comprobar que se puede empaquetar como escritorio",
+      "state": "todo",
+      "group": "CYE",
+      "deps": ["CYE-02"],
+      "at": "2026-11-07T11:42:13Z",
+      "by": "claude-code",
+      "desc": "Prueba acotada de que la arquitectura sirve para escritorio: una envoltura mínima en Electron arranca el servidor y la app en macOS, sin tocar el núcleo.\n\nCompara también con Tauri, que necesitaría incluir Node como proceso aparte, y deja una recomendación.\n\nFuera de alcance: instalador, firma y actualizaciones.\n\nDecisión para ti: es opcional en este MVP. Recházala si prefieres dejarla para más adelante.\n\nAsignación: Codex · gpt-6.1-terra · medium.",
+      "notes": [
+        {
+          "at": "2026-11-07T11:56:12Z",
+          "by": "claude-code",
+          "text": "Confirmado por el usuario: la prueba de empaquetado entra en este MVP."
+        }
+      ]
+    }
+  ]
+}
