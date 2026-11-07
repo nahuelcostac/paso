@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, delimiter, isAbsolute, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { ApiError, isMissing } from './errors.js';
+import { harnessEnvironment } from './agent/process.js';
 
 const ids = ['claude', 'codex', 'agy'] as const;
 type HarnessId = typeof ids[number];
@@ -12,7 +13,9 @@ type Status = 'signed_in' | 'signed_out' | 'unknown';
 export type DetectionOptions = { searchPaths?: string[]; loginShell?: boolean; timeoutMs?: number };
 function validId(value: unknown): value is HarnessId { return typeof value === 'string' && ids.some((id) => id === value); }
 function run(file: string, args: string[], timeout: number): Promise<{ ok: boolean; output: string }> {
-  return new Promise((done) => execFile(file, args, { timeout, maxBuffer: 64 * 1024, windowsHide: true, env: process.env }, (error, stdout, stderr) => {
+  return new Promise((done) => execFile(file, args, { timeout, maxBuffer: 64 * 1024, windowsHide: true,
+    // The same reduced environment a session gets, so "signed in" means what the session will see.
+    env: harnessEnvironment({}) }, (error, stdout, stderr) => {
     done({ ok: !error, output: String(stdout) + (args[0] === 'login' ? String(stderr) : '') });
   }));
 }

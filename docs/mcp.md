@@ -51,8 +51,9 @@ trusted parent. Do not put a token in repository configuration or a prompt.
 
 This is a transport definition, not a complete provider-specific config file.
 Claude Code and `agy` hosts must place it in their supported MCP configuration
-or pass it through their launcher. Launch integration and board-only harness
-permission policies belong to AG-05, AG-06 and AG-07.
+or pass it through their launcher. Paso's own Claude Code launcher, with its
+board-only permissions, is described in [server-api.md](server-api.md#agent-sessions).
+The Codex and `agy` launchers and their board-only policies belong to AG-06 and AG-07.
 
 For Codex, a host can use the documented MCP server configuration in its
 private or temporary config. Inherit the two values instead of storing them.
