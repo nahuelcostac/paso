@@ -6,13 +6,35 @@ import { assetName } from './disk.js';
 import { ApiError, errorResponse } from './errors.js';
 import { authorize } from './security.js';
 import { Store } from './store.js';
-import { HarnessRegistry, registryPath, type DetectionOptions } from './harnesses.js';
+import { HarnessRegistry, detectHarness, registryPath, type DetectionOptions } from './harnesses.js';
 import { RunStore } from './runs.js';
+import { join, dirname, resolve } from 'node:path';
+import { handleAgentRoute } from './agent/api.js';
+import { SessionManager } from './agent/sessions.js';
+import type { AgentRunHooks, HarnessAdapter, HarnessId } from './agent/types.js';
+
+export type AgentOptions = {
+  /** Neutral, empty directory the agents run in. Default: `agent-workspace` next to the projects directory. */
+  workDir?: string;
+  /** Where session IDs and resume tokens are kept. Must be outside `dataDir`. Default: next to the projects directory. */
+  sessionsPath?: string;
+  /** How to start the Paso MCP server. Default: this repository's compiled `apps/mcp/dist/cli.js` run with this Node. */
+  mcp?: { command?: string; entry?: string; args?: string[]; browserExecutable?: string };
+  /** Called where a run starts and ends. Restore points attach here. */
+  hooks?: AgentRunHooks;
+  /** Concurrent runs allowed per project (default 1) and in total (default 4). */
+  maxRunsPerProject?: number; maxRuns?: number;
+  /** A run with no output for this long fails (default 120 s). A run is stopped after `maxRunMs` (default 20 min). */
+  idleTimeoutMs?: number; maxRunMs?: number;
+  /** Replaces or adds harness adapters. Tests use it. */
+  adapters?: Partial<Record<HarnessId, HarnessAdapter>>;
+};
 
 export type StartServerOptions = {
   dataDir: string; port?: number; sessionToken?: string; allowedOrigins?: string[];
   maxJsonBytes?: number; maxAssetBytes?: number; pollIntervalMs?: number;
   harnessRegistryPath?: string; harnessDetection?: DetectionOptions;
+  agent?: AgentOptions;
   runsDir?: string; runRetentionLimit?: number;
 };
 
@@ -44,6 +66,25 @@ export async function startServer(options: StartServerOptions) {
   const runs = await RunStore.create(options.dataDir, { runsDir: options.runsDir, retentionLimit: options.runRetentionLimit });
   const store = await Store.create(options.dataDir, options.pollIntervalMs, runs);
   let port = options.port ?? 3001;
+  const agent = options.agent ?? {};
+  const mcpEntry = agent.mcp?.entry ?? join(import.meta.dirname, '..', '..', 'mcp', 'dist', 'cli.js');
+  const dataRoot = resolve(options.dataDir);
+  const sessions = new SessionManager({
+    adapters: agent.adapters,
+    detect: (id) => detectHarness(id, options.harnessDetection ?? {}),
+    validateTarget: async (projectId, sceneId) => { await store.read(projectId, sceneId); },
+    board: () => ({
+      serviceUrl: `http://127.0.0.1:${port}`, sessionToken,
+      mcp: {
+        command: agent.mcp?.command ?? process.execPath, args: agent.mcp?.args ?? [mcpEntry],
+        ...(agent.mcp?.browserExecutable ? { browserExecutable: agent.mcp.browserExecutable } : {}),
+      },
+    }),
+    workDir: agent.workDir ?? join(dirname(dataRoot), 'agent-workspace'), dataDir: dataRoot,
+    sessionsPath: registryPath(options.dataDir, agent.sessionsPath ?? join(dirname(dataRoot), 'agent-sessions.json')),
+    hooks: agent.hooks, maxRunsPerProject: agent.maxRunsPerProject, maxRuns: agent.maxRuns,
+    idleTimeoutMs: agent.idleTimeoutMs, maxRunMs: agent.maxRunMs,
+  });
   const allowedOrigins = new Set(options.allowedOrigins ?? []);
   const server = createServer((request, response) => {
     void (async () => {
@@ -70,6 +111,8 @@ export async function startServer(options: StartServerOptions) {
         if (parts.length === 3 && method === 'DELETE') { await harnesses.remove(parts[2]); send(response, 204); return; }
         throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
       }
+      const agentReply = await handleAgentRoute(sessions, parts, method, new URL(request.url ?? '/', 'http://127.0.0.1'), json);
+      if (agentReply) { send(response, agentReply.status, agentReply.data); return; }
       if (parts[0] !== 'api' || parts[1] !== 'projects') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
       if (parts.length === 2) {
         if (method === 'GET') { send(response, 200, await store.list()); return; }
@@ -173,13 +216,17 @@ export async function startServer(options: StartServerOptions) {
       socket.end(`HTTP/1.1 ${failure.status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
     }
   });
-  const unsubscribe = store.subscribe((event) => {
+  const broadcast = (event: unknown) => {
     const message = JSON.stringify(event);
     for (const client of websocket.clients) {
       if (client.bufferedAmount > 1024 * 1024) client.terminate();
       else if (client.readyState === WebSocket.OPEN) client.send(message);
     }
-  });
+  };
+  const unsubscribeStore = store.subscribe(broadcast);
+  // Agent events share the authenticated socket: { type: 'agent', sessionId, runId, seq, at, event }.
+  const unsubscribeAgents = sessions.subscribe((entry) => broadcast({ type: 'agent', ...entry }));
+  const unsubscribe = () => { unsubscribeStore(); unsubscribeAgents(); };
   try {
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
@@ -192,6 +239,8 @@ export async function startServer(options: StartServerOptions) {
   return {
     server, port, url: `http://127.0.0.1:${port}`, sessionToken,
     async close() {
+      // Stop agents first: their board tools call this service, and no harness process may outlive it.
+      await sessions.close();
       unsubscribe();
       for (const client of websocket.clients) client.terminate();
       websocket.close();
