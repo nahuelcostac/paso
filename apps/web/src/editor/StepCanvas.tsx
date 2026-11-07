@@ -8,8 +8,9 @@ import type { ApiClient } from '../lib/api';
 import type { Session, StepStore } from './step-store';
 import '../styles/editor.css';
 
-export default function StepCanvas({ api, store, session, theme }: { api: ApiClient; store: StepStore; session: Session; theme: 'light' | 'dark' }) {
+export default function StepCanvas({ api, store, session, theme, keepFocus }: { api: ApiClient; store: StepStore; session: Session; theme: 'light' | 'dark'; keepFocus: () => boolean }) {
   const mounted = useRef(false);
+  const focusCanvas = useRef(true);
   const [data, setData] = useState<ExcalidrawInitialDataState>();
   const [retry, setRetry] = useState(0);
   const [error, setError] = useState<string>();
@@ -22,6 +23,8 @@ export default function StepCanvas({ api, store, session, theme }: { api: ApiCli
       await loadDrawingFonts([session.document]);
       const files = await loadFiles(api, session.target.projectId, session.document, session.binaries);
       const restored = restore({ elements: canvasElements(session.document), appState: session.document.appState, files: canvasFiles(files) }, null, null, { refreshDimensions: true });
+      // Excalidraw takes focus when it mounts. Not while the keyboard is moving through the carousel.
+      focusCanvas.current = !keepFocus();
       if (!cancelled) setData({ ...restored, scrollToContent: true });
     })().catch(() => { if (!cancelled) setError('No se pudo cargar el dibujo o una de sus imágenes.'); });
     return () => { cancelled = true; mounted.current = false; };
@@ -29,7 +32,7 @@ export default function StepCanvas({ api, store, session, theme }: { api: ApiCli
   if (error) return <div className="editor-message" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); setRetry((value) => value + 1); }}>Reintentar</button></div>;
   if (!data) return <div className="editor-message" aria-busy="true">Cargando dibujo…</div>;
   return <div className="step-canvas" data-step-id={session.target.stepId}>
-    <Excalidraw initialData={data} theme={theme} langCode="es-ES" autoFocus handleKeyboardGlobally={false}
+    <Excalidraw initialData={data} theme={theme} langCode="es-ES" autoFocus={focusCanvas.current} handleKeyboardGlobally={false}
       validateEmbeddable={false} UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, toggleTheme: false, export: false } }}
       onChange={(elements, appState, files) => {
         if (!mounted.current) return;

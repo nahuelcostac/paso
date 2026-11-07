@@ -1,13 +1,15 @@
-import { lazy, Suspense, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import type { Scene } from '@paso/shared';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import type { SceneEnvelope, StepActions } from './step-actions';
 import type { ApiClient } from '../lib/api';
 import type { Route } from '../lib/route';
 import { type StepStore, targetKey, type Session } from './step-store';
+import { StepCarousel } from './StepCarousel';
+import { useThumbnails } from './use-thumbnails';
 import { useTheme } from './use-theme';
 import './excalidraw-runtime';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
-const labels = { saved: 'Guardado', dirty: 'Cambios pendientes', saving: 'Guardando…', failed: 'No se pudo guardar', conflict: 'El paso cambió fuera de Paso. Tu trabajo local se conserva.' };
+const messages = { failed: 'No se pudo guardar. Tu trabajo sigue en este navegador.', conflict: 'El paso cambió fuera de Paso. Tu trabajo local se conserva.' };
 
 function download(session: Session) {
   // Recovery includes image bytes as well as the valid shared document.
@@ -17,31 +19,39 @@ function download(session: Session) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function Lienzo({ api, store, projectId, projectName, structureRevision, route, navigate }: {
-  api: ApiClient; store: StepStore; projectId: string; projectName: string; structureRevision: string; route: Route;
-  navigate: (route: Route, options?: { replace?: boolean }) => void;
+/** True when the keyboard is working the carousel. A new canvas then keeps focus out of the way, or the next arrow key would draw. */
+function keyboardInCarousel() {
+  const active = document.activeElement;
+  if (!active?.closest('.carousel')) return false;
+  try { return active.matches(':focus-visible'); } catch { return true; }
+}
+
+export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate }: {
+  api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
+  scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
+  route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
 }) {
   useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const [scenes, setScenes] = useState<Scene[]>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const theme = useTheme();
-  const scene = scenes?.find((item) => item.id === route.sceneId);
+  const scene = scenes?.find((item) => item.document.id === route.sceneId)?.document;
+  const stepIds = useMemo(() => scene?.stepIds ?? [], [scene]);
   const stepId = scene?.stepIds.includes(route.stepId ?? '') ? route.stepId : undefined;
   const current = store.current();
   const session = current?.target.projectId === projectId && current.target.sceneId === scene?.id && current.target.stepId === stepId ? current : undefined;
-  const refresh = useCallback(async () => {
-    const result = await api.listScenes(projectId);
-    setScenes(result.map(({ document }) => document));
-  }, [api, projectId]);
+  const { svgs, titles } = useThumbnails(api, projectId, scene?.id, theme, `${structureRevision}/${stepIds.join()}`);
+  // Written during render on purpose: the effect below runs after the canvas mounted, and the canvas asks when it loads.
+  const routeRef = useRef(route); routeRef.current = route;
 
-  useEffect(() => { void refresh().catch(() => setError('No se pudieron cargar las escenas.')); }, [refresh, structureRevision]);
+  // An address that names a scene or step that is not there lands on the first one.
   useEffect(() => {
     if (!scenes) return;
-    const selected = scenes.find((item) => item.id === route.sceneId) ?? scenes[0];
+    const selected = scenes.find((item) => item.document.id === route.sceneId)?.document ?? scenes[0]?.document;
     const selectedStep = selected?.stepIds.includes(route.stepId ?? '') ? route.stepId : selected?.stepIds[0];
     if (selected?.id !== route.sceneId || selectedStep !== route.stepId) navigate({ ...route, sceneId: selected?.id, stepId: selectedStep }, { replace: true });
   }, [scenes, route, navigate]);
+  // Every step change goes through the store: it saves the step being left before it opens the next.
   useEffect(() => {
     if (!scene || !stepId) return;
     setError(undefined);
@@ -49,34 +59,23 @@ export default function Lienzo({ api, store, projectId, projectName, structureRe
     return () => { void store.flushAll(); };
   }, [store, projectId, scene?.id, stepId]);
 
-  async function create(kind: 'scene' | 'step') {
+  /** Runs a structure action. It reports its own failure, and the carousel is disabled meanwhile. */
+  const run = useCallback(async <T,>(job: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true); setError(undefined);
-    try {
-      const sceneId = kind === 'scene' ? (await api.createScene(projectId, `Escena ${(scenes?.length ?? 0) + 1}`)).document.id : scene!.id;
-      const step = await api.createStep(projectId, sceneId);
-      await refresh();
-      navigate({ ...route, sceneId, stepId: step.document.id });
-    } catch { setError('No se pudo crear. Inténtalo de nuevo.'); }
+    try { return await job(); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : 'No se pudo completar la acción.'); return undefined; }
     finally { setBusy(false); }
-  }
+  }, []);
+  const goTo = async (id: string | undefined) => {
+    await refreshScenes();
+    navigate({ ...routeRef.current, sceneId: scene?.id, stepId: id });
+  };
+  const copy = (make: () => Promise<string>) => async () => { const id = await run(make); if (id) await goTo(id); };
+
   return <main className="lienzo" aria-label="Lienzo">
-    <div className="step-switcher glass">
-      <span>Selector temporal</span>
-      {scenes && scenes.length > 0 && <>
-        <label>Escena <select aria-label="Escena temporal" value={scene?.id ?? ''} onChange={(event) => navigate({ ...route, sceneId: event.target.value, stepId: scenes.find((item) => item.id === event.target.value)?.stepIds[0] })}>
-          {scenes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select></label>
-        {scene && scene.stepIds.length > 0 && <label>Paso <select aria-label="Paso temporal" value={stepId ?? ''} onChange={(event) => navigate({ ...route, stepId: event.target.value })}>
-          {scene.stepIds.map((id, index) => <option key={id} value={id}>{index + 1}</option>)}
-        </select></label>}
-        <button className="btn" disabled={busy} onClick={() => void create('step')}>Añadir paso</button>
-      </>}
-      <button className="btn" disabled={busy} onClick={() => void create('scene')}>{scenes?.length ? 'Añadir escena' : 'Crear primera escena'}</button>
-      {session && <span className="save-state" role="status" data-save-state={session.status}>{labels[session.status]}</span>}
-    </div>
-    {error && <div role="alert">{error}<button className="btn" onClick={() => { void refresh(); if (scene && stepId) void store.select({ projectId, sceneId: scene.id, stepId }); }}>Reintentar</button></div>}
+    {error && <div className="editor-notice" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); void refreshScenes(); if (scene && stepId) void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => setError('No se pudo cargar el paso.')); }}>Reintentar</button></div>}
     {session && (session.status === 'failed' || session.status === 'conflict' || session.error) && <div className="editor-notice" role="alert">
-      <span>{session.error ?? labels[session.status]}</span>
+      <span>{session.error ?? messages[session.status as 'failed' | 'conflict']}</span>
       <button className="btn" onClick={() => download(session)}>Descargar copia local</button>
       {session.status === 'failed' && <button className="btn" onClick={() => void store.flush(session.target)}>Reintentar guardado</button>}
       {session.status === 'conflict' && <button className="btn" onClick={() => {
@@ -86,10 +85,22 @@ export default function Lienzo({ api, store, projectId, projectName, structureRe
     </div>}
     <div className="canvas canvas--editor">
       {session ? <Suspense fallback={<div className="editor-message">Cargando editor…</div>}>
-        <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} />
-      </Suspense> : <div className="canvas__placeholder"><h1>{projectName}</h1><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos.' : 'Crea una escena para empezar a dibujar.'}</p>
-        {scene && !stepId && <button className="btn" disabled={busy} onClick={() => void create('step')}>Crear primer paso</button>}
-      </div>}
+        <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} keepFocus={keyboardInCarousel} />
+      </Suspense> : <div className="canvas__placeholder"><h1>{projectName}</h1><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena con el selector de arriba para empezar a dibujar.'}</p></div>}
     </div>
+    {scene && <StepCarousel
+      stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} busy={busy}
+      onSelect={(id) => { if (id !== stepId) navigate({ ...route, sceneId: scene.id, stepId: id }); }}
+      onAdd={() => void copy(() => actions.add(projectId, scene.id, stepId))()}
+      onDuplicate={() => { if (stepId) void copy(() => actions.duplicate({ projectId, sceneId: scene.id, stepId }))(); }}
+      onNudge={async (id, delta) => { const result = await actions.nudge(projectId, scene.id, id, delta).catch((failure: Error) => { setError(failure.message); throw failure; }); await refreshScenes(); return result; }}
+      onMove={async (id, index) => { try { await actions.move(projectId, scene.id, id, index); } catch (failure) { setError((failure as Error).message); throw failure; } await refreshScenes(); }}
+      onDelete={async (id) => {
+        const next = await actions.remove({ projectId, sceneId: scene.id, stepId: id });
+        await refreshScenes();
+        // Deleting the step on screen lands on its neighbour. Deleting another one leaves the person where they are.
+        if (id === stepId) navigate({ ...routeRef.current, sceneId: scene.id, stepId: next });
+      }}
+    />}
   </main>;
 }

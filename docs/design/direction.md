@@ -71,6 +71,12 @@ Excalidraw stays the star because its canvas is the largest sheet of paper on sc
 
 **Carousel.** 108px glass bar, in normal flow below the Excalidraw container. It must never overlap the container. Frames are 104×65, left edge at 16px, which lines up with Excalidraw's zoom controls above. Add and duplicate are pinned right so they do not move. Arrow keys move between steps only while focus is inside the carousel (see below).
 
+**Carousel behaviour.** The strip scrolls and keeps the open step in view; Añadir and Duplicar stay pinned. Both start from the open step and both put the new step right after it:
+- *Añadir paso* copies the drawing (same element IDs) and starts without title or speaker notes, because it is a new beat.
+- *Duplicar paso* is an exact copy, title and notes included.
+- Arrow keys, Home and End move between steps while focus is in the strip. Alt and the arrows move the step; Delete asks before removing it; a thumbnail can also be dragged. A new canvas does not take focus from the keyboard while the strip is in use.
+- Deleting the open step opens the next one, or the previous one when it was the last. Deleting the last step leaves an empty scene with *Añadir paso* ready.
+
 **Agent chat.** It follows T3 Code's anatomy, read from its source (`pingdotgg/t3code`, `apps/web/src/components/chat/`):
 - The person's message: right-aligned bubble, 80% maximum width, `--radius-card`, `--table-well`. No name or avatar.
 - The agent's text: bare, on the panel. No bubble.

@@ -27,8 +27,12 @@ describe('thumbnail revision cache', () => {
     expect(mocks.loadDrawingFonts.mock.invocationCallOrder[0]).toBeLessThan(mocks.exportToSvg.mock.invocationCallOrder[0]);
     expect(mocks.exportToSvg).toHaveBeenCalledWith(expect.objectContaining({ appState: expect.objectContaining({ exportWithDarkMode: true }), exportPadding: 0 }));
     await cache.scene(api, 'p', 's', 'dark'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(2);
-    steps[1].revision = 'b2'; await cache.scene(api, 'p', 's', 'dark'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(4);
-    await cache.scene(api, 'p', 's', 'light'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(6);
-    cache.clear(); await cache.scene(api, 'p', 's', 'light'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(8);
+    // A step whose revision did not change keeps its export while the camera is the same.
+    steps[1].revision = 'b2'; await cache.scene(api, 'p', 's', 'dark'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(3);
+    // A change that moves the common camera exports every step again.
+    steps[1].document.elements.push({ ...element, id: 'far', x: 5000 }); steps[1].revision = 'b3';
+    await cache.scene(api, 'p', 's', 'dark'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(5);
+    await cache.scene(api, 'p', 's', 'light'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(7);
+    cache.clear(); await cache.scene(api, 'p', 's', 'light'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(9);
   });
 });

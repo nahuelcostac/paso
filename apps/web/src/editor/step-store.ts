@@ -15,6 +15,7 @@ export interface StepTransport {
   getStep(target: Target): Promise<Envelope>;
   saveStep(target: Target, revision: string, document: Step, keepalive?: boolean): Promise<Envelope>;
   uploadFiles(target: Target, document: Step, binaries: Binaries, keepalive?: boolean): Promise<void>;
+  deleteStep(target: Target, revision: string): Promise<void>;
 }
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
 export type Session = Draft & { target: Target; status: SaveState; generation: number; canvasVersion: number; baseline?: string; error?: string };
@@ -34,11 +35,23 @@ export class StepStore {
   private loads = new Map<string, number>();
   private eventVersions = new Map<string, number>();
   private deferredEvents = new Map<string, string | null>();
+  /** Steps deleted through remove(). Late callbacks from their old canvas must not bring them back. */
+  private removed = new Set<string>();
+  /** Revisions this client wrote, per step. The service echoes each write as an event, and an echo
+   * that arrives late must never look like somebody else's edit. */
+  private written = new Map<string, Set<string>>();
   constructor(private api: StepTransport, private recovery: Recovery, private debounceMs = 500) {}
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   getSnapshot = () => this.version;
   current = () => this.active ? this.sessions.get(this.active) : undefined;
   all = () => [...this.sessions.values()];
+  session = (target: Target) => this.sessions.get(targetKey(target));
+  /** Steps whose local work is not on the service: a failed save or a conflict. Clean steps never appear here. */
+  unresolved = () => this.all().filter((session) => !this.removed.has(targetKey(session.target)) && (session.status === 'failed' || session.status === 'conflict'));
+  private wrote(key: string, revision: string) {
+    const set = this.written.get(key) ?? new Set<string>();
+    set.add(revision); this.written.set(key, set);
+  }
   private emit() { this.version++; this.listeners.forEach((listener) => listener()); }
   private persist(session: Session) {
     const key = targetKey(session.target);
@@ -54,6 +67,8 @@ export class StepStore {
     this.active = targetKey(target);
     this.emit();
     const existing = this.current();
+    // Coming back to a step whose save failed is a good moment to try again: the service may be back.
+    if (existing?.status === 'failed') void this.flush(target);
     if (existing && existing.status !== 'saved') return;
     await this.refresh(target, true);
   }
@@ -97,6 +112,7 @@ export class StepStore {
   /** First onChange is Excalidraw restoring the document. It establishes the render baseline,
    * without writing normalization or selection state back to disk. */
   change(session: Session, elements: readonly ExcalidrawElement[], appState: unknown, binaries: Binaries) {
+    if (this.removed.has(targetKey(session.target))) return;
     const originals = new Map(session.document.elements.map((element) => [element.id, element]));
     const files = { ...session.document.files };
     const retained = { ...session.binaries };
@@ -132,11 +148,13 @@ export class StepStore {
   fail(session: Session, message: string) { session.status = 'failed'; session.error = message; this.emit(); }
   private schedule(session: Session) {
     const key = targetKey(session.target);
+    if (this.removed.has(key)) return;
     clearTimeout(this.timers.get(key));
     this.timers.set(key, setTimeout(() => { this.timers.delete(key); void this.flush(session.target); }, this.debounceMs));
   }
   async flush(target: Target, keepalive = false): Promise<void> {
     const key = targetKey(target);
+    if (this.removed.has(key)) return;
     clearTimeout(this.timers.get(key)); this.timers.delete(key);
     const inflight = this.saves.get(key);
     if (inflight) { await inflight; const next = this.sessions.get(key); if (next?.status === 'dirty') return this.flush(target, keepalive); return; }
@@ -152,6 +170,7 @@ export class StepStore {
         await this.api.uploadFiles(session.target, document, binaries, keepalive);
         const result = await this.api.saveStep(session.target, revision, document, keepalive);
         session.revision = result.revision;
+        this.wrote(key, result.revision);
         for (const id of Object.keys(binaries)) {
           if (session.binaries[id]?.dataURL === binaries[id].dataURL) delete session.binaries[id];
         }
@@ -189,11 +208,41 @@ export class StepStore {
       if (this.loads.has(key)) this.deferredEvents.set(key, revision);
       return;
     }
-    if (session.revision === revision) return;
+    if (session.revision === revision || (revision !== null && this.written.get(key)?.has(revision))) return;
     if (this.saves.has(key)) { this.deferredEvents.set(key, revision); return; }
+    // A clean step that vanished has no local work to protect: forget it instead of warning about it.
+    if (revision === null && session.status === 'saved') { this.forget(key); return; }
     if (session.status !== 'saved') { session.status = 'conflict'; this.persist(session); this.emit(); return; }
-    if (revision === null) { session.status = 'conflict'; session.error = 'El paso se eliminó fuera de Paso.'; this.emit(); return; }
     await this.refresh(target);
+  }
+  private forget(key: string) {
+    this.sessions.delete(key); this.loads.delete(key); this.eventVersions.delete(key); this.deferredEvents.delete(key); this.written.delete(key);
+    clearTimeout(this.timers.get(key)); this.timers.delete(key);
+    if (this.active === key) this.active = undefined;
+    this.emit();
+  }
+  /** Deletes a step on the service. Pending edits to it are discarded (the person confirmed), but a save already
+   * on its way is awaited first, so the delete carries the revision that save produced. If the delete fails,
+   * the step stays as it was and any pending edits are scheduled again. */
+  async remove(target: Target) {
+    const key = targetKey(target);
+    this.removed.add(key);
+    clearTimeout(this.timers.get(key)); this.timers.delete(key);
+    try {
+      await this.saves.get(key)?.catch(() => {});
+      const session = this.sessions.get(key);
+      const revision = session?.status === 'conflict' || !session ? (await this.api.getStep(target)).revision : session.revision;
+      try { await this.api.deleteStep(target, revision); }
+      catch (error) { if (!(error instanceof ApiRequestError && error.status === 404)) throw error; }
+    } catch (error) {
+      this.removed.delete(key);
+      const session = this.sessions.get(key);
+      if (session?.status === 'dirty') this.schedule(session);
+      throw error;
+    }
+    this.forget(key);
+    await (this.recoveries.get(key) ?? Promise.resolve()).catch(() => {});
+    await this.recovery.remove(key).catch(() => {});
   }
   /** The UI downloads the local document before the person explicitly chooses the server copy. */
   async useServer(session: Session) {
