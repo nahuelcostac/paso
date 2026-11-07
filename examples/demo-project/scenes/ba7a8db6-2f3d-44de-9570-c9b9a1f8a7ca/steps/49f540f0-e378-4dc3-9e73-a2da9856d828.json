@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "49f540f0-e378-4dc3-9e73-a2da9856d828",
+  "title": "Remember the flow",
+  "speakerNotes": "Sample content. Explain how an input produces an output.",
+  "elements": [
+    {
+      "id": "n3QtX9wLaR7mVc2YpK6Zb",
+      "type": "text",
+      "x": 100,
+      "y": 150,
+      "width": 230,
+      "height": 30,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 12345,
+      "version": 1,
+      "versionNonce": 12345,
+      "isDeleted": false,
+      "index": "a0",
+      "boundElements": null,
+      "updated": 1794052800000,
+      "link": null,
+      "locked": false,
+      "fontSize": 24,
+      "fontFamily": 2,
+      "text": "Input leads to output.",
+      "originalText": "Input leads to output.",
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff"
+  },
+  "files": {}
+}

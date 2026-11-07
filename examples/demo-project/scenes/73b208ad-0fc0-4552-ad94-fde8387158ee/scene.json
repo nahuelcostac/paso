@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "73b208ad-0fc0-4552-ad94-fde8387158ee",
+  "name": "Build a pipeline",
+  "stepIds": [
+    "bb7377ef-d997-4f1d-a82e-6f81f852ce52",
+    "a5a3a742-a2e3-474c-8087-66c417cf65ac",
+    "908a3ec5-808c-4aa0-b8b9-2dbe07a27e14"
+  ]
+}

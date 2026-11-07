@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "8102c635-b675-431b-961a-59bca74677d8",
+  "name": "Sample content - A simple pipeline",
+  "createdAt": "2026-11-07T12:00:00.000Z",
+  "updatedAt": "2026-11-07T12:00:00.000Z",
+  "sceneIds": [
+    "73b208ad-0fc0-4552-ad94-fde8387158ee",
+    "ba7a8db6-2f3d-44de-9570-c9b9a1f8a7ca"
+  ]
+}
