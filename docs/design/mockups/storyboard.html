@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paso · Storyboard</title>
+<!-- ?theme=light or ?theme=dark; otherwise the OS preference decides. -->
+<script>const t = new URLSearchParams(location.search).get('theme'); if (t) document.documentElement.dataset.theme = t;</script>
+<link rel="stylesheet" href="../../../apps/web/src/styles/tokens.css">
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+<div class="app app--storyboard">
+  <aside class="projects" aria-label="Proyectos">
+    <div class="brand"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 15h4.5v-4.5H10V6h4.5V1.5"/></svg>paso</div>
+    <div class="projects__head"><span>Proyectos</span><button class="icon-btn" aria-label="Nuevo proyecto"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg></button></div>
+    <ul class="project-list">
+      <li><button class="project" aria-current="true"><span class="project__name">Búsqueda binaria</span><span class="project__count">17</span></button></li>
+      <li><button class="project"><span class="project__name">Por qué hay estaciones</span><span class="project__count">9</span></button></li>
+      <li><button class="project"><span class="project__name">Fotosíntesis, de la luz al azúcar</span><span class="project__count">12</span></button></li>
+      <li><button class="project"><span class="project__name">Transformada de Fourier</span><span class="project__count">23</span></button></li>
+      <li><button class="project"><span class="project__name">Regresión lineal para el seminario de doctorado</span><span class="project__count">14</span></button></li>
+      <li><button class="project"><span class="project__name">TCP: el saludo de tres vías</span><span class="project__count">8</span></button></li>
+      <li><button class="project"><span class="project__name">Inferencia bayesiana</span><span class="project__count">11</span></button></li>
+    </ul>
+    <p class="projects__foot">Guardado en este equipo</p>
+  </aside>
+  <header class="topbar">
+    <div class="selector" role="radiogroup" aria-label="Vista">
+      <button role="radio" aria-checked="true">Storyboard</button>
+      <button role="radio" aria-checked="false">Lienzo</button>
+    </div>
+  </header>
+  <main class="board">
+    <div class="board__head">
+      <h1 class="board__title">Búsqueda binaria</h1>
+      <p class="board__meta">4 escenas · 17 pasos</p>
+      <span class="spacer"></span>
+      <button class="btn btn--bare"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>Nueva escena</button>
+    </div>
+    <section class="scene">
+      <div><span class="scene__num">01</span><h2 class="scene__title">El problema</h2><p class="scene__meta">4 pasos</p></div>
+      <div class="scene__steps">
+        <button class="frame" aria-label="Paso 1"><span class="frame__paper"><img src="assets/s1-1.svg" alt=""></span><span class="frame__label"><span class="frame__num">01</span></span></button>
+        <button class="frame" aria-label="Paso 2"><span class="frame__paper"><img src="assets/s1-2.svg" alt=""></span><span class="frame__label"><span class="frame__num">02</span></span></button>
+        <button class="frame" aria-label="Paso 3"><span class="frame__paper"><img src="assets/s1-3.svg" alt=""></span><span class="frame__label"><span class="frame__num">03</span></span></button>
+        <button class="frame" aria-label="Paso 4"><span class="frame__paper"><img src="assets/s1-4.svg" alt=""></span><span class="frame__label"><span class="frame__num">04</span></span></button>
+      </div>
+    </section>
+    <section class="scene">
+      <div><span class="scene__num">02</span><h2 class="scene__title">Partir en dos</h2><p class="scene__meta">6 pasos</p></div>
+      <div class="scene__steps">
+        <button class="frame" aria-label="Paso 1"><span class="frame__paper"><img src="assets/s2-1.svg" alt=""></span><span class="frame__label"><span class="frame__num">01</span></span></button>
+        <button class="frame" aria-current="step" aria-label="Paso 2"><span class="frame__paper"><img src="assets/s2-2.svg" alt=""></span><span class="frame__label"><span class="frame__num">02</span></span></button>
+        <button class="frame" aria-label="Paso 3"><span class="frame__paper"><img src="assets/s2-3.svg" alt=""></span><span class="frame__label"><span class="frame__num">03</span><span class="chip chip--agent">agente</span></span></button>
+        <button class="frame" aria-label="Paso 4"><span class="frame__paper"><img src="assets/s2-4.svg" alt=""></span><span class="frame__label"><span class="frame__num">04</span></span></button>
+        <button class="frame frame--agent-working" aria-label="Paso 5"><span class="frame__paper"><img src="assets/s2-5.svg" alt=""></span><span class="frame__label"><span class="frame__num">05</span><span class="chip chip--agent">cambiando…</span></span></button>
+        <button class="frame" aria-label="Paso 6"><span class="frame__paper"><img src="assets/s2-6.svg" alt=""></span><span class="frame__label"><span class="frame__num">06</span></span></button>
+        <button class="frame-add" aria-label="Añadir paso a la escena 2"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg></button>
+      </div>
+    </section>
+    <section class="scene">
+      <div><span class="scene__num">03</span><h2 class="scene__title">Por qué es tan rápida</h2><p class="scene__meta">4 pasos</p></div>
+      <div class="scene__steps">
+        <button class="frame" aria-label="Paso 1"><span class="frame__paper"><img src="assets/s3-1.svg" alt=""></span><span class="frame__label"><span class="frame__num">01</span></span></button>
+        <button class="frame is-focus" aria-label="Paso 2"><span class="frame__paper"><img src="assets/s3-2.svg" alt=""></span><span class="frame__label"><span class="frame__num">02</span></span></button>
+        <button class="frame" aria-label="Paso 3"><span class="frame__paper"><img src="assets/s3-3.svg" alt=""></span><span class="frame__label"><span class="frame__num">03</span></span></button>
+        <button class="frame" aria-label="Paso 4"><span class="frame__paper"><img src="assets/s3-4.svg" alt=""></span><span class="frame__label"><span class="frame__num">04</span></span></button>
+      </div>
+    </section>
+    <section class="scene">
+      <div><span class="scene__num">04</span><h2 class="scene__title">Lo que la rompe</h2><p class="scene__meta">3 pasos</p></div>
+      <div class="scene__steps">
+        <button class="frame" aria-label="Paso 1"><span class="frame__paper"><img src="assets/s4-1.svg" alt=""></span><span class="frame__label"><span class="frame__num">01</span></span></button>
+        <button class="frame" aria-label="Paso 2"><span class="frame__paper"><img src="assets/s4-2.svg" alt=""></span><span class="frame__label"><span class="frame__num">02</span></span></button>
+        <button class="frame" aria-label="Paso 3"><span class="frame__paper"><img src="assets/s4-3.svg" alt=""></span><span class="frame__label"><span class="frame__num">03</span></span></button>
+      </div>
+    </section>
+  </main>
+  <aside class="agent" aria-label="Agente">
+    <div class="agent__head">
+      <button class="select">Claude Code<svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg></button>
+      <button class="select">Opus 5.5<svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg></button>
+    </div>
+    <div class="agent__log" role="log">
+      <div class="turn">
+        <p class="turn__who">Tú</p>
+        <p class="turn__text">Añade un paso final con las tres miradas: 31, 64 y 42.</p>
+      </div>
+      <div class="turn">
+        <p class="turn__who">Claude Code</p>
+        <p class="turn__text">Listo. El paso 6 cierra la escena con el recorrido completo.</p>
+        <ul class="activity">
+          <li><span class="activity__slot"><span class="chip chip--agent">6</span></span><span>creó el paso 6 <span class="activity__meta">· +19 elementos</span></span></li>
+        </ul>
+        <div class="run-end"><span>1 cambio</span><button class="btn"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 9.5 3 6.5l3-3"/><path d="M3 6.5h6.5a3.5 3.5 0 0 1 0 7H8"/></svg>Deshacer ejecución</button></div>
+      </div>
+      <hr class="turn-sep">
+      <div class="turn">
+        <p class="turn__who">Tú</p>
+        <p class="turn__text">En el paso 3 no se ve qué mitad descartamos. Táchala y añade una nota. Haz lo mismo en el 5.</p>
+      </div>
+      <div class="turn">
+        <p class="turn__who">Claude Code</p>
+        <p class="turn__text">Tacho las seis cajas de la izquierda y añado una nota con flecha.</p>
+        <ul class="activity">
+          <li><span class="activity__slot"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg></span><span>leyó la escena 2 <span class="activity__meta">· 6 pasos</span></span></li>
+          <li><span class="activity__slot"><span class="chip chip--agent">3</span></span><span>cambió el paso 3 <span class="activity__meta">· +4 elementos</span></span></li>
+        </ul>
+        <p class="turn__text turn__text--next">El paso 3 ya está. Ahora repito la tachadura en el paso 5, esta vez sobre la<span class="caret"></span></p>
+        <ul class="activity">
+          <li><span class="activity__slot"><span class="chip chip--agent">5</span></span><span class="activity__now">cambiando el paso 5…</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="agent__run">
+      <span>Trabajando · 1 cambio</span>
+      <span class="spacer"></span>
+      <button class="btn"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1" fill="currentColor"/></svg>Detener</button>
+    </div>
+    <div class="composer">
+      <div class="composer__input">Pide un cambio…</div>
+      <button class="composer__send" aria-label="Enviar"><svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3.5M4 7.5l4-4 4 4"/></svg></button>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

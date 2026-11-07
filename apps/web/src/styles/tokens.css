@@ -1,0 +1,199 @@
+/*
+ * Paso design tokens. Read docs/design/direction.md before using them.
+ *
+ * Theme: set data-theme="light" or "dark" on <html>; with neither, the OS
+ * preference decides. Pass the same resolved value to Excalidraw's `theme` prop.
+ *
+ * This file holds tokens and font faces only. It must not style app elements.
+ */
+
+/* Typefaces: vendored so the app works offline. Source and licence (SIL OFL 1.1):
+   @fontsource-variable/atkinson-hyperlegible-next and -mono, version 5.3.0. */
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./fonts/atkinson-hyperlegible-next-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./fonts/atkinson-hyperlegible-mono-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./fonts/atkinson-hyperlegible-mono-latin-wght-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* ------------------------------------------------------------------ colour
+     Each pair is light-dark(light, dark). Use the names, never raw values. */
+
+  /* Surfaces. The table is all app chrome. Only drawings sit on paper. */
+  --table: light-dark(#e6e6e3, #1f1f20); /* panels, top bar, carousel, storyboard */
+  --table-well: light-dark(#d9d9d5, #2e2e2f); /* hover, selected list row, inputs */
+  --raised: light-dark(#f7f7f5, #2a2a2b); /* menus and popovers only */
+  --paper: light-dark(#ffffff, #121212); /* canvas and thumbnails. Dark value is Excalidraw's own */
+
+  /* Lines. */
+  --line: light-dark(#c9c9c4, #38383a); /* structure: panel edges, scene rules */
+  --line-frame: light-dark(#a8a8a3, #4e4e50); /* thumbnail edge */
+  --line-control: light-dark(#7c7c77, #7f7f7c); /* 3:1 edges: inputs, outline buttons */
+
+  /* Text. All three pass AA on --table, --table-well and --paper. */
+  --ink: light-dark(#161615, #eeeeeb);
+  --ink-2: light-dark(#454542, #c2c2be);
+  --ink-3: light-dark(#5a5a56, #a3a39f);
+  --on-ink: light-dark(#ffffff, #161615); /* text on an --ink fill */
+
+  /* The two markers. Always a fill behind --on-marker text, never a line or
+     text colour. --mark: where you are, and the one primary action.
+     --agent: what the agent touched. */
+  --mark: #dcf23c;
+  --agent: #ff7ab2;
+  --on-marker: #161615;
+  --agent-ink: light-dark(#a3124f, #ff9ec6); /* agent text with no fill behind it */
+  --mark-edge: light-dark(#161615, #dcf23c); /* In light, --mark matches --table in luminance: edge the primary button */
+
+  --danger-ink: light-dark(#ad1f17, #ff9389);
+  --focus: light-dark(#161615, #dcf23c);
+
+  /* ---------------------------------------------------------------- typography
+     Minimum size is 12px. Mono is for numbers and tool activity, not for prose. */
+  --font-ui: 'Atkinson Hyperlegible Next', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-12: 12px; /* meta, frame numbers, tool activity */
+  --text-13: 13px; /* default UI and agent conversation */
+  --text-15: 15px; /* scene titles */
+  --text-22: 22px; /* project title on the storyboard */
+
+  --leading-tight: 1.2;
+  --leading-ui: 1.4;
+  --leading-prose: 1.5; /* agent conversation */
+
+  --weight-regular: 400;
+  --weight-medium: 550;
+  --weight-bold: 700;
+
+  /* ------------------------------------------------------------------- spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px; /* also Excalidraw's own canvas inset: align to it */
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* -------------------------------------------------------------------- layout */
+  --panel-projects: 216px;
+  --panel-agent: 344px;
+  --topbar-h: 44px;
+  --carousel-h: 104px;
+  --control-h: 28px;
+  --canvas-min-w: 808px; /* Excalidraw clips "Biblioteca" somewhere under 780px and turns mobile below 730px */
+
+  /* --------------------------------------------------------------------- shape */
+  --radius-frame: 2px; /* thumbnails */
+  --radius-control: 4px; /* buttons, inputs, chips, selector */
+  --radius-float: 8px; /* menus and popovers; matches Excalidraw's floating islands */
+
+  --border: 1px solid var(--line);
+  --border-control: 1px solid var(--line-control);
+
+  /* ----------------------------------------------------------------- elevation
+     Chrome is docked and flat. Elevation is for what floats over a surface. */
+  --elevation-float: 0 1px 2px rgb(0 0 0 / 0.16), 0 8px 24px rgb(0 0 0 / 0.16);
+
+  /* --------------------------------------------------------------------- focus
+     Apply as box-shadow on :focus-visible so it follows the radius and is not
+     clipped. The inner ring separates it from fills. */
+  --focus-ring: 0 0 0 2px var(--table), 0 0 0 4px var(--focus);
+
+  /* -------------------------------------------------------------------- motion */
+  --motion-fast: 120ms cubic-bezier(0.2, 0, 0, 1);
+
+  /* Thumbnails in the light theme are the drawing as is. */
+  --thumb-filter: none;
+}
+
+/* Non-colour theme values cannot use light-dark(). This filter is Excalidraw's own
+   dark-mode filter, so a thumbnail always matches the canvas it came from. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --thumb-filter: invert(93%) hue-rotate(180deg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --thumb-filter: invert(93%) hue-rotate(180deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms linear;
+  }
+}
+
+/*
+ * Excalidraw theme: neutralises its violet and puts its UI in Paso's typeface.
+ * The doubled class wins regardless of stylesheet order. Variable names come from
+ * @excalidraw/excalidraw 0.18.1: re-check them when upgrading.
+ */
+.excalidraw.excalidraw,
+.excalidraw.excalidraw.theme--dark {
+  --ui-font: var(--font-ui);
+
+  --island-bg-color: light-dark(#ffffff, #2a2a2b);
+  --color-surface-lowest: light-dark(#f7f7f5, #1f1f20);
+  --color-surface-low: light-dark(#ededea, #2a2a2b);
+  --color-surface-mid: light-dark(#f3f3f1, #1f1f20);
+  --color-surface-high: light-dark(#e4e4e0, #38383a);
+  --color-border-outline-variant: var(--line);
+  --color-slider-track: var(--line-control);
+
+  --color-primary: var(--ink);
+  --color-primary-darker: var(--ink);
+  --color-primary-darkest: var(--ink);
+  --color-primary-hover: var(--ink-2);
+  --color-primary-light: var(--table-well);
+  --color-primary-light-darker: var(--table-well);
+  --color-brand-hover: var(--ink-2);
+  --color-brand-active: var(--table-well);
+
+  /* Selection box and handles. The canvas is drawn through Excalidraw's dark filter,
+     so the dark value is the one that comes out as --ink-2 after inversion. */
+  --color-selection: light-dark(#454542, #333331);
+
+  /* One variable drives the active tool and every selected option in the
+     properties panel, so it must stay neutral. */
+  --color-surface-primary-container: light-dark(#dfdfdb, #454547);
+  --color-on-primary-container: var(--ink);
+}
+
+/* The active tool alone gets the same inverted block as the view selector. */
+.excalidraw.excalidraw .App-toolbar {
+  --color-surface-primary-container: var(--ink);
+  --color-on-primary-container: var(--on-ink);
+}

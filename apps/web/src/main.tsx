@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { HealthResponse } from '@paso/shared';
+import './styles/tokens.css';
 
 function App() {
   const [status, setStatus] = useState('Checking server...');
