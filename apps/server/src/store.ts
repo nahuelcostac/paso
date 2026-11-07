@@ -140,6 +140,7 @@ export class Store {
     return this.lock(id, async () => {
       await this.reconcile(id);
       const state = await this.load(id);
+      await this.runs?.observeState(this, state.tree, state.records);
       return operation(state);
     });
   }
@@ -256,12 +257,10 @@ export class Store {
       const { tree, records } = await this.load(id);
       const path = stepId ? stepPath(id, sceneId!, stepId) : sceneId ? scenePath(id, sceneId) : projectPath(id);
       const target = this.require(records, path);
-      const previousRevision = target.revision;
-      const previousStep = stepId && target.document ? structuredClone(target.document as Step) : undefined;
       if (action !== 'createScene' && action !== 'createStep') this.match(target, revision);
+      await this.runs?.observeState(this, tree, records);
       const entry = tree.scenes.find(({ scene }) => scene.id === sceneId);
       let resultPath = path;
-      let createdId: string | undefined;
       if (action === 'rename') {
         if (sceneId) entry!.scene = parseScene({ ...entry!.scene, name: renameInput.parse(input).name });
         else {
@@ -273,7 +272,6 @@ export class Store {
       } else if (action === 'createScene') {
         const data = namedInput.parse(input);
         const scene = createScene(data.name, { id: data.id });
-        createdId = scene.id;
         tree.project.sceneIds.push(scene.id); tree.scenes.push({ scene, steps: [] });
         resultPath = scenePath(id, scene.id);
       } else if (action === 'createStep' || action === 'duplicate') {
@@ -286,7 +284,6 @@ export class Store {
           const data = stepInput.parse(input);
           step = createStep(data);
         }
-        createdId = step.id;
         entry!.scene.stepIds.push(step.id); entry!.steps.push(step);
         resultPath = stepPath(id, sceneId!, step.id);
       } else if (action === 'updateStep') {
@@ -331,20 +328,13 @@ export class Store {
       }
       if (action === 'delete' && sceneId && !stepId) await this.disk.remove(`${id}/scenes/${sceneId}`);
       await this.reconcile(id);
+      if (this.runs?.hasActiveRun(id)) {
+        const refreshed = await this.load(id);
+        await this.runs.recordMutation(actor, action, records, refreshed.tree, refreshed.records, sceneId);
+      }
       if (action === 'delete') return null;
       const document = next.get(resultPath)!;
       const newRevision = hash(jsonBytes(document));
-      await this.runs?.recordMutation(id, {
-        action,
-        actor,
-        sceneId,
-        stepId,
-        createdId,
-        previousRevision,
-        newRevision,
-        previousStep,
-        newStep: action === 'updateStep' ? (document as Step) : undefined,
-      });
       return { document, revision: newRevision };
     });
   }

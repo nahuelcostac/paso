@@ -396,7 +396,6 @@ and a little quota:
 pnpm build
 PASO_TEST_REAL_CLAUDE=1 pnpm exec vitest run apps/server/src/agent/claude.real.test.ts
 ```
-
 ## Agent runs and restore points
 
 Before an agent run starts, `POST /api/projects/:p/runs` (with optional
@@ -407,21 +406,42 @@ the MCP tools (and is called automatically by `SessionManager` around each
 session turn). Only one run may be active per project at a time; starting a
 second while one is `running` returns `409 RUN_IN_PROGRESS`.
 
-While a run is `running`, the service records which scenes and steps are
-created, which steps are updated (with their resulting content revisions), and
-which order lists change. `POST /api/projects/:p/runs/:r/finish` records the
+While a run is `running`, the service records only agent-created scenes and
+steps, agent edits and deletions, and explicit agent order changes. The production
+MCP HTTP client sends `X-Paso-Actor: mcp` on every write. Requests without that
+header, including normal web-client requests, are person-authored. This is
+attribution inside an authenticated local service, not a separate authorization
+boundary. A client with the service token can choose its actor.
+
+Writes are attached to the single active run for the target project. MCP writes
+outside a run still succeed, but belong to no restore point and are never added
+to a later run. No run ID or extra environment variable is required. Harness
+sessions can start the existing compiled MCP entry point with `PASO_SERVICE_URL`
+and `PASO_SESSION_TOKEN`; attribution is set by the MCP client code, independently
+of the harness or its launch environment. Hosts must open the restore point
+before launching the harness and finish it after its MCP processes have stopped.
+
+The service records person edits separately, including edits before the first
+agent write. Agent revisions stay distinct from person revisions. Observed
+external disk changes also count as person edits.
+
+`POST /api/projects/:p/runs/:r/finish` records the
 final revisions at the end of the run and transitions it to `finished`
 (idempotent if already `finished`). `GET /api/projects/:p/runs` and
 `GET /api/projects/:p/runs/:r` return run summaries, change lists and any
 current undo warnings.
 
 To undo a run, first call `GET /api/projects/:p/runs/:r/undo`. This read-only
-preview modifies nothing and returns `{ plan }` containing:
+preview modifies no project files and returns `{ plan }` containing:
+
 - `changes`: `stepsToRestore`, `stepsToRecreate`, `stepsToDelete`,
-  `scenesToDelete`, `scenesToKeepWithPostRunSteps` and `orderChanges`.
+  `scenesToDelete`, `scenesToRecreate` (items with `id` and `name`),
+  `scenesToKeepWithPostRunSteps` and `orderChanges`.
 - `warnings`: conflict warnings naming affected steps or scenes (`STEP_MODIFIED_CONCURRENTLY`,
   `STEP_MODIFIED_AFTER_RUN`, `STEP_DELETED`, `SCENE_DELETED`,
-  `SCENE_HAS_POST_RUN_STEPS`, `ORDER_MODIFIED_AFTER_RUN`).
+  `SCENE_HAS_POST_RUN_STEPS`, `ORDER_MODIFIED_AFTER_RUN`,
+  `ORDER_MODIFIED_CONCURRENTLY`, `SCENE_MODIFIED_CONCURRENTLY`,
+  `SCENE_MODIFIED_AFTER_RUN`).
 - `requiresForce`: `true` when undoing would overwrite human edits made during
   or after the run, or recreate a step that a person deleted.
 - `confirmationToken`: a SHA-256 token bound to the exact plan and current
@@ -445,8 +465,29 @@ as a complete snapshot, restoring a step that both the agent and a person edited
 during the same run also reverts the person's edits to that step; the service
 detects this and warns (`STEP_MODIFIED_CONCURRENTLY`) with the step ID and
 title. Steps that only a person edited during the run (untouched by the agent)
-are left untouched when the agent edits use the MCP client or when the person's
-edit happens externally on disk.
+are left untouched and have no loss warning. This also applies to person-only
+creations, deletions and order changes. Removing an agent-created step or scene
+does not reset the order of surviving items. Explicit agent reorders restore the
+baseline order, with human-created items placed using their order before the
+first agent reorder. Mixed human and agent reorders, and human reorders after
+the run, warn and require `force: true`. No-op agent order requests do not count
+as reorders.
+
+A baseline step deleted by the agent is recreated. A person-deleted step is
+recreated only if the agent also touched it, with `STEP_DELETED` and explicit
+force. A person-deleted scene stays deleted, with `SCENE_DELETED` when a step
+restore is skipped. An agent-deleted scene is listed in `scenesToRecreate` and
+recreated with its recorded steps. An agent-created scene that contains
+human-created steps is kept with those steps, including when they were added
+during the run. `SCENE_HAS_POST_RUN_STEPS` is informational and does not itself
+require force. Deleting an agent-created scene that a person renamed requires
+force and a scene warning.
+
+Restore points made before reliable attribution have no `attributionVersion: 2`.
+They remain readable in history, but undo preview and execution return
+`409 RUN_ATTRIBUTION_UNKNOWN`, even with force. Their authors cannot be recovered
+from the old record, so applying them could silently revert person-only work.
+New restore points, including interrupted ones, preserve the attribution log.
 
 Restore points are stored as atomic JSON files outside `dataDir` (by default in
 `runs/<projectId>/<runId>.json` beside the `projects` directory, configurable
@@ -455,4 +496,3 @@ in project listings or trigger watcher events. On startup, any run left in
 `running` state because the service stopped is marked `interrupted` and remains
 undoable. The service retains the latest 10 non-active runs per project by
 default (`runRetentionLimit` in `startServer`).
-

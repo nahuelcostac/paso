@@ -330,6 +330,37 @@ describe('a turn as it happens', () => {
 });
 
 describe('undoing a run', () => {
+  it('keeps a person edit made during the turn when undoing the agent edit on another step', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    const humanPath = '/projects/p/scenes/s2/steps/step2';
+    let humanStep: StepEnvelope | undefined;
+    adapterImpl = async function* () {
+      // The session has opened its restore point before the harness starts.
+      await personEdits(humanPath, (document) => ({ ...document, title: 'Trabajo de la persona' }));
+      humanStep = await call<StepEnvelope>('GET', humanPath);
+      yield* editsStepOne()();
+    };
+    const user = userEvent.setup();
+    const panel = await openPanel();
+    const scene1 = await screen.findByRole('region', { name: 'Escena 1: El problema' }, patience);
+    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
+    await send(panel, user, 'Actualiza el paso 1');
+    await user.click(await within(panel).findByRole('button', { name: 'Deshacer ejecución' }, patience));
+
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Deshacer esta ejecución?' }, patience);
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('list', { name: 'Avisos' })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Deshacer ejecución' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(within(panel).getByText(/· Deshecha/)).toBeInTheDocument();
+      expect(within(scene1).getByRole('button', { name: 'Paso 1: Inicio' })).toBeInTheDocument();
+      expect(within(scene2).getByRole('button', { name: 'Paso 1: Trabajo de la persona' })).toBeInTheDocument();
+    }, patience);
+    expect(humanStep).toBeDefined();
+    expect(await call<StepEnvelope>('GET', humanPath)).toEqual(humanStep);
+  });
+
   it('previews, then undoes on confirmation', async () => {
     await call('POST', '/harnesses', { id: 'claude' });
     const user = userEvent.setup();

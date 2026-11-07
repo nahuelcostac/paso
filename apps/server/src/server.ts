@@ -36,8 +36,8 @@ export type StartServerOptions = {
   dataDir: string; port?: number; sessionToken?: string; allowedOrigins?: string[];
   maxJsonBytes?: number; maxAssetBytes?: number; pollIntervalMs?: number;
   harnessRegistryPath?: string; harnessDetection?: DetectionOptions;
-  runsDir?: string; runRetentionLimit?: number;
   agent?: AgentOptions;
+  runsDir?: string; runRetentionLimit?: number;
 };
 
 async function body(request: IncomingMessage, limit: number) {

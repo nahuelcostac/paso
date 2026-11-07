@@ -28,10 +28,11 @@ export class BoardApi {
     try {
       response = await fetch(`${this.config.serviceUrl}${path}`, {
         method, redirect: 'error', signal: AbortSignal.timeout(15_000),
-        headers: { Authorization: `Bearer ${this.config.sessionToken}`, 'X-Paso-Actor': 'mcp', ...(input === undefined ? {} : { 'Content-Type': 'application/json' }), ...(revision ? { 'If-Match': `"${revision}"` } : {}) },
+        headers: { Authorization: `Bearer ${this.config.sessionToken}`, ...(method === 'GET' ? {} : { 'X-Paso-Actor': 'mcp' }), ...(input === undefined ? {} : { 'Content-Type': 'application/json' }), ...(revision ? { 'If-Match': `"${revision}"` } : {}) },
         body: input === undefined ? undefined : JSON.stringify(input),
       });
     } catch { throw new Error('SERVICE_UNAVAILABLE. Start the local Paso service and check PASO_SERVICE_URL. The request was not retried. Read current state before retrying a write with an unknown outcome.'); }
+    if (response.status === 204) return null as T;
     const data = await response.json() as { error?: { code?: string; message?: string } };
     if (!response.ok) {
       if (response.status === 401) throw new Error('UNAUTHORIZED. PASO_SESSION_TOKEN does not match the running service. Ask the host to refresh the MCP environment.');
