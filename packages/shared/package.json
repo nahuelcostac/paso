@@ -4,5 +4,6 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "build": "tsc", "typecheck": "tsc" }
+  "scripts": { "build": "tsc", "typecheck": "tsc" },
+  "dependencies": { "zod": "^4.1.12" }
 }
