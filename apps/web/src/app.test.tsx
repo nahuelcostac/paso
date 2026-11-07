@@ -21,7 +21,9 @@ let dataDir: string;
 let config: ClientConfig;
 
 async function start(port = 0) {
-  service = await startServer({ dataDir, port, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100 });
+  service = await startServer({ dataDir, port, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100,
+    // The agent panel asks which harnesses are installed: never run the real ones from a test.
+    harnessDetection: { searchPaths: [], loginShell: false } });
   config = { baseUrl: service.url, token };
 }
 async function seed(name: string, id: string, extra: Record<string, unknown> = {}) {
@@ -137,6 +139,36 @@ describe('projects panel against the real service', () => {
     expect(row).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Con escenas');
     expect(screen.getByRole('main')).toHaveTextContent('2 escenas · 3 pasos');
+  });
+
+  it('focuses the first menuitem when opening RowMenu while the popover is visible', async () => {
+    const user = userEvent.setup();
+    await seed('Proyecto teclado', 'kb');
+    render(<App config={config} />);
+    await screen.findByRole('button', { name: /^Proyecto teclado/ }, patience);
+
+    let visibilityAtFocus: string | undefined;
+    const origFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (...args) {
+      if (this.getAttribute('role') === 'menuitem') {
+        visibilityAtFocus = this.closest<HTMLElement>('.popover')?.style.visibility;
+      }
+      return origFocus.apply(this, args);
+    };
+    try {
+      const moreBtn = screen.getByRole('button', { name: 'Más acciones de Proyecto teclado' });
+      moreBtn.focus();
+      await user.keyboard('{Enter}');
+      const renameItem = await screen.findByRole('menuitem', { name: 'Renombrar' });
+      expect(renameItem).toHaveFocus();
+      expect(visibilityAtFocus).toBe('');
+      await user.keyboard('{ArrowDown}');
+      expect(screen.getByRole('menuitem', { name: /Eliminar/ })).toHaveFocus();
+      await user.keyboard('{Escape}');
+      expect(moreBtn).toHaveFocus();
+    } finally {
+      HTMLElement.prototype.focus = origFocus;
+    }
   });
 });
 

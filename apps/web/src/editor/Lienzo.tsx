@@ -26,10 +26,11 @@ function keyboardInCarousel() {
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
-export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate }: {
+export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates }: {
   api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
   scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
   route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
+  stepAgentStates?: Record<string, 'working' | 'changed'>;
 }) {
   useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [error, setError] = useState<string>();
@@ -89,7 +90,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
       </Suspense> : <div className="canvas__placeholder"><h1>{projectName}</h1><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena con el selector de arriba para empezar a dibujar.'}</p></div>}
     </div>
     {scene && <StepCarousel
-      stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} busy={busy}
+      stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}
       onSelect={(id) => { if (id !== stepId) navigate({ ...route, sceneId: scene.id, stepId: id }); }}
       onAdd={() => void copy(() => actions.add(projectId, scene.id, stepId))()}
       onDuplicate={() => { if (stepId) void copy(() => actions.duplicate({ projectId, sceneId: scene.id, stepId }))(); }}

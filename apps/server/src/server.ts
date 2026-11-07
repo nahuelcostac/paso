@@ -11,7 +11,9 @@ import { RunStore } from './runs.js';
 import { join, dirname, resolve } from 'node:path';
 import { handleAgentRoute } from './agent/api.js';
 import { SessionManager } from './agent/sessions.js';
-import type { AgentRunHooks, HarnessAdapter, HarnessId } from './agent/types.js';
+import type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId } from './agent/types.js';
+
+export type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId };
 
 export type AgentOptions = {
   /** Neutral, empty directory the agents run in. Default: `agent-workspace` next to the projects directory. */

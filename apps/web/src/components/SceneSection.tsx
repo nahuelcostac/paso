@@ -23,6 +23,7 @@ type Props = {
   /** The scroll container: thumbnails are drawn once their scene nears it. */
   root: HTMLElement | null;
   currentStepId?: string;
+  stepAgentStates?: Record<string, 'working' | 'changed'>;
   renaming: boolean;
   grabbed: boolean;
   dragging: boolean;
@@ -45,7 +46,7 @@ type Props = {
 
 /** One scene: number, title and step count on a line, then its steps as a grid of numbered frames. */
 export function SceneSection(props: Props) {
-  const { scene, index, total, state, store, api, cache, theme, root, currentStepId, renaming, grabbed, dragging, dropMarker } = props;
+  const { scene, index, total, state, store, api, cache, theme, root, currentStepId, stepAgentStates, renaming, grabbed, dragging, dropMarker } = props;
   const section = useRef<HTMLElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLButtonElement>(null);
@@ -143,6 +144,7 @@ export function SceneSection(props: Props) {
             number={at + 1}
             title={state.steps[id]?.title}
             current={id === currentStepId}
+            agentState={stepAgentStates?.[id]}
             svg={thumbnails?.[id]?.svg}
             tabIndex={last === at ? 0 : -1}
             onFocus={() => setActive(at)}

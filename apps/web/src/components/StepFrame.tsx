@@ -8,6 +8,8 @@ export type StepFrameProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 
   title?: string;
   /** The step open in the Lienzo: a 2px ink edge and a lime number. */
   current?: boolean;
+  /** Whether the agent is changing this step right now or changed it in an active run. */
+  agentState?: 'working' | 'changed';
   /** The step drawn by the thumbnail service, as an SVG document. Without it a quiet placeholder shows. */
   svg?: string;
   /**
@@ -37,12 +39,13 @@ function useSvgUrl(svg: string | undefined) {
  * drawing is already drawn for the current theme, so no colour filter is applied to it.
  * Anything else a button takes, such as `onClick` or `ref`, goes to the button.
  */
-export function StepFrame({ number, title, current = false, svg, size = 'storyboard', className = '', ...button }: StepFrameProps) {
+export function StepFrame({ number, title, current = false, agentState, svg, size = 'storyboard', className = '', ...button }: StepFrameProps) {
   const url = useSvgUrl(svg);
+  const workingClass = agentState === 'working' ? 'frame--agent-working' : '';
   return (
     <button
       type="button"
-      className={`frame frame--${size} ${className}`.trim()}
+      className={`frame frame--${size} ${workingClass} ${className}`.replace(/\s+/g, ' ').trim()}
       aria-current={current ? 'step' : undefined}
       aria-label={`Paso ${number}${title ? `: ${title}` : ''}`}
       title={title}
@@ -53,6 +56,11 @@ export function StepFrame({ number, title, current = false, svg, size = 'storybo
       </span>
       <span className="frame__label">
         <span className="frame__num">{pad(number)}</span>
+        {agentState && (
+          <span className="chip chip--agent">
+            {agentState === 'working' ? (size === 'carousel' ? 'agente\u2026' : 'cambiando\u2026') : 'agente'}
+          </span>
+        )}
         {title && size === 'storyboard' && <span className="frame__title">{title}</span>}
       </span>
     </button>

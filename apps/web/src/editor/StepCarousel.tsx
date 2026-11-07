@@ -10,6 +10,7 @@ type Props = {
   /** Thumbnails as SVG documents by step ID. A step without one shows the frame's quiet placeholder. */
   svgs: Record<string, string>;
   titles: Record<string, string>;
+  stepAgentStates?: Record<string, 'working' | 'changed'>;
   /** An action is running: the buttons wait, so two clicks never start two copies. */
   busy: boolean;
   onSelect: (stepId: string) => void;
@@ -29,7 +30,7 @@ const HINT = 'Flechas: cambiar de paso. Alt y flechas: mover el paso. Supr: elim
  * The strip of steps under the canvas. It is not inside the Excalidraw container and never overlaps it.
  * Keys act only while focus is in here: Excalidraw uses bare keys, so nothing is bound on the window.
  */
-export function StepCarousel({ stepIds, currentId, svgs, titles, busy, onSelect, onAdd, onDuplicate, onNudge, onMove, onDelete }: Props) {
+export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates, busy, onSelect, onAdd, onDuplicate, onNudge, onMove, onDelete }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const frames = useRef(new Map<string, HTMLElement>());
   const refocus = useRef<string | undefined>(undefined);
@@ -125,6 +126,7 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, busy, onSelect,
           <StepFrame
             ref={(element) => { if (element) frames.current.set(id, element); else frames.current.delete(id); }}
             number={index + 1} title={titles[id]} svg={svgs[id]} size="carousel" current={id === currentId}
+            agentState={stepAgentStates?.[id]}
             tabIndex={id === currentId || (!currentId && index === 0) ? 0 : -1}
             aria-describedby="carousel-hint" aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Delete"
             onClick={() => onSelect(id)} onKeyDown={(event) => onKeyDown(event, id, index)}

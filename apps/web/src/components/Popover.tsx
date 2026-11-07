@@ -1,5 +1,27 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
+
+/**
+ * Keyboard for a menu inside a popover: on open the checked item, or the first, takes focus; arrow keys,
+ * Home and End move. Items marked `aria-disabled` can be reached, so their reason can be read, but not used.
+ */
+export function useMenuKeys(list: RefObject<HTMLElement | null>) {
+  const items = () => [...(list.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([disabled])') ?? [])];
+  // Once, on open. The popover is placed before effects run, so its items can take focus here.
+  useEffect(() => {
+    const all = items();
+    (all.find((item) => item.getAttribute('aria-checked') === 'true') ?? all[0])?.focus();
+  }, []);
+  return (event: KeyboardEvent<HTMLDivElement>) => {
+    const keys: Record<string, number | 'first' | 'last'> = { ArrowDown: 1, ArrowUp: -1, Home: 'first', End: 'last' };
+    const to = keys[event.key];
+    if (to === undefined) return;
+    event.preventDefault();
+    const all = items();
+    const from = all.indexOf(document.activeElement as HTMLElement);
+    all[to === 'first' ? 0 : to === 'last' ? all.length - 1 : (from + to + all.length) % all.length]?.focus();
+  };
+}
 
 type Props = {
   anchor: HTMLElement;
@@ -19,8 +41,9 @@ type Props = {
  */
 export function Popover({ anchor, onClose, align = 'start', role, label, className = '', children, onKeyDown }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
+  // Placed straight on the element, before paint and before any effect: a menu that focuses its first item
+  // in an effect finds it visible and in place. Hiding it until a re-render made that focus fail.
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
@@ -31,7 +54,9 @@ export function Popover({ anchor, onClose, align = 'start', role, label, classNa
       const left = align === 'end' ? a.right - width : a.left;
       let top = a.bottom + 6;
       if (top + height > window.innerHeight - margin) top = Math.max(margin, a.top - height - 6);
-      setPosition({ left: Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - width - margin)), top });
+      const clampedLeft = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - width - margin));
+      element.style.left = `${clampedLeft}px`;
+      element.style.top = `${top}px`;
     };
     place();
     window.addEventListener('resize', place);
@@ -56,7 +81,7 @@ export function Popover({ anchor, onClose, align = 'start', role, label, classNa
       role={role}
       aria-label={label}
       className={`popover ${className}`}
-      style={position ? { left: position.left, top: position.top } : { left: 0, top: 0, visibility: 'hidden' }}
+      style={{ left: 0, top: 0 }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') { event.stopPropagation(); close(true); return; }
         if (event.key === 'Tab' && role === 'menu') { close(false); return; }

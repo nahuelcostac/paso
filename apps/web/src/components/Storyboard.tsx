@@ -20,6 +20,8 @@ type Props = {
   thumbnails: ThumbnailCache;
   route: Route;
   navigate: (route: Route, options?: { replace?: boolean }) => void;
+  /** The agent's marks: `changed` for its work, `working` for the step it is changing now. */
+  stepAgentStates?: Record<string, 'working' | 'changed'>;
 };
 
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Inténtalo de nuevo.';
@@ -32,7 +34,7 @@ function insertAt(order: string[], from: number, to: number) {
 }
 
 /** The whole project at a glance: its scenes, in the ledger layout, with thumbnails of their steps. */
-export function Storyboard({ api, projectId, projectName, listedSize, events, thumbnails, route, navigate }: Props) {
+export function Storyboard({ api, projectId, projectName, listedSize, events, thumbnails, route, navigate, stepAgentStates }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);
   useEffect(() => { store.start(); return () => store.dispose(); }, [store]);
   const state = useStoryboard(store);
@@ -263,6 +265,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, events, th
           theme={theme}
           root={board}
           currentStepId={route.sceneId === scene.id ? route.stepId : undefined}
+          stepAgentStates={stepAgentStates}
           renaming={renamingId === scene.id}
           grabbed={grabbed === scene.id}
           dragging={drag?.id === scene.id && drag.moved}
