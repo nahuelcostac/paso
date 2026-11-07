@@ -15,6 +15,10 @@ const service = await startServer({
   runsDir: process.env.PASO_RUNS_DIR,
   port, sessionToken: process.env.PASO_SESSION_TOKEN,
   allowedOrigins: process.env.PASO_ALLOWED_ORIGINS?.split(',').filter(Boolean),
+  agent: {
+    workDir: process.env.PASO_AGENT_WORKDIR, sessionsPath: process.env.PASO_AGENT_SESSIONS_PATH,
+    mcp: { entry: process.env.PASO_MCP_ENTRY, browserExecutable: process.env.PASO_MCP_BROWSER_EXECUTABLE },
+  },
 });
 console.log(`Paso listening on ${service.url}`);
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => { void service.close(); });

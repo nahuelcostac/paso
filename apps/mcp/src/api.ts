@@ -28,7 +28,7 @@ export class BoardApi {
     try {
       response = await fetch(`${this.config.serviceUrl}${path}`, {
         method, redirect: 'error', signal: AbortSignal.timeout(15_000),
-        headers: { Authorization: `Bearer ${this.config.sessionToken}`, ...(input === undefined ? {} : { 'Content-Type': 'application/json' }), ...(revision ? { 'If-Match': `"${revision}"` } : {}) },
+        headers: { Authorization: `Bearer ${this.config.sessionToken}`, 'X-Paso-Actor': 'mcp', ...(input === undefined ? {} : { 'Content-Type': 'application/json' }), ...(revision ? { 'If-Match': `"${revision}"` } : {}) },
         body: input === undefined ? undefined : JSON.stringify(input),
       });
     } catch { throw new Error('SERVICE_UNAVAILABLE. Start the local Paso service and check PASO_SERVICE_URL. The request was not retried. Read current state before retrying a write with an unknown outcome.'); }
