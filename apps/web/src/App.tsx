@@ -11,6 +11,7 @@ import { ThumbnailCache } from './editor/thumbnails';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { TopBar } from './components/TopBar';
 import { SceneSelector } from './components/SceneSelector';
+import { PresentButton } from './present/PresentButton';
 import { useScenes } from './state/scenes';
 import { ProjectsStore, useProjects } from './state/projects-store';
 import { formatSize } from './lib/format';
@@ -108,6 +109,11 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         /> : undefined}
         saveState={saveState}
         notice={sceneError ? <span className="topbar__error" role="alert">{sceneError}<button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setSceneError(undefined)}>×</button></span> : undefined}
+        presentar={lienzo ? <PresentButton
+          key={openProject!.id} api={api} store={steps} subscribeEvents={store.subscribeEvents} projectId={openProject!.id}
+          scene={scenes?.find((item) => item.document.id === sceneId)?.document} stepId={route.stepId}
+          onShowStep={(id, stepId) => navigate({ projectId: openProject!.id, view: 'lienzo', sceneId: id, stepId })}
+        /> : undefined}
         panelOpen={panelOpen}
         onTogglePanel={() => setPanelOpen(!panelOpen)}
       />

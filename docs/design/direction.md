@@ -87,7 +87,10 @@ Excalidraw stays the star because its canvas is the largest sheet of paper on sc
 
 On the Lienzo there is no panel, so the top bar shows who is changing which step, with `Detener`. Under 1160px the sentence would hit the selector, so only the chip and `Detener` remain.
 
-**Presentar.** The drawing and a step indicator at bottom right (ticks and `3/6`, in `--ink-3`), on `--paper`, with the cursor hidden. No other chrome, no glass and no markers.
+**Presentar.** The drawing and a step indicator at bottom right (ticks and `3/6`, in `--ink-3`), on `--paper`, with the cursor hidden after two seconds without moving. No other chrome, no glass and no markers.
+- One camera per scene, from the union of all its steps and the screen (`present/framing.ts`), so whatever stays still between steps stays still on screen. Margins are 5% and 6% of the screen, never less than 32px and 48px, which keeps drawings clear of the indicator. A scene under 480×300 is framed as if it were that size, so a small sketch is not blown up to the edges.
+- A step with its own canvas colour fills the screen with it, through the same dark filter as its drawing.
+- Above 24 steps, or under 480px wide, the indicator drops the ticks and keeps the numbers.
 
 **Focus.** Every interactive element gets `--focus-ring`: ink in light, lime in dark. The mockups show it on `Duplicar paso` (Lienzo) and on scene 3, step 2 (Storyboard).
 

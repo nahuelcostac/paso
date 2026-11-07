@@ -73,6 +73,10 @@ Document bodies never contain revision fields.
 | GET, PUT, DELETE | `/projects/:p/scenes/:s/steps/:t` | Read, replace a complete versioned step, or delete |
 | POST | `/projects/:p/scenes/:s/steps/:t/duplicate` | `{ id? }`, returns 201 with the copy appended |
 | GET, PUT, DELETE | `/projects/:p/assets/:fileId.:ext` | Read binary bytes, upload immutable bytes, or delete an unused asset |
+| GET, POST | `/projects/:p/runs` | List `{ runs: [...] }` or start a run `{ id?, label? }`, returns 201 |
+| GET | `/projects/:p/runs/:r` | Read `{ run }` summary and conflict warnings |
+| POST | `/projects/:p/runs/:r/finish` | Finish a running run, returns `{ run }` |
+| GET, POST | `/projects/:p/runs/:r/undo` | Preview `{ plan }` without modifying files, or execute undo `{ confirm, force? }` |
 | WS | `/events` | Global stream for all projects in this data directory |
 
 JSON requests need `Content-Type: application/json`. A step creation body may
@@ -389,3 +393,60 @@ and a little quota:
 pnpm build
 PASO_TEST_REAL_CLAUDE=1 pnpm exec vitest run apps/server/src/agent/claude.real.test.ts
 ```
+## Agent runs and restore points
+
+Before an agent run starts, `POST /api/projects/:p/runs` (with optional
+`{ id?, label? }`) saves a baseline restore point of the project's scenes,
+steps, order lists and exact content revisions, and returns `{ run }` with
+status 201 (`status: "running"`). Starting a run is an explicit route outside
+the MCP tools. Only one run may be active per project at a time; starting a
+second while one is `running` returns `409 RUN_IN_PROGRESS`.
+
+While a run is `running`, the service records which scenes and steps are
+created, which steps are updated (with their resulting content revisions), and
+which order lists change. `POST /api/projects/:p/runs/:r/finish` records the
+final revisions at the end of the run and transitions it to `finished`
+(idempotent if already `finished`). `GET /api/projects/:p/runs` and
+`GET /api/projects/:p/runs/:r` return run summaries, change lists and any
+current undo warnings.
+
+To undo a run, first call `GET /api/projects/:p/runs/:r/undo`. This read-only
+preview modifies nothing and returns `{ plan }` containing:
+- `changes`: `stepsToRestore`, `stepsToRecreate`, `stepsToDelete`,
+  `scenesToDelete`, `scenesToKeepWithPostRunSteps` and `orderChanges`.
+- `warnings`: conflict warnings naming affected steps or scenes (`STEP_MODIFIED_CONCURRENTLY`,
+  `STEP_MODIFIED_AFTER_RUN`, `STEP_DELETED`, `SCENE_DELETED`,
+  `SCENE_HAS_POST_RUN_STEPS`, `ORDER_MODIFIED_AFTER_RUN`).
+- `requiresForce`: `true` when undoing would overwrite human edits made during
+  or after the run, or recreate a step that a person deleted.
+- `confirmationToken`: a SHA-256 token bound to the exact plan and current
+  project revisions.
+
+To execute the undo, call `POST /api/projects/:p/runs/:r/undo` with
+`{ "confirm": "<confirmationToken>", "force": true }` (`force` is required when
+`requiresForce` is `true`). Missing `confirm` returns `428 CONFIRMATION_REQUIRED`;
+a stale token (because any document changed after the preview) returns
+`409 CONFIRMATION_MISMATCH`; omitting `force` when warnings require it returns
+`409 FORCE_REQUIRED`. Undo writes through the same atomic per-file store path
+and emits the normal WebSocket events (`updated`, `created`, `deleted`,
+`reordered`). The run status becomes `undone` only after all project files are
+updated, so any partial failure leaves the run retryable.
+
+Undoing an older run while a newer run on the same project is still `finished`
+or `interrupted` returns `409 NEWER_RUN_EXISTS`; undo the newer run first so it
+becomes `undone`, after which the older run can be undone safely. Assets are
+shared across steps and are never deleted by undo. Because each step is stored
+as a complete snapshot, restoring a step that both the agent and a person edited
+during the same run also reverts the person's edits to that step; the service
+detects this and warns (`STEP_MODIFIED_CONCURRENTLY`) with the step ID and
+title. Steps that only a person edited during the run (untouched by the agent)
+are left untouched when the agent edits use the MCP client or when the person's
+edit happens externally on disk.
+
+Restore points are stored as atomic JSON files outside `dataDir` (by default in
+`runs/<projectId>/<runId>.json` beside the `projects` directory, configurable
+via `runsDir` in `startServer` or `PASO_RUNS_DIR` in the CLI). They never appear
+in project listings or trigger watcher events. On startup, any run left in
+`running` state because the service stopped is marked `interrupted` and remains
+undoable. The service retains the latest 10 non-active runs per project by
+default (`runRetentionLimit` in `startServer`).

@@ -60,9 +60,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .menu--scenes .menu__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu--scenes button[aria-checked='true'] { background: var(--table-well); font-weight: var(--weight-medium); }
 .menu--scenes button[aria-checked='true'] svg.i { color: var(--ink); }
-/* Room for Presentar (LYP-03): its width in the mockup, 108px. It is empty until that button exists. */
+/* Presentar's room where the button is not shown, such as the Storyboard: its width in the mockup, 108px. */
 .topbar__presentar-slot { flex: none; width: 108px; height: var(--topbar-h); }
 .topbar__notice { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.topbar__error-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar__error { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; padding: 0 var(--space-1) 0 var(--space-3); height: var(--control-h); border-radius: var(--radius-pill); background: var(--glass-raised); color: var(--danger-ink); font-size: var(--text-12); }
 
 /* Selector: a glass capsule. The selected option is an inverted pill. */
@@ -76,6 +77,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .btn:hover:not(:disabled) { background: var(--table-well); }
 .btn--soft { background: var(--table-well); }
 .btn--soft:hover:not(:disabled) { background: var(--line); }
+/* The one --mark action on a screen. In light theme --mark matches the table in luminance, so it carries --mark-edge. */
+.btn--primary { flex: none; height: var(--topbar-h); padding: 0 var(--space-4) 0 var(--space-3); background: var(--mark); color: var(--on-marker); font-weight: var(--weight-bold); box-shadow: inset 0 0 0 1px var(--mark-edge), inset 0 1px 0 rgb(255 255 255 / 0.55), 0 1px 2px rgb(74 56 28 / 0.14), 0 6px 16px rgb(74 56 28 / 0.12); }
+.btn--primary:hover:not(:disabled) { background: var(--mark); }
+.btn--primary svg.i { fill: currentColor; }
 .btn--large { height: var(--topbar-h); padding: 0 var(--space-4); }
 .btn--danger { background: var(--table-well); color: var(--danger-ink); }
 .btn--danger:hover:not(:disabled) { background: var(--line); }

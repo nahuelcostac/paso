@@ -410,6 +410,57 @@ describe('run hooks and logging', () => {
     await run(id, 'SCENARIO:ok'); await run(id, 'SCENARIO:quota');
     expect(calls).toEqual([`before:${p}:s1:claude`, 'after:36:completed:', `before:${p}:s1:claude`, 'after:36:failed:quota']);
   });
+  it('can record and undo a session edit through the restore-point API', async () => {
+    await service.close();
+    await start({
+      hooks: {
+        beforeRun: async ({ projectId, runId }) => {
+          const started = await api(`/api/projects/${projectId}/runs`, 'POST', { id: runId });
+          expect(started.status).toBe(201);
+        },
+        afterRun: async ({ projectId, runId }) => {
+          const finished = await api(`/api/projects/${projectId}/runs/${runId}/finish`, 'POST', {});
+          expect(finished.status).toBe(200);
+        },
+      },
+      adapters: {
+        claude: {
+          id: 'claude',
+          async *run(request) {
+            const path = `/api/projects/${request.context.projectId}/scenes/s1/steps/step`;
+            const original = await api(path);
+            const response = await fetch(request.board.serviceUrl + path, {
+              method: 'PUT',
+              headers: {
+                Authorization: `Bearer ${request.board.sessionToken}`,
+                'Content-Type': 'application/json',
+                'If-Match': `"${original.data.revision}"`,
+                'X-Paso-Actor': 'mcp',
+              },
+              body: JSON.stringify({ ...original.data.document, title: 'Cambio del asistente' }),
+            });
+            expect(response.status).toBe(200);
+            yield { type: 'finished', reason: 'completed' };
+          },
+        },
+      },
+    });
+    const p = await project();
+    const path = `/api/projects/${p}/scenes/s1/steps/step`;
+    expect((await api(`/api/projects/${p}/scenes/s1/steps`, 'POST', { id: 'step', title: 'Original' })).status).toBe(201);
+    const id = await session(p, { sceneId: 's1' });
+    const { runId, end } = await run(id, 'Cambia el título');
+    expect(end).toEqual({ type: 'finished', reason: 'completed' });
+    expect((await api(path)).data.document.title).toBe('Cambio del asistente');
+    const runPath = `/api/projects/${p}/runs/${runId}`;
+    expect((await api(runPath)).data.run).toMatchObject({ id: runId, status: 'finished' });
+    const preview = await api(`${runPath}/undo`);
+    expect(preview.status).toBe(200);
+    expect(preview.data.plan.requiresForce).toBe(false);
+    expect((await api(`${runPath}/undo`, 'POST', { confirm: preview.data.plan.confirmationToken })).status).toBe(200);
+    expect((await api(path)).data.document.title).toBe('Original');
+    expect((await api(`/api/agent/sessions/${id}`)).data.state).toBe('idle');
+  });
   it('does not start the harness when a hook refuses, and still ends the run', async () => {
     const afterRun = vi.fn();
     await service.close(); await start({ hooks: { beforeRun: () => { throw new Error('no restore point'); }, afterRun } });

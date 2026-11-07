@@ -12,6 +12,7 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invali
 const service = await startServer({
   dataDir: process.env.PASO_DATA_DIR ?? defaultDataDir,
   harnessRegistryPath: process.env.PASO_HARNESS_REGISTRY_PATH,
+  runsDir: process.env.PASO_RUNS_DIR,
   port, sessionToken: process.env.PASO_SESSION_TOKEN,
   allowedOrigins: process.env.PASO_ALLOWED_ORIGINS?.split(',').filter(Boolean),
   agent: {
