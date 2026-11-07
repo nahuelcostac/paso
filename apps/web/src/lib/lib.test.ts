@@ -30,6 +30,13 @@ describe('routes', () => {
   });
 });
 
+it('round-trips scene and step and rejects unsafe IDs', () => {
+  const route = { projectId: 'p', view: 'lienzo' as const, sceneId: 's', stepId: 't' };
+  expect(routeHash(route)).toBe('#/p/lienzo/s/t');
+  expect(parseRoute(routeHash(route))).toEqual(route);
+  expect(parseRoute('#/p/lienzo/../bad%20step')).toEqual({ projectId: 'p', view: 'lienzo' });
+});
+
 describe('icons', () => {
   it('lists each Lucide name once, in the shape the format allows', () => {
     const names = ICONS.map((entry) => entry.name);

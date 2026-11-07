@@ -1,4 +1,5 @@
-import type { Project, Scene } from '@paso/shared';
+import type { Project, Scene, Step } from '@paso/shared';
+import type { Target, Binaries } from '../editor/step-store';
 
 export type ClientConfig = { baseUrl: string; token: string };
 
@@ -26,11 +27,12 @@ export function configFromPage(): ClientConfig {
 export class ApiClient {
   constructor(readonly config: ClientConfig) {}
 
-  private async request<T>(path: string, init: { method?: string; body?: unknown; revision?: string } = {}): Promise<T> {
+  private async request<T>(path: string, init: { method?: string; body?: unknown; revision?: string; keepalive?: boolean } = {}): Promise<T> {
     let response: Response;
     try {
       response = await fetch(`${this.config.baseUrl}/api${path}`, {
         method: init.method ?? 'GET',
+        keepalive: init.keepalive,
         headers: {
           Authorization: `Bearer ${this.config.token}`,
           ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -65,6 +67,38 @@ export class ApiClient {
   }
   deleteProject(id: string, revision: string) {
     return this.request<void>(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE', revision });
+  }
+
+  private stepPath(target: Target) {
+    return `/projects/${encodeURIComponent(target.projectId)}/scenes/${encodeURIComponent(target.sceneId)}/steps/${encodeURIComponent(target.stepId)}`;
+  }
+  getStep(target: Target) { return this.request<{ document: Step; revision: string }>(this.stepPath(target)); }
+  saveStep(target: Target, revision: string, document: Step, keepalive = false) {
+    return this.request<{ document: Step; revision: string }>(this.stepPath(target), { method: 'PUT', body: document, revision, keepalive });
+  }
+  async listSteps(projectId: string, sceneId: string) {
+    return (await this.request<{ steps: Array<{ document: Step; revision: string }> }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`)).steps;
+  }
+  createScene(projectId: string, name: string) {
+    return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'POST', body: { name } });
+  }
+  createStep(projectId: string, sceneId: string) {
+    return this.request<{ document: Step; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`, { method: 'POST', body: {} });
+  }
+  async asset(projectId: string, path: string, init: RequestInit = {}) {
+    const response = await fetch(`${this.config.baseUrl}/api/projects/${encodeURIComponent(projectId)}/${path}`, {
+      ...init, headers: { ...init.headers, Authorization: `Bearer ${this.config.token}` },
+    });
+    if (!response.ok) throw new ApiRequestError(response.status, 'ASSET', 'No se pudo cargar o guardar una imagen.');
+    return response;
+  }
+  async uploadFiles(target: Target, document: Step, binaries: Binaries, keepalive = false) {
+    for (const [id, binary] of Object.entries(binaries)) {
+      const entry = document.files[id];
+      if (!entry) continue;
+      const blob = await (await fetch(binary.dataURL)).blob();
+      await this.asset(target.projectId, entry.path, { method: 'PUT', body: blob, keepalive });
+    }
   }
 
   /** WebSocket URL and subprotocols. The token never goes in the URL. */

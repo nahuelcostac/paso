@@ -153,3 +153,11 @@ button.project__tile:hover { color: var(--ink); }
 .main-message__details { color: var(--ink-3); font-size: var(--text-12); max-width: 100%; }
 .main-message__details summary { cursor: pointer; }
 .main-message__details p { margin-top: var(--space-2); color: var(--ink-3); overflow-wrap: anywhere; text-align: left; max-height: 160px; overflow: auto; }
+
+.lienzo { grid-column: -2 / -1; grid-row: 2; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.step-switcher { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3); border-radius: var(--radius-card); flex-wrap: wrap; color: var(--ink-2); font-size: var(--text-12); }
+.step-switcher select { max-width: 180px; background: var(--glass-raised); color: var(--ink); font: inherit; border: 1px solid var(--line-control); border-radius: var(--radius-control); }
+.save-state { margin-left: auto; }
+.editor-notice { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-card); background: var(--glass-raised); }
+.canvas--editor { display: block; padding: 0; flex: 1; min-height: 320px; overflow: auto; }
+.editor-message { display: grid; place-content: center; height: 100%; color: var(--ink-2); }

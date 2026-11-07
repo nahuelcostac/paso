@@ -25,13 +25,15 @@ const sortRows = (rows: ProjectRow[]) => [...rows].sort((a, b) => {
   return a.id < b.id ? -1 : 1;
 });
 
-type ServiceEvent = { type: string; kind?: string; projectId?: string; revision?: string | null; message?: string };
+export type ServiceEvent = { type: string; kind?: string; projectId?: string; sceneId?: string; id?: string; revision?: string | null; message?: string };
 
 /**
  * Keeps the project list in step with the service. It opens the event stream first, waits for
  * `ready`, then reads everything, and applies later events by re-reading only the project they name.
  */
 export class ProjectsStore {
+  private eventListeners = new Set<(event: ServiceEvent) => void>();
+  subscribeEvents = (listener: (event: ServiceEvent) => void) => { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener); }; };
   private state: StoreState = { phase: 'loading', connected: false, reason: null, rows: [] };
   private listeners = new Set<() => void>();
   private socket?: WebSocket;
@@ -101,6 +103,7 @@ export class ProjectsStore {
   }
 
   private handle(event: ServiceEvent) {
+    this.eventListeners.forEach((listener) => listener(event));
     if (event.type === 'ready') { void this.loadAll(); return; }
     if (!event.projectId || event.kind === 'asset') return;
     // A step's own edits change nothing the list shows. Creating or removing one is a scene or project event.
