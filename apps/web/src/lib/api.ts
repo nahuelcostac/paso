@@ -82,8 +82,23 @@ export class ApiClient {
   createScene(projectId: string, name: string) {
     return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'POST', body: { name } });
   }
-  createStep(projectId: string, sceneId: string) {
-    return this.request<{ document: Step; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`, { method: 'POST', body: {} });
+  getScene(projectId: string, sceneId: string) {
+    return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}`);
+  }
+  /** Appends a step. With no content it is blank; with a body it is a snapshot of that content, element IDs included. */
+  createStep(projectId: string, sceneId: string, body: Partial<Pick<Step, 'title' | 'speakerNotes' | 'elements' | 'appState' | 'files'>> = {}) {
+    return this.request<{ document: Step; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`, { method: 'POST', body });
+  }
+  /** The copy is appended to the scene. `revision` is the revision of the step being copied. */
+  duplicateStep(target: Target, revision: string) {
+    return this.request<{ document: Step; revision: string }>(`${this.stepPath(target)}/duplicate`, { method: 'POST', body: {}, revision });
+  }
+  deleteStep(target: Target, revision: string) {
+    return this.request<void>(this.stepPath(target), { method: 'DELETE', revision });
+  }
+  /** `revision` is the scene's. `ids` must be exactly the scene's current steps. */
+  reorderSteps(projectId: string, sceneId: string, revision: string, ids: string[]) {
+    return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`, { method: 'PUT', body: { ids }, revision });
   }
   async asset(projectId: string, path: string, init: RequestInit = {}) {
     const response = await fetch(`${this.config.baseUrl}/api/projects/${encodeURIComponent(projectId)}/${path}`, {

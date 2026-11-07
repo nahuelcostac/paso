@@ -34,6 +34,26 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .topbar__side--end { justify-content: flex-end; }
 .brand { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3) 0 var(--space-2); width: calc(var(--panel-projects) - var(--control-h) - var(--space-2)); flex: none; font-size: var(--text-15); font-weight: var(--weight-bold); letter-spacing: -0.01em; }
 .brand svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* With the projects panel closed there is no panel to line up with: the brand takes only its own width. */
+.brand--compact { width: auto; }
+
+/* Scene selector: the Lienzo's counterpart of the project name. A pill that shortens its name, never its number. */
+.select { display: inline-flex; align-items: center; gap: var(--space-1); flex: 0 1 auto; min-width: 0; max-width: 260px; height: var(--topbar-h); padding: 0 var(--space-3) 0 var(--space-4); border-radius: var(--radius-pill); white-space: nowrap; font-weight: var(--weight-medium); }
+.select:hover:not(:disabled) { background: var(--glass-sheen), var(--table-well); }
+.select svg.i { color: var(--ink-3); }
+.select__num { font-family: var(--font-mono); font-weight: var(--weight-regular); color: var(--ink-3); margin-right: 2px; }
+.select__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.select:has(> svg.i:first-child) { padding-left: var(--space-3); }
+.menu--scenes { min-width: 220px; max-width: min(320px, calc(100vw - 16px)); }
+.menu--scenes hr { margin: var(--space-1) var(--space-2); border: 0; border-top: 1px solid var(--line); }
+.menu--scenes .menu__num { width: 16px; flex: none; font-family: var(--font-mono); font-size: var(--text-12); color: var(--ink-3); }
+.menu--scenes .menu__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu--scenes button[aria-checked='true'] { background: var(--table-well); font-weight: var(--weight-medium); }
+.menu--scenes button[aria-checked='true'] svg.i { color: var(--ink); }
+/* Room for Presentar (LYP-03): its width in the mockup, 108px. It is empty until that button exists. */
+.topbar__presentar-slot { flex: none; width: 108px; height: var(--topbar-h); }
+.topbar__notice { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.topbar__error { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; padding: 0 var(--space-1) 0 var(--space-3); height: var(--control-h); border-radius: var(--radius-pill); background: var(--glass-raised); color: var(--danger-ink); font-size: var(--text-12); }
 
 /* Selector: a glass capsule. The selected option is an inverted pill. */
 .selector { display: inline-flex; gap: 2px; height: var(--topbar-h); padding: 3px; border-radius: var(--radius-pill); }
@@ -155,9 +175,11 @@ button.project__tile:hover { color: var(--ink); }
 .main-message__details p { margin-top: var(--space-2); color: var(--ink-3); overflow-wrap: anywhere; text-align: left; max-height: 160px; overflow: auto; }
 
 .lienzo { grid-column: -2 / -1; grid-row: 2; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.step-switcher { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3); border-radius: var(--radius-card); flex-wrap: wrap; color: var(--ink-2); font-size: var(--text-12); }
-.step-switcher select { max-width: 180px; background: var(--glass-raised); color: var(--ink); font: inherit; border: 1px solid var(--line-control); border-radius: var(--radius-control); }
-.save-state { margin-left: auto; }
-.editor-notice { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-card); background: var(--glass-raised); }
+.save-state { flex: none; padding: 0 var(--space-2); color: var(--ink-3); font-size: var(--text-12); white-space: nowrap; }
+.editor-notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-card); background: var(--glass-raised); }
+.canvas--editor > .canvas__placeholder { height: 100%; justify-content: center; padding: var(--space-5); }
 .canvas--editor { display: block; padding: 0; flex: 1; min-height: 320px; overflow: auto; }
 .editor-message { display: grid; place-content: center; height: 100%; color: var(--ink-2); }
+
+/* Under 1160px the save state keeps its place for screen readers but gives its room to the scene's name. */
+@media (max-width: 1159px) { .save-state { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); } }
