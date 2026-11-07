@@ -19,6 +19,7 @@ function setup() {
       documents.set(target.stepId, result); return result;
     }),
     uploadFiles: vi.fn(async () => {}),
+    deleteStep: vi.fn(async (target: Target, revision: string) => { expect(revision).toBe(documents.get(target.stepId)!.revision); documents.delete(target.stepId); }),
   };
   const store = new StepStore(api, recovery, 500);
   return { api, store, recovery, documents, drafts };
@@ -162,4 +163,86 @@ it('does not discard edits made while the person loads the server copy after dow
   const replacing = store.useServer(session); draw(store, session, 'during-replace');
   get.resolve({ document: createStep({ id: 'a' }), revision: 'new' }); await expect(replacing).rejects.toThrow(/cambió/);
   expect(store.current()!.document.elements.map((e) => e.id)).toContain('during-replace'); store.stopTimers();
+});
+
+describe('warnings that must be true: unresolved steps', () => {
+  it('lists only steps whose local work is not on the service', async () => {
+    const { store, api } = setup();
+    await store.select(a); const sa = mount(store); draw(store, sa, 'mine');
+    // The save fails, and leaving the step retries it once more, which fails too.
+    vi.mocked(api.saveStep).mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'));
+    await store.flush(a);
+    expect(sa.status).toBe('failed'); expect(store.unresolved()).toEqual([sa]);
+    await store.select(b); mount(store); await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sa.status).toBe('failed');
+    expect(store.unresolved().map((session) => session.target.stepId)).toEqual(['a']);
+    await store.flush(a); expect(store.unresolved()).toEqual([]);
+    store.stopTimers();
+  });
+  it('treats an echo of its own earlier write as its own, even when it arrives late', async () => {
+    const { store } = setup();
+    await store.select(a); const sa = mount(store); draw(store, sa, 'one'); await store.flush(a);
+    draw(store, sa, 'two'); await store.flush(a);
+    expect(sa.revision).toBe('r0++');
+    draw(store, sa, 'three');
+    // The service reports r0+ (the first write) after the second one was saved and while the person is editing again.
+    await store.external(a, 'r0+');
+    expect(sa.status).toBe('dirty');
+    // A revision this client never wrote is somebody else's edit.
+    await store.external(a, 'somebody-else');
+    expect(sa.status).toBe('conflict');
+    store.stopTimers();
+  });
+  it('forgets a clean step that was deleted outside the app instead of calling it a conflict', async () => {
+    const { store } = setup();
+    await store.select(a); await store.select(b);
+    await store.external(a, null);
+    expect(store.session(a)).toBeUndefined(); expect(store.unresolved()).toEqual([]);
+    // With unsaved work the step stays, because that work is the only copy.
+    const sb = mount(store); draw(store, sb, 'mine');
+    await store.external(b, null);
+    expect(sb.status).toBe('conflict'); expect(store.unresolved()).toEqual([sb]);
+    store.stopTimers();
+  });
+  it('tries a failed save again when the person returns to that step', async () => {
+    const { store, api, documents } = setup();
+    await store.select(a); const sa = mount(store); draw(store, sa, 'mine');
+    vi.mocked(api.saveStep).mockRejectedValueOnce(new Error('offline'));
+    await store.flush(a); expect(sa.status).toBe('failed');
+    await store.select(b); await store.select(a); await store.flushAll();
+    expect(sa.status).toBe('saved'); expect(documents.get('a')!.document.elements.map((e) => e.id)).toEqual(['mine']);
+    store.stopTimers();
+  });
+});
+
+describe('removing a step', () => {
+  it('discards pending edits, waits for a save in flight and deletes with the revision that save produced', async () => {
+    const { store, api, documents } = setup();
+    await store.select(a); const sa = mount(store); draw(store, sa, 'first');
+    const slow = deferred<Envelope>(); vi.mocked(api.saveStep).mockImplementationOnce(() => slow.promise);
+    const saving = store.flush(a); await Promise.resolve();
+    draw(store, sa, 'second');
+    const removing = store.remove(a);
+    const saved = { document: { ...sa.document, elements: [element('first')] }, revision: 'r1' };
+    documents.set('a', saved); slow.resolve(saved);
+    await removing; await saving;
+    expect(api.deleteStep).toHaveBeenCalledWith(a, 'r1');
+    expect(documents.has('a')).toBe(false);
+    expect(store.session(a)).toBeUndefined(); expect(store.current()).toBeUndefined();
+    // The canvas that was on screen is still alive for a moment. Nothing it does comes back to life.
+    draw(store, sa, 'late'); await store.flushAll();
+    expect(api.saveStep).toHaveBeenCalledTimes(1);
+    expect(store.unresolved()).toEqual([]);
+    store.stopTimers();
+  });
+  it('leaves the step and its pending edit alone when the delete fails', async () => {
+    const { store, api, documents } = setup();
+    await store.select(a); const sa = mount(store); draw(store, sa, 'mine');
+    vi.mocked(api.deleteStep).mockRejectedValueOnce(new ApiRequestError(409, 'CONFLICT', 'stale'));
+    await expect(store.remove(a)).rejects.toThrow('stale');
+    await store.flushAll();
+    expect(documents.get('a')!.document.elements.map((e) => e.id)).toEqual(['mine']);
+    expect(store.session(a)).toBe(sa);
+    store.stopTimers();
+  });
 });
