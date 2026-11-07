@@ -10,7 +10,7 @@
     "build": "pnpm -r build",
     "lint": "eslint .",
     "typecheck": "pnpm --filter \"@paso/server...\" build && pnpm -r typecheck",
-    "test": "pnpm --filter \"@paso/server...\" build && vitest run"
+    "test": "pnpm --filter \"@paso/mcp...\" build && vitest run"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
