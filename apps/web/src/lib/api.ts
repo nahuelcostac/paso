@@ -82,12 +82,21 @@ export class ApiClient {
   createScene(projectId: string, name: string) {
     return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'POST', body: { name } });
   }
-  getScene(projectId: string, sceneId: string) {
-    return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}`);
+  private scenePath(projectId: string, sceneId: string) { return `/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}`; }
+  getScene(projectId: string, sceneId: string) { return this.request<{ document: Scene; revision: string }>(this.scenePath(projectId, sceneId)); }
+  renameScene(projectId: string, sceneId: string, revision: string, name: string) {
+    return this.request<{ document: Scene; revision: string }>(this.scenePath(projectId, sceneId), { method: 'PATCH', body: { name }, revision });
+  }
+  deleteScene(projectId: string, sceneId: string, revision: string) {
+    return this.request<void>(this.scenePath(projectId, sceneId), { method: 'DELETE', revision });
+  }
+  /** Scene order lives in the project document, so this is guarded by the project's revision. */
+  reorderScenes(projectId: string, revision: string, ids: string[]) {
+    return this.request<ProjectEnvelope>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'PUT', body: { ids }, revision });
   }
   /** Appends a step. With no content it is blank; with a body it is a snapshot of that content, element IDs included. */
   createStep(projectId: string, sceneId: string, body: Partial<Pick<Step, 'title' | 'speakerNotes' | 'elements' | 'appState' | 'files'>> = {}) {
-    return this.request<{ document: Step; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`, { method: 'POST', body });
+    return this.request<{ document: Step; revision: string }>(`${this.scenePath(projectId, sceneId)}/steps`, { method: 'POST', body });
   }
   /** The copy is appended to the scene. `revision` is the revision of the step being copied. */
   duplicateStep(target: Target, revision: string) {
@@ -98,7 +107,7 @@ export class ApiClient {
   }
   /** `revision` is the scene's. `ids` must be exactly the scene's current steps. */
   reorderSteps(projectId: string, sceneId: string, revision: string, ids: string[]) {
-    return this.request<{ document: Scene; revision: string }>(`/projects/${encodeURIComponent(projectId)}/scenes/${encodeURIComponent(sceneId)}/steps`, { method: 'PUT', body: { ids }, revision });
+    return this.request<{ document: Scene; revision: string }>(`${this.scenePath(projectId, sceneId)}/steps`, { method: 'PUT', body: { ids }, revision });
   }
   async asset(projectId: string, path: string, init: RequestInit = {}) {
     const response = await fetch(`${this.config.baseUrl}/api/projects/${encodeURIComponent(projectId)}/${path}`, {

@@ -19,3 +19,6 @@ export function explainProjectError(message: string) {
   }
   return { short: 'No se puede leer: archivos dañados', long: 'Los archivos de este proyecto no son válidos. Repáralos en el disco o restaura una copia; el resto de proyectos siguen funcionando.' };
 }
+
+/** "4 pasos" for a scene's heading. An empty scene says so. */
+export const formatSteps = (count: number) => count === 0 ? 'Sin pasos' : plural(count, 'paso', 'pasos');

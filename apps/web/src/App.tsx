@@ -6,11 +6,14 @@ import { BrowserRecovery } from './editor/recovery';
 import { bindStepLifecycle } from './editor/lifecycle';
 import { useRoute } from './lib/route';
 import { MainView } from './components/MainView';
+import { Storyboard } from './components/Storyboard';
+import { ThumbnailCache } from './editor/thumbnails';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { TopBar } from './components/TopBar';
 import { SceneSelector } from './components/SceneSelector';
 import { useScenes } from './state/scenes';
 import { ProjectsStore, useProjects } from './state/projects-store';
+import { formatSize } from './lib/format';
 
 const Lienzo = lazy(() => import('./editor/Lienzo'));
 
@@ -33,6 +36,8 @@ function usePanelOpen() {
 export function App({ config, recovery }: { config: ClientConfig; recovery?: Recovery }) {
   const api = useMemo(() => new ApiClient(config), [config]);
   const store = useMemo(() => new ProjectsStore(api), [api]);
+  // One cache of drawn thumbnails for the whole window, so a scene is not drawn twice for the same revisions.
+  const thumbnails = useMemo(() => new ThumbnailCache(48), []);
   const steps = useMemo(() => new StepStore(api, recovery ?? new BrowserRecovery(config.baseUrl)), [api, config.baseUrl, recovery]);
   const actions = useMemo(() => new StepActions(api, steps), [api, steps]);
   useEffect(() => bindStepLifecycle(steps), [steps]);
@@ -91,7 +96,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const startCreating = () => { setPanelOpen(true); setCreating(true); };
 
   return (
-    <div className={`app${panelOpen ? '' : ' app--panel-closed'}`}>
+    <div className={`app${panelOpen ? '' : ' app--panel-closed'}${route.view === 'storyboard' ? ' app--agent' : ''}`}>
       <TopBar
         view={route.view}
         onViewChange={(view) => navigate({ ...route, view })}
@@ -121,9 +126,11 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           }}
         />
       )}
-      {route.view === 'lienzo' && row?.kind === 'ok' ? <Suspense fallback={<main className="main-message" aria-label="Lienzo">Cargando…</main>}>
+      {row?.kind === 'ok' && route.view === 'lienzo' ? <Suspense fallback={<main className="main-message" aria-label="Lienzo">Cargando…</main>}>
         <Lienzo key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} />
-      </Suspense> : <MainView state={state} row={row} requestedId={route.projectId} view={route.view} onCreate={startCreating} onRetry={() => store.retry()} />}
+      </Suspense> : row?.kind === 'ok' ? (
+        <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} listedSize={formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} />
+      ) : <MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} />}
     </div>
   );
 }
