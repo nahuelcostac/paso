@@ -4,7 +4,7 @@
  * Theme: set data-theme="light" or "dark" on <html>; with neither, the OS
  * preference decides. Pass the same resolved value to Excalidraw's `theme` prop.
  *
- * This file holds tokens and font faces only. It must not style app elements.
+ * This file holds tokens, font faces and the Excalidraw theme. It must not style app elements.
  */
 
 /* Typefaces: vendored so the app works offline. Source and licence (SIL OFL 1.1):
@@ -48,42 +48,64 @@
   /* ------------------------------------------------------------------ colour
      Each pair is light-dark(light, dark). Use the names, never raw values. */
 
-  /* Surfaces. The table is all app chrome. Only drawings sit on paper. */
-  --table: light-dark(#e6e6e3, #1f1f20); /* panels, top bar, carousel, storyboard */
-  --table-well: light-dark(#d9d9d5, #2e2e2f); /* hover, selected list row, inputs */
-  --raised: light-dark(#f7f7f5, #2a2a2b); /* menus and popovers only */
-  --paper: light-dark(#ffffff, #121212); /* canvas and thumbnails. Dark value is Excalidraw's own */
+  /* The table: warm beige behind everything. The wash is a very soft tonal shift
+     that gives glass something to refract; on flat colour glass looks like plain fill. */
+  --table: light-dark(#ece5d7, #1b1916);
+  --table-wash:
+    radial-gradient(70% 90% at 12% 8%, light-dark(#f5f0e6, #27231e) 0%, transparent 70%),
+    radial-gradient(60% 80% at 92% 96%, light-dark(#ddd2bd, #12100e) 0%, transparent 72%),
+    var(--table);
 
-  /* Lines. */
-  --line: light-dark(#c9c9c4, #38383a); /* structure: panel edges, scene rules */
-  --line-frame: light-dark(#a8a8a3, #4e4e50); /* thumbnail edge */
-  --line-control: light-dark(#7c7c77, #7f7f7c); /* 3:1 edges: inputs, outline buttons */
+  /* Paper: drawings only. Dark value is Excalidraw's own. */
+  --paper: light-dark(#ffffff, #121212);
 
-  /* Text. All three pass AA on --table, --table-well and --paper. */
-  --ink: light-dark(#161615, #eeeeeb);
-  --ink-2: light-dark(#454542, #c2c2be);
-  --ink-3: light-dark(#5a5a56, #a3a39f);
-  --on-ink: light-dark(#ffffff, #161615); /* text on an --ink fill */
+  /* Glass. --glass for panels and bars, --glass-raised where text input or a menu
+     needs more opacity. Always use with --glass-filter, --glass-sheen and --glass-shadow.
+     backdrop-filter does not nest: a blurred element inside a blurred element sees
+     nothing behind its parent, so mount menus and popovers outside the panel. */
+  --glass: light-dark(rgb(255 253 248 / 0.56), rgb(66 61 53 / 0.46));
+  --glass-raised: light-dark(rgb(255 254 251 / 0.84), rgb(58 54 47 / 0.84));
+  --glass-filter: blur(24px) saturate(1.5);
+  --glass-sheen: linear-gradient(180deg, light-dark(rgb(255 255 255 / 0.3), rgb(255 248 235 / 0.05)), transparent 64px);
+  --glass-edge: light-dark(rgb(255 255 255 / 0.8), rgb(255 248 235 / 0.11));
+  --glass-shadow:
+    inset 0 1px 0 var(--glass-edge),
+    inset 0 0 0 1px light-dark(rgb(255 255 255 / 0.3), rgb(255 248 235 / 0.05)),
+    0 1px 2px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.3)),
+    0 10px 30px light-dark(rgb(74 56 28 / 0.1), rgb(0 0 0 / 0.28));
+
+  /* Soft fill for hover, selected rows and the user's chat bubble. */
+  --table-well: light-dark(rgb(74 56 28 / 0.1), rgb(255 245 225 / 0.1));
+
+  /* Lines. Rare: separate with space first. */
+  --line: light-dark(rgb(74 56 28 / 0.16), rgb(255 245 225 / 0.13));
+  --line-control: light-dark(#7a7160, #857d6e); /* 3:1 edges: dashed slots, inputs */
+
+  /* Text. All three pass AA on the table, on glass and on paper. */
+  --ink: light-dark(#1d1a15, #f2ede3);
+  --ink-2: light-dark(#4b453a, #d9d3c6);
+  --ink-3: light-dark(#544d41, #c1b8a8);
+  --on-ink: light-dark(#fffdf8, #1d1a15); /* text on an --ink fill */
 
   /* The two markers. Always a fill behind --on-marker text, never a line or
      text colour. --mark: where you are, and the one primary action.
      --agent: what the agent touched. */
   --mark: #dcf23c;
   --agent: #ff7ab2;
-  --on-marker: #161615;
-  --agent-ink: light-dark(#a3124f, #ff9ec6); /* agent text with no fill behind it */
-  --mark-edge: light-dark(#161615, #dcf23c); /* In light, --mark matches --table in luminance: edge the primary button */
+  --on-marker: #1d1a15;
+  --agent-ink: light-dark(#960e48, #ff9ec6); /* agent text with no fill behind it */
+  --mark-edge: light-dark(rgb(29 26 21 / 0.55), rgb(220 242 60 / 0)); /* In light, --mark matches the table in luminance */
 
-  --danger-ink: light-dark(#ad1f17, #ff9389);
-  --focus: light-dark(#161615, #dcf23c);
+  --danger-ink: light-dark(#9a1a12, #ff9389);
+  --focus: light-dark(#1d1a15, #dcf23c);
 
   /* ---------------------------------------------------------------- typography
-     Minimum size is 12px. Mono is for numbers and tool activity, not for prose. */
+     Minimum size is 12px. Mono is for step and scene numbers, not for prose. */
   --font-ui: 'Atkinson Hyperlegible Next', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  --text-12: 12px; /* meta, frame numbers, tool activity */
-  --text-13: 13px; /* default UI and agent conversation */
+  --text-12: 12px; /* meta, frame numbers */
+  --text-13: 13px; /* default UI, agent conversation, tool activity */
   --text-15: 15px; /* scene titles */
   --text-22: 22px; /* project title on the storyboard */
 
@@ -97,7 +119,7 @@
 
   /* ------------------------------------------------------------------- spacing */
   --space-1: 4px;
-  --space-2: 8px;
+  --space-2: 8px; /* also the gutter around and between panels */
   --space-3: 12px;
   --space-4: 16px; /* also Excalidraw's own canvas inset: align to it */
   --space-5: 24px;
@@ -105,24 +127,30 @@
   --space-7: 48px;
 
   /* -------------------------------------------------------------------- layout */
-  --panel-projects: 216px;
-  --panel-agent: 344px;
-  --topbar-h: 44px;
-  --carousel-h: 104px;
+  --panel-projects: 232px;
+  --panel-agent: 360px;
+  --topbar-h: 36px;
+  --carousel-h: 108px;
   --control-h: 28px;
   --canvas-min-w: 808px; /* Excalidraw clips "Biblioteca" somewhere under 780px and turns mobile below 730px */
 
-  /* --------------------------------------------------------------------- shape */
-  --radius-frame: 2px; /* thumbnails */
-  --radius-control: 4px; /* buttons, inputs, chips, selector */
-  --radius-float: 8px; /* menus and popovers; matches Excalidraw's floating islands */
+  /* --------------------------------------------------------------------- shape
+     Radii are concentric: an inner radius is the outer one minus the gap, so
+     a 16px card sits 8px inside a 24px panel. */
+  --radius-panel: 24px; /* panels, carousel, canvas */
+  --radius-card: 16px; /* composer, chat bubble, list rows, popovers */
+  --radius-frame: 12px; /* thumbnails */
+  --radius-frame-small: 10px; /* carousel thumbnails, project icon tile */
+  --radius-control: 8px; /* ghost controls inside a card */
+  --radius-pill: 999px; /* buttons, selector, chips */
 
   --border: 1px solid var(--line);
-  --border-control: 1px solid var(--line-control);
 
-  /* ----------------------------------------------------------------- elevation
-     Chrome is docked and flat. Elevation is for what floats over a surface. */
-  --elevation-float: 0 1px 2px rgb(0 0 0 / 0.16), 0 8px 24px rgb(0 0 0 / 0.16);
+  /* Paper resting on the table. */
+  --shadow-paper:
+    0 0 0 1px light-dark(rgb(74 56 28 / 0.12), rgb(255 245 225 / 0.14)),
+    0 1px 2px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.3)),
+    0 6px 16px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.24));
 
   /* --------------------------------------------------------------------- focus
      Apply as box-shadow on :focus-visible so it follows the radius and is not
@@ -155,9 +183,19 @@
     --motion-fast: 0ms linear;
   }
 }
+/* People who ask for less transparency get the same layout on solid surfaces. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: light-dark(#f4efe5, #2f2b25);
+    --glass-raised: light-dark(#fbf8f2, #38342d);
+    --glass-filter: none;
+    --glass-sheen: none;
+  }
+}
 
 /*
- * Excalidraw theme: neutralises its violet and puts its UI in Paso's typeface.
+ * Excalidraw theme: replaces its violet, puts its UI in Paso's typeface and gives
+ * its floating controls the same glass and radii as the rest of the app.
  * The doubled class wins regardless of stylesheet order. Variable names come from
  * @excalidraw/excalidraw 0.18.1: re-check them when upgrading.
  */
@@ -165,11 +203,17 @@
 .excalidraw.excalidraw.theme--dark {
   --ui-font: var(--font-ui);
 
-  --island-bg-color: light-dark(#ffffff, #2a2a2b);
-  --color-surface-lowest: light-dark(#f7f7f5, #1f1f20);
-  --color-surface-low: light-dark(#ededea, #2a2a2b);
-  --color-surface-mid: light-dark(#f3f3f1, #1f1f20);
-  --color-surface-high: light-dark(#e4e4e0, #38383a);
+  --border-radius-md: 10px;
+  --border-radius-lg: 14px;
+
+  /* More opaque than --glass: drawings of any colour pass underneath. */
+  --island-bg-color: light-dark(rgb(255 253 248 / 0.74), rgb(52 48 42 / 0.76));
+  --shadow-island: var(--glass-shadow);
+
+  --color-surface-lowest: light-dark(#f7f3ea, #1f1d19);
+  --color-surface-low: light-dark(#f1ebdf, #2c2924);
+  --color-surface-mid: light-dark(#f5f0e6, #24211d);
+  --color-surface-high: light-dark(#e6decd, #3a362f);
   --color-border-outline-variant: var(--line);
   --color-slider-track: var(--line-control);
 
@@ -182,14 +226,53 @@
   --color-brand-hover: var(--ink-2);
   --color-brand-active: var(--table-well);
 
-  /* Selection box and handles. The canvas is drawn through Excalidraw's dark filter,
-     so the dark value is the one that comes out as --ink-2 after inversion. */
-  --color-selection: light-dark(#454542, #333331);
-
   /* One variable drives the active tool and every selected option in the
      properties panel, so it must stay neutral. */
-  --color-surface-primary-container: light-dark(#dfdfdb, #454547);
+  --color-surface-primary-container: light-dark(#e6decd, #4a453c);
   --color-on-primary-container: var(--ink);
+}
+
+/* Selection box and handles. Excalidraw hands this value straight to the canvas, which
+   rejects light-dark() and silently draws black, so each theme needs a literal colour.
+   The dark canvas is drawn through Excalidraw's filter: that value comes out as --ink-2. */
+.excalidraw.excalidraw {
+  --color-selection: #4b453a;
+}
+.excalidraw.excalidraw.theme--dark {
+  --color-selection: #251e0f;
+}
+
+.excalidraw.excalidraw .Island {
+  backdrop-filter: var(--glass-filter);
+}
+
+/* Its corner buttons are flat by default: give them the same glass as the islands. */
+.excalidraw.excalidraw .zoom-actions,
+.excalidraw.excalidraw .undo-redo-buttons,
+.excalidraw.excalidraw .sidebar-trigger:not(:hover),
+.excalidraw.excalidraw .main-menu-trigger:not(:hover),
+.excalidraw.excalidraw .help-icon:not(:hover) {
+  background-color: var(--island-bg-color);
+  border-color: transparent;
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--shadow-island);
+}
+.excalidraw.excalidraw .zoom-actions button,
+.excalidraw.excalidraw .undo-redo-buttons button {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+.excalidraw.excalidraw .zoom-actions button:hover,
+.excalidraw.excalidraw .undo-redo-buttons button:not(:disabled):hover {
+  background-color: var(--table-well) !important;
+}
+
+/* Its two hardcoded violet-grey hovers in dark mode. */
+.excalidraw.excalidraw.excalidraw.theme--dark .dropdown-menu-button:hover {
+  --background: var(--color-surface-high);
+}
+.excalidraw.excalidraw.excalidraw.theme--dark .App-menu__left {
+  --button-hover-bg: var(--color-surface-high);
 }
 
 /* The active tool alone gets the same inverted block as the view selector. */
