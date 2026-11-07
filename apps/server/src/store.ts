@@ -6,6 +6,7 @@ import {
 import { z } from 'zod';
 import { Disk, assetName, hash, jsonBytes, type Document, type RecordFile } from './disk.js';
 import { ApiError } from './errors.js';
+import type { RunStore } from './runs.js';
 
 export type ChangeEvent = {
   type: 'created' | 'updated' | 'deleted' | 'reordered' | 'project-error';
@@ -54,10 +55,10 @@ export class Store {
   private closed = false;
   private scanning = false;
   private rescanPending = false;
-  private constructor(readonly disk: Disk) {}
+  private constructor(readonly disk: Disk, private readonly runs?: RunStore) {}
 
-  static async create(dataDir: string, pollIntervalMs = 1000) {
-    const store = new Store(await Disk.create(dataDir));
+  static async create(dataDir: string, pollIntervalMs = 1000, runs?: RunStore) {
+    const store = new Store(await Disk.create(dataDir), runs);
     // Watch before the baseline scan so edits during startup cannot be missed.
     store.watcher = watch(store.disk.root, { recursive: true }, () => store.schedule());
     store.watcher.on('error', () => store.schedule());
@@ -132,6 +133,51 @@ export class Store {
     void tail.then(() => { if (this.queues.get(id) === tail) this.queues.delete(id); });
     return result;
   }
+  async loadTree(id: string) {
+    return this.load(id);
+  }
+  async withProjectLock<T>(id: string, operation: (state: { tree: ProjectTree; records: Map<string, RecordFile> }) => Promise<T>): Promise<T> {
+    return this.lock(id, async () => {
+      await this.reconcile(id);
+      const state = await this.load(id);
+      return operation(state);
+    });
+  }
+  async applyTree(id: string, tree: ProjectTree, records: Map<string, RecordFile>, rawOverrides?: Map<string, Uint8Array>) {
+    this.touch(tree);
+    const parsed = validateProjectTree(tree);
+    this.checkAssets(parsed, records);
+    const next = documents(parsed);
+    for (const file of next.keys()) {
+      if (!records.has(file) && await this.disk.exists(file)) throw new ApiError(409, 'PATH_COLLISION', 'Document path already exists with another spelling.');
+    }
+    for (const [file, document] of next) {
+      const existing = records.get(file);
+      const override = rawOverrides?.get(file);
+      if (override) {
+        if (!existing || hash(override) !== existing.revision) {
+          await this.disk.write(file, override);
+        }
+        continue;
+      }
+      const bytes = jsonBytes(document);
+      const existingNormalized = existing?.document ? jsonBytes(existing.document) : undefined;
+      if (!existing || (hash(bytes) !== existing.revision && (!existingNormalized || !bytes.equals(existingNormalized)))) {
+        await this.disk.write(file, bytes);
+      }
+    }
+    const nextSceneIds = new Set(parsed.scenes.map(({ scene }) => scene.id));
+    for (const record of records.values()) {
+      if (record.kind !== 'asset' && !next.has(record.path)) await this.disk.remove(record.path);
+    }
+    for (const record of records.values()) {
+      if (record.kind === 'scene' && !nextSceneIds.has(record.id)) {
+        await this.disk.remove(`${id}/scenes/${record.id}`);
+      }
+    }
+    await this.reconcile(id);
+    return parsed;
+  }
   private async load(id: string) {
     let records: Map<string, RecordFile>;
     try { records = await this.disk.scanProject(id); }
@@ -204,15 +250,18 @@ export class Store {
     });
   }
   async mutate(id: string, action: 'rename' | 'delete' | 'createScene' | 'createStep' | 'updateStep' | 'duplicate' | 'orderScenes' | 'orderSteps',
-    input: unknown, revision?: string, sceneId?: string, stepId?: string) {
+    input: unknown, revision?: string, sceneId?: string, stepId?: string, actor: 'mcp' | 'user' = 'user') {
     return this.lock(id, async () => {
       await this.reconcile(id);
       const { tree, records } = await this.load(id);
       const path = stepId ? stepPath(id, sceneId!, stepId) : sceneId ? scenePath(id, sceneId) : projectPath(id);
       const target = this.require(records, path);
+      const previousRevision = target.revision;
+      const previousStep = stepId && target.document ? structuredClone(target.document as Step) : undefined;
       if (action !== 'createScene' && action !== 'createStep') this.match(target, revision);
       const entry = tree.scenes.find(({ scene }) => scene.id === sceneId);
       let resultPath = path;
+      let createdId: string | undefined;
       if (action === 'rename') {
         if (sceneId) entry!.scene = parseScene({ ...entry!.scene, name: renameInput.parse(input).name });
         else {
@@ -224,6 +273,7 @@ export class Store {
       } else if (action === 'createScene') {
         const data = namedInput.parse(input);
         const scene = createScene(data.name, { id: data.id });
+        createdId = scene.id;
         tree.project.sceneIds.push(scene.id); tree.scenes.push({ scene, steps: [] });
         resultPath = scenePath(id, scene.id);
       } else if (action === 'createStep' || action === 'duplicate') {
@@ -236,6 +286,7 @@ export class Store {
           const data = stepInput.parse(input);
           step = createStep(data);
         }
+        createdId = step.id;
         entry!.scene.stepIds.push(step.id); entry!.steps.push(step);
         resultPath = stepPath(id, sceneId!, step.id);
       } else if (action === 'updateStep') {
@@ -252,7 +303,10 @@ export class Store {
           tree.scenes = tree.scenes.filter(({ scene }) => scene.id !== sceneId);
           tree.project.sceneIds = tree.project.sceneIds.filter((s) => s !== sceneId);
         } else {
-          await this.disk.remove(id); await this.reconcile(id); return null;
+          await this.disk.remove(id);
+          await this.runs?.deleteProjectRuns(id);
+          await this.reconcile(id);
+          return null;
         }
       }
       this.touch(tree);
@@ -265,8 +319,12 @@ export class Store {
         if (!records.has(file) && await this.disk.exists(file)) throw new ApiError(409, 'PATH_COLLISION', 'Document path already exists with another spelling.');
       }
       for (const [file, document] of next) {
+        const existing = records.get(file);
         const bytes = jsonBytes(document);
-        if (hash(bytes) !== records.get(file)?.revision) await this.disk.write(file, bytes);
+        const existingNormalized = existing?.document ? jsonBytes(existing.document) : undefined;
+        if (!existing || file === resultPath || (hash(bytes) !== existing.revision && (!existingNormalized || !bytes.equals(existingNormalized)))) {
+          if (hash(bytes) !== existing?.revision) await this.disk.write(file, bytes);
+        }
       }
       for (const record of records.values()) {
         if (record.kind !== 'asset' && !next.has(record.path)) await this.disk.remove(record.path);
@@ -275,7 +333,19 @@ export class Store {
       await this.reconcile(id);
       if (action === 'delete') return null;
       const document = next.get(resultPath)!;
-      return { document, revision: hash(jsonBytes(document)) };
+      const newRevision = hash(jsonBytes(document));
+      await this.runs?.recordMutation(id, {
+        action,
+        actor,
+        sceneId,
+        stepId,
+        createdId,
+        previousRevision,
+        newRevision,
+        previousStep,
+        newStep: action === 'updateStep' ? (document as Step) : undefined,
+      });
+      return { document, revision: newRevision };
     });
   }
   private touch(tree: ProjectTree) {

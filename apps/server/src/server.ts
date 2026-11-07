@@ -7,11 +7,13 @@ import { ApiError, errorResponse } from './errors.js';
 import { authorize } from './security.js';
 import { Store } from './store.js';
 import { HarnessRegistry, registryPath, type DetectionOptions } from './harnesses.js';
+import { RunStore } from './runs.js';
 
 export type StartServerOptions = {
   dataDir: string; port?: number; sessionToken?: string; allowedOrigins?: string[];
   maxJsonBytes?: number; maxAssetBytes?: number; pollIntervalMs?: number;
   harnessRegistryPath?: string; harnessDetection?: DetectionOptions;
+  runsDir?: string; runRetentionLimit?: number;
 };
 
 async function body(request: IncomingMessage, limit: number) {
@@ -39,7 +41,8 @@ export async function startServer(options: StartServerOptions) {
   const sessionToken = options.sessionToken ?? randomBytes(32).toString('base64url');
   if (!/^[A-Za-z0-9_-]{32,256}$/.test(sessionToken)) throw new Error('Session token must contain 32 to 256 base64url characters.');
   const harnesses = new HarnessRegistry(registryPath(options.dataDir, options.harnessRegistryPath), options.harnessDetection ?? {});
-  const store = await Store.create(options.dataDir, options.pollIntervalMs);
+  const runs = await RunStore.create(options.dataDir, { runsDir: options.runsDir, retentionLimit: options.runRetentionLimit });
+  const store = await Store.create(options.dataDir, options.pollIntervalMs, runs);
   let port = options.port ?? 3001;
   const allowedOrigins = new Set(options.allowedOrigins ?? []);
   const server = createServer((request, response) => {
@@ -52,9 +55,12 @@ export async function startServer(options: StartServerOptions) {
       catch { throw new ApiError(400, 'INVALID_PATH', 'Invalid path encoding.'); }
       const method = request.method;
       const revision = typeof request.headers['if-match'] === 'string' ? request.headers['if-match'] : undefined;
-      const json = async () => {
+      const actor = request.headers['x-paso-actor'] === 'mcp' ? 'mcp' : 'user';
+      const json = async (allowEmpty = false) => {
+        const raw = await body(request, options.maxJsonBytes ?? 10 * 1024 * 1024);
+        if (allowEmpty && raw.length === 0) return {};
         if (!request.headers['content-type']?.startsWith('application/json')) throw new ApiError(415, 'CONTENT_TYPE', 'Use application/json.');
-        return JSON.parse((await body(request, options.maxJsonBytes ?? 10 * 1024 * 1024)).toString('utf8')) as unknown;
+        return JSON.parse(raw.toString('utf8')) as unknown;
       };
       if (rawPath === '/api/health' && method === 'GET') { send(response, 200, { status: 'ok' }); return; }
       if (parts[0] === 'api' && parts[1] === 'harnesses') {
@@ -74,9 +80,28 @@ export async function startServer(options: StartServerOptions) {
       let status = 200;
       if (parts.length === 3) {
         if (method === 'GET') result = await store.read(projectId);
-        else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision);
-        else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision); status = 204; }
+        else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision, undefined, undefined, actor);
+        else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, undefined, undefined, actor); status = 204; }
         else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+      } else if (parts[3] === 'runs') {
+        if (parts.length === 4) {
+          if (method === 'GET') result = await runs.list(store, projectId);
+          else if (method === 'POST') { result = { run: await runs.start(store, projectId, await json(true)) }; status = 201; }
+          else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+        } else {
+          const runId = idSchema.parse(parts[4]);
+          if (parts.length === 5) {
+            if (method === 'GET') result = await runs.get(store, projectId, runId);
+            else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+          } else if (parts.length === 6 && parts[5] === 'finish') {
+            if (method === 'POST') result = { run: await runs.finish(store, projectId, runId) };
+            else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+          } else if (parts.length === 6 && parts[5] === 'undo') {
+            if (method === 'GET') result = await runs.previewUndo(store, projectId, runId);
+            else if (method === 'POST') result = await runs.executeUndo(store, projectId, runId, await json());
+            else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+          } else throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+        }
       } else if (parts[3] === 'assets' && parts.length === 5) {
         assetName(parts[4]);
         if (method !== 'GET' && method !== 'PUT' && method !== 'DELETE') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
@@ -94,30 +119,30 @@ export async function startServer(options: StartServerOptions) {
       } else if (parts[3] === 'scenes') {
         if (parts.length === 4) {
           if (method === 'GET') result = await store.read(projectId, undefined, undefined, 'scenes');
-          else if (method === 'POST') { result = await store.mutate(projectId, 'createScene', await json()); status = 201; }
-          else if (method === 'PUT') result = await store.mutate(projectId, 'orderScenes', await json(), revision);
+          else if (method === 'POST') { result = await store.mutate(projectId, 'createScene', await json(), undefined, undefined, undefined, actor); status = 201; }
+          else if (method === 'PUT') result = await store.mutate(projectId, 'orderScenes', await json(), revision, undefined, undefined, actor);
           else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
         } else {
           const sceneId = idSchema.parse(parts[4]);
           if (parts.length === 5) {
             if (method === 'GET') result = await store.read(projectId, sceneId);
-            else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision, sceneId);
-            else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId); status = 204; }
+            else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision, sceneId, undefined, actor);
+            else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId, undefined, actor); status = 204; }
             else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
           } else if (parts[5] === 'steps') {
             if (parts.length === 6) {
               if (method === 'GET') result = await store.read(projectId, sceneId, undefined, 'steps');
-              else if (method === 'POST') { result = await store.mutate(projectId, 'createStep', await json(), undefined, sceneId); status = 201; }
-              else if (method === 'PUT') result = await store.mutate(projectId, 'orderSteps', await json(), revision, sceneId);
+              else if (method === 'POST') { result = await store.mutate(projectId, 'createStep', await json(), undefined, sceneId, undefined, actor); status = 201; }
+              else if (method === 'PUT') result = await store.mutate(projectId, 'orderSteps', await json(), revision, sceneId, undefined, actor);
               else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
             } else {
               const stepId = idSchema.parse(parts[6]);
               if (parts.length === 8 && parts[7] === 'duplicate' && method === 'POST') {
-                result = await store.mutate(projectId, 'duplicate', await json(), revision, sceneId, stepId); status = 201;
+                result = await store.mutate(projectId, 'duplicate', await json(), revision, sceneId, stepId, actor); status = 201;
               } else if (parts.length === 7) {
                 if (method === 'GET') result = await store.read(projectId, sceneId, stepId);
-                else if (method === 'PUT') result = await store.mutate(projectId, 'updateStep', await json(), revision, sceneId, stepId);
-                else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId, stepId); status = 204; }
+                else if (method === 'PUT') result = await store.mutate(projectId, 'updateStep', await json(), revision, sceneId, stepId, actor);
+                else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId, stepId, actor); status = 204; }
                 else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
               } else throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
             }
