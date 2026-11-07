@@ -1,5 +1,18 @@
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { startServer } from './server.js';
 
-const port = 3001;
-startServer({ port });
-console.log(`Server listening on http://127.0.0.1:${port}`);
+const defaultDataDir = process.platform === 'win32'
+  ? join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Paso', 'projects')
+  : process.platform === 'darwin'
+    ? join(homedir(), 'Library', 'Application Support', 'Paso', 'projects')
+    : join(process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share'), 'paso', 'projects');
+const port = Number(process.env.PASO_PORT ?? 3001);
+if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid PASO_PORT.');
+const service = await startServer({
+  dataDir: process.env.PASO_DATA_DIR ?? defaultDataDir,
+  port, sessionToken: process.env.PASO_SESSION_TOKEN,
+  allowedOrigins: process.env.PASO_ALLOWED_ORIGINS?.split(',').filter(Boolean),
+});
+console.log(`Paso listening on ${service.url}`);
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => { void service.close(); });

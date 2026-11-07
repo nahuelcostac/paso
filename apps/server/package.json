@@ -9,11 +9,18 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.6",
     "@paso/shared": "workspace:*",
-    "hono": "^4.10.6"
+    "ws": "^8.22.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.2",
     "tsx": "^4.20.6"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
   }
 }
