@@ -24,9 +24,16 @@ hyphens. Creation helpers generate UUIDs unless an ID is supplied.
 
 | File | Required fields | Optional fields |
 | --- | --- | --- |
-| `project.json` | `schemaVersion`, `id`, `name`, `createdAt`, `updatedAt`, `sceneIds` | None |
+| `project.json` | `schemaVersion`, `id`, `name`, `createdAt`, `updatedAt`, `sceneIds` | `icon` |
 | `scene.json` | `schemaVersion`, `id`, `name`, `stepIds` | None |
 | Step JSON | `schemaVersion`, `id`, `elements`, `appState`, `files` | `title`, `speakerNotes` |
+
+`icon` is the name of a [Lucide](https://lucide.dev) icon in kebab case, such as
+`folder` or `chart-scatter`. It is for the project list and needs no format change:
+files without it stay valid at version 1, and the app shows `folder` for them. The
+schema checks only the shape (lowercase letters, digits and single hyphens, at most
+64 characters), not the list of icons, so a newer Lucide release needs no change here.
+An app that does not know a name shows `folder`. Scenes and steps have no icon.
 
 Project timestamps are ISO 8601 strings with a time zone, for example
 `2026-11-07T12:00:00.000Z`. The writer must update `updatedAt` when project
@@ -119,8 +126,8 @@ Direct schema parsing has the same version guard. No migration framework is
 needed yet.
 
 `createProject`, `createScene` and `createStep` return detached documents with
-empty children or content by default. Supply IDs and a project `now` string for
-deterministic creation. They do not insert documents into parents or change
+empty children or content by default. `createProject` also takes an optional
+`icon`. Supply IDs and a project `now` string for deterministic creation. They do not insert documents into parents or change
 existing documents. `duplicateStep` accepts a source and an optional new ID.
 
 `validateProjectTree` takes the following in-memory shape and returns a parsed

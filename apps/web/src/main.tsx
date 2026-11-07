@@ -1,29 +1,10 @@
-import { useEffect, useState } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { HealthResponse } from '@paso/shared';
+import { App } from './App';
+import { configFromPage } from './lib/api';
 import './styles/tokens.css';
+import './styles/app.css';
 
-function App() {
-  const [status, setStatus] = useState('Comprobando servidor…');
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/health', {
-      signal: controller.signal,
-      headers: { Authorization: `Bearer ${document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? ''}` },
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Servidor no disponible');
-        const health: HealthResponse = await response.json();
-        setStatus(health.status === 'ok' ? 'Servidor accesible' : 'Servidor no disponible');
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setStatus('Servidor no disponible');
-      });
-    return () => controller.abort();
-  }, []);
-
-  return <main><h1>Paso</h1><p>{status}</p></main>;
-}
-
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <StrictMode><App config={configFromPage()} /></StrictMode>,
+);

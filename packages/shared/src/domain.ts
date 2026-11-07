@@ -4,11 +4,11 @@ import {
   type Project, type Scene, type Step, type FileManifestEntry,
 } from './format.js';
 
-export function createProject(name: string, options: { id?: string; now?: string } = {}): Project {
+export function createProject(name: string, options: { id?: string; now?: string; icon?: string } = {}): Project {
   const now = options.now ?? new Date().toISOString();
   return projectSchema.parse({
     schemaVersion: SCHEMA_VERSION, id: options.id ?? crypto.randomUUID(),
-    name, createdAt: now, updatedAt: now, sceneIds: [],
+    name, ...(options.icon === undefined ? {} : { icon: options.icon }), createdAt: now, updatedAt: now, sceneIds: [],
   });
 }
 

@@ -230,3 +230,18 @@ describe('sample project on disk', () => {
     }
   });
 });
+
+describe('project icon', () => {
+  const base = { schemaVersion: 1, id: 'p', name: 'P', createdAt: '2026-11-07T12:00:00.000Z', updatedAt: '2026-11-07T12:00:00.000Z', sceneIds: [] };
+  it('is optional, so projects written before it still parse at version 1', () => {
+    expect(parseProject(base)).toEqual(base);
+    expect(createProject('P', { id: 'p' })).not.toHaveProperty('icon');
+  });
+  it('stores a Lucide icon name and checks only its shape', () => {
+    expect(parseProject({ ...base, icon: 'chart-scatter' }).icon).toBe('chart-scatter');
+    expect(createProject('P', { icon: 'grid-2x2' }).icon).toBe('grid-2x2');
+    for (const icon of ['Folder', 'a b', 'a--b', '-a', 'a-', '', 'x'.repeat(65), 7, null]) {
+      expect(() => parseProject({ ...base, icon }), String(icon)).toThrow();
+    }
+  });
+});

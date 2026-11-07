@@ -2,7 +2,7 @@
 
 Run `pnpm install` and `pnpm dev` from the repository root. Open
 <http://127.0.0.1:5173>. The API listens on `127.0.0.1:3001`.
-The web page reports `Servidor accesible` after an authenticated health check.
+The web app lists and edits projects through this API.
 
 For the compiled service, run `pnpm build`, then
 `node apps/server/dist/cli.js`. Set `PASO_DATA_DIR` to a directory containing
@@ -65,8 +65,8 @@ Document bodies never contain revision fields.
 | --- | --- | --- |
 | GET | `/health` | `{ status: "ok" }` |
 | GET | `/projects` | `{ projects: [{ id, document, revision } or { id, error }] }` |
-| POST | `/projects` | `{ name, id? }`, returns 201 |
-| GET, PATCH, DELETE | `/projects/:p` | Read, rename with `{ name }`, or delete recursively |
+| POST | `/projects` | `{ name, id?, icon? }`, returns 201 |
+| GET, PATCH, DELETE | `/projects/:p` | Read, change with `{ name?, icon? }`, or delete recursively |
 | GET, POST, PUT | `/projects/:p/scenes` | List `{ scenes: [...] }`, create `{ name, id? }`, or reorder `{ ids }` |
 | GET, PATCH, DELETE | `/projects/:p/scenes/:s` | Read, rename with `{ name }`, or delete recursively |
 | GET, POST, PUT | `/projects/:p/scenes/:s/steps` | List `{ steps: [...] }`, create a snapshot, or reorder `{ ids }` |
@@ -80,6 +80,11 @@ contain `id`, `title`, `speakerNotes`, `elements`, `appState` and `files`.
 Omitted content uses shared creation defaults. Step replacement requires the
 complete step document, including `schemaVersion`. Its ID cannot change.
 Duplication retains element IDs, asset references and unknown element fields.
+A project body has an optional `icon`, the name of a Lucide icon (see the data
+format). `POST /projects` accepts it. `PATCH /projects/:p` takes a `name`, an
+`icon`, or both, and needs at least one; `{ "icon": null }` removes the icon. A name
+that is not the shape of an icon returns 400. The service does not know which icons
+exist. Scenes are renamed with `{ name }` only.
 Lists follow parent order. Reordering must contain exactly the current children.
 It changes the parent order list and the project's `updatedAt` timestamp.
 
