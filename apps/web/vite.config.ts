@@ -1,13 +1,34 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { cp, readFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const webPort = Number(process.env.PASO_WEB_PORT ?? 5173);
+const servicePort = Number(process.env.PASO_PORT ?? 3001);
+const fonts = join(dirname(require.resolve('@excalidraw/excalidraw')), 'fonts');
 
 export default defineConfig(({ command }) => ({
+  define: { 'process.env.IS_PREACT': JSON.stringify('false') },
   plugins: [react(), {
+    name: 'paso-offline-excalidraw-fonts',
+    async writeBundle(options) { await cp(fonts, resolve(options.dir ?? 'dist', 'excalidraw/fonts'), { recursive: true }); },
+    configureServer(server) {
+      server.middlewares.use('/excalidraw/fonts', (request, response, next) => {
+        const path = decodeURIComponent((request.url ?? '').split('?')[0]);
+        if (!/^\/[A-Za-z]+\/[A-Za-z0-9_-]+\.woff2$/.test(path)) { next(); return; }
+        void readFile(join(fonts, path)).then((bytes) => {
+          response.setHeader('Content-Type', 'font/woff2'); response.end(bytes);
+        }).catch(() => { response.statusCode = 404; response.end(); });
+      });
+    },
+  }, {
     name: 'paso-dev-session',
     configureServer(server) {
-      const origins = new Set(['http://127.0.0.1:5173', 'http://localhost:5173']);
+      const origins = new Set([`http://127.0.0.1:${webPort}`, `http://localhost:${webPort}`]);
       server.middlewares.use((request, response, next) => {
-        if (!new Set(['127.0.0.1:5173', 'localhost:5173']).has(request.headers.host ?? '') ||
+        if (!new Set([`127.0.0.1:${webPort}`, `localhost:${webPort}`]).has(request.headers.host ?? '') ||
           (request.headers.origin !== undefined && !origins.has(request.headers.origin))) {
           response.statusCode = 403; response.end('Forbidden'); return;
         }
@@ -23,7 +44,7 @@ export default defineConfig(({ command }) => ({
     },
   }],
   server: {
-    host: '127.0.0.1', port: 5173, strictPort: true, cors: false,
-    proxy: { '/api': { target: 'http://127.0.0.1:3001', changeOrigin: true, ws: true } },
+    host: '127.0.0.1', port: webPort, strictPort: true, cors: false,
+    proxy: { '/api': { target: `http://127.0.0.1:${servicePort}`, changeOrigin: true, ws: true } },
   },
 }));

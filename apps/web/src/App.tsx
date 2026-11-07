@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ApiClient, type ClientConfig } from './lib/api';
+import { StepStore } from './editor/step-store';
+import { BrowserRecovery } from './editor/recovery';
+import { bindStepLifecycle } from './editor/lifecycle';
 import { useRoute } from './lib/route';
 import { MainView } from './components/MainView';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { TopBar } from './components/TopBar';
 import { ProjectsStore, useProjects } from './state/projects-store';
 
-/** Below this the Excalidraw canvas would not fit beside the panel (docs/design/direction.md). */
+const Lienzo = lazy(() => import('./editor/Lienzo'));
+
+/** Below this the canvas would not fit beside the panel. */
 const NARROW = '(max-width: 1063px)';
 
 function usePanelOpen() {
@@ -22,9 +27,20 @@ function usePanelOpen() {
 }
 
 export function App({ config }: { config: ClientConfig }) {
-  const store = useMemo(() => new ProjectsStore(new ApiClient(config)), [config]);
+  const api = useMemo(() => new ApiClient(config), [config]);
+  const store = useMemo(() => new ProjectsStore(api), [api]);
+  const steps = useMemo(() => new StepStore(api, new BrowserRecovery(config.baseUrl)), [api, config.baseUrl]);
+  useEffect(() => bindStepLifecycle(steps), [steps]);
+  useEffect(() => store.subscribeEvents((event) => {
+    if (event.type === 'ready') {
+      for (const session of steps.all()) void api.getStep(session.target).then((fresh) => steps.external(session.target, fresh.revision)).catch(() => {});
+    }
+    if (event.kind === 'step' && event.projectId && event.sceneId && event.id) void steps.external({ projectId: event.projectId, sceneId: event.sceneId, stepId: event.id }, event.revision ?? null).catch(() => {});
+  }), [store, steps, api]);
   useEffect(() => { store.start(); return () => store.dispose(); }, [store]);
   const state = useProjects(store);
+  useSyncExternalStore(steps.subscribe, steps.getSnapshot);
+  const failedStep = steps.all().find((session) => session.status === 'failed' || session.status === 'conflict');
   const [route, navigate] = useRoute();
   const [panelOpen, setPanelOpen] = usePanelOpen();
   const [creating, setCreating] = useState(false);
@@ -48,7 +64,8 @@ export function App({ config }: { config: ClientConfig }) {
     <div className={`app${panelOpen ? '' : ' app--panel-closed'}`}>
       <TopBar
         view={route.view}
-        onViewChange={(view) => navigate({ projectId: route.projectId, view })}
+        onViewChange={(view) => navigate({ ...route, view })}
+        saveNotice={failedStep ? <button className="btn btn--soft" onClick={() => navigate({ ...failedStep.target, view: 'lienzo' })}>Revisar paso sin guardar</button> : undefined}
         panelOpen={panelOpen}
         onTogglePanel={() => setPanelOpen(!panelOpen)}
       />
@@ -67,7 +84,9 @@ export function App({ config }: { config: ClientConfig }) {
           }}
         />
       )}
-      <MainView state={state} row={row} requestedId={route.projectId} view={route.view} onCreate={startCreating} onRetry={() => store.retry()} />
+      {route.view === 'lienzo' && row?.kind === 'ok' ? <Suspense fallback={<main className="main-message" aria-label="Lienzo">Cargando…</main>}>
+        <Lienzo key={row.id} api={api} store={steps} projectId={row.id} projectName={row.project.name} structureRevision={row.revision} route={route} navigate={navigate} />
+      </Suspense> : <MainView state={state} row={row} requestedId={route.projectId} view={route.view} onCreate={startCreating} onRetry={() => store.retry()} />}
     </div>
   );
 }

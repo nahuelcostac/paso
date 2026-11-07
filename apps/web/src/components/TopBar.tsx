@@ -2,13 +2,13 @@ import { PanelLeft } from 'lucide-react';
 import type { View } from '../lib/route';
 import { ViewSelector } from './ViewSelector';
 
-type Props = { view: View; onViewChange: (view: View) => void; panelOpen: boolean; onTogglePanel: () => void };
+type Props = { saveNotice?: React.ReactNode; view: View; onViewChange: (view: View) => void; panelOpen: boolean; onTogglePanel: () => void };
 
 /**
  * Three columns with equal outer ones, so the selector sits on the window's true centre in both views.
  * The right column is kept for the agent status and Presentar.
  */
-export function TopBar({ view, onViewChange, panelOpen, onTogglePanel }: Props) {
+export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotice }: Props) {
   return (
     <header className="topbar">
       <div className="topbar__side">
@@ -21,7 +21,7 @@ export function TopBar({ view, onViewChange, panelOpen, onTogglePanel }: Props) 
         </button>
       </div>
       <ViewSelector view={view} onChange={onViewChange} />
-      <div className="topbar__side topbar__side--end" />
+      <div className="topbar__side topbar__side--end">{saveNotice}</div>
     </header>
   );
 }
