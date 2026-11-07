@@ -6,10 +6,12 @@ import { assetName } from './disk.js';
 import { ApiError, errorResponse } from './errors.js';
 import { authorize } from './security.js';
 import { Store } from './store.js';
+import { HarnessRegistry, registryPath, type DetectionOptions } from './harnesses.js';
 
 export type StartServerOptions = {
   dataDir: string; port?: number; sessionToken?: string; allowedOrigins?: string[];
   maxJsonBytes?: number; maxAssetBytes?: number; pollIntervalMs?: number;
+  harnessRegistryPath?: string; harnessDetection?: DetectionOptions;
 };
 
 async function body(request: IncomingMessage, limit: number) {
@@ -36,6 +38,7 @@ function send(response: ServerResponse, status: number, data?: unknown, revision
 export async function startServer(options: StartServerOptions) {
   const sessionToken = options.sessionToken ?? randomBytes(32).toString('base64url');
   if (!/^[A-Za-z0-9_-]{32,256}$/.test(sessionToken)) throw new Error('Session token must contain 32 to 256 base64url characters.');
+  const harnesses = new HarnessRegistry(registryPath(options.dataDir, options.harnessRegistryPath), options.harnessDetection ?? {});
   const store = await Store.create(options.dataDir, options.pollIntervalMs);
   let port = options.port ?? 3001;
   const allowedOrigins = new Set(options.allowedOrigins ?? []);
@@ -54,6 +57,13 @@ export async function startServer(options: StartServerOptions) {
         return JSON.parse((await body(request, options.maxJsonBytes ?? 10 * 1024 * 1024)).toString('utf8')) as unknown;
       };
       if (rawPath === '/api/health' && method === 'GET') { send(response, 200, { status: 'ok' }); return; }
+      if (parts[0] === 'api' && parts[1] === 'harnesses') {
+        if (parts.length === 3 && parts[2] === 'detect' && method === 'GET') { send(response, 200, await harnesses.detect()); return; }
+        if (parts.length === 2 && method === 'GET') { send(response, 200, await harnesses.list()); return; }
+        if (parts.length === 2 && method === 'POST') { const input = await json() as { id?: unknown } | null; send(response, 201, await harnesses.add(input?.id)); return; }
+        if (parts.length === 3 && method === 'DELETE') { await harnesses.remove(parts[2]); send(response, 204); return; }
+        throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+      }
       if (parts[0] !== 'api' || parts[1] !== 'projects') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
       if (parts.length === 2) {
         if (method === 'GET') { send(response, 200, await store.list()); return; }

@@ -167,3 +167,26 @@ Default limits are 10 MiB for JSON and 50 MiB for one binary upload. Embedders
 can set `maxJsonBytes`, `maxAssetBytes` and `pollIntervalMs`. Slow WebSocket
 clients are disconnected above 1 MiB of pending output. Requests time out
 after 30 seconds. Headers have a 10-second timeout.
+
+## Agent harnesses
+
+All harness routes require the session token. `GET /api/harnesses/detect`
+returns `{ harnesses: [...] }` for Claude Code (`claude`), Codex (`codex`)
+and Antigravity (`agy`). Each entry has `id`, `found`, `path`, `version` and
+`session` (`signed_in`, `signed_out` or `unknown`). `path` and `version` can
+be null. A missing or signed-out harness also has a Spanish `message`.
+Detection runs asynchronous, time-limited commands and never starts a session.
+Claude provides `auth status --json`; Codex provides `login status`; agy has
+no status command in its help. A failed or unrecognised status is `unknown`.
+
+`GET /api/harnesses` returns the added harnesses with fresh detection results.
+`POST /api/harnesses` with `{ "id": "claude" }` adds one and returns its
+current detection with status 201. Adding an already added ID is idempotent.
+A missing executable returns 422; an unknown ID returns 400.
+`DELETE /api/harnesses/:id` removes it and returns 204, even if absent.
+Only IDs are persisted. The default file is `harnesses.json` next to the
+projects directory, outside project listings. Embedders can set
+`harnessRegistryPath`; the CLI accepts `PASO_HARNESS_REGISTRY_PATH`. The file
+must be outside `dataDir`. Writes use a flushed temporary file and rename.
+Run one service per registry file. Detection searches PATH, common install
+locations and the login shell, so a desktop host need not inherit a shell PATH.
