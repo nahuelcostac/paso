@@ -75,7 +75,9 @@ beforeEach(async () => {
   dataDir = await mkdtemp(join(tmpdir(), 'paso-storyboard-'));
   window.history.replaceState(null, '', '#/p/storyboard');
   window.matchMedia ??= ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
-  service = await startServer({ dataDir, port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100 });
+  service = await startServer({ dataDir, port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100,
+    // The agent panel asks which harnesses are installed: never run the real ones from a test.
+    harnessDetection: { searchPaths: [], loginShell: false } });
   config = { baseUrl: service.url, token };
 });
 afterEach(async () => {

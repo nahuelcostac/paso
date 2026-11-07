@@ -87,6 +87,12 @@ Excalidraw stays the star because its canvas is the largest sheet of paper on sc
 
 On the Lienzo there is no panel, so the top bar shows who is changing which step, with `Detener`. Under 1160px the sentence would hit the selector, so only the chip and `Detener` remain.
 
+Decided with the agent panel (IN-04):
+- **Under 1100px** the Storyboard keeps no column for the panel. A ghost `Agente` button takes Presentar's slot in the top bar and opens the panel as a drawer over the board, at the same 360px and 8px from the edges; Escape or its close button hides it. While it is closed, the top bar shows the same status as on the Lienzo.
+- **Adding a harness** is asked once, in the panel, before the first message: it says Paso will use the person's own login and quota with board tools only. Harnesses Paso cannot run yet are listed with their version and "Todavía no disponible en Paso", not hidden.
+- **The target** is in the panel's header: a scene or the whole project. A conversation is one harness session, so changing the target, the harness or the model starts another one.
+- **Undo** always shows what it will do first. Warnings are in Spanish, named by step number and scene; when the service asks for force, a checkbox must be ticked before the danger button works.
+
 **Presentar.** The drawing and a step indicator at bottom right (ticks and `3/6`, in `--ink-3`), on `--paper`, with the cursor hidden after two seconds without moving. No other chrome, no glass and no markers.
 - One camera per scene, from the union of all its steps and the screen (`present/framing.ts`), so whatever stays still between steps stays still on screen. Margins are 5% and 6% of the screen, never less than 32px and 48px, which keeps drawings clear of the indicator. A scene under 480×300 is framed as if it were that size, so a small sketch is not blown up to the edges.
 - A step with its own canvas colour fills the screen with it, through the same dark filter as its drawing.

@@ -82,5 +82,62 @@ switch (name) {
   case 'unsafe-use': init(); assistant([{ type: 'tool_use', id: 'x', name: 'Bash', input: { command: 'echo PWNED' } }]); await sleep(60_000); break;
   case 'no-board': init({ mcp_servers: [{ name: 'paso', status: 'failed' }], tools: [] }); await sleep(60_000); break;
   case 'unknown-flag': process.stderr.write("error: unknown option '--setting-sources'\n"); process.exit(1); break;
+  case 'edit': {
+    const promptArg = args[args.indexOf('--append-system-prompt') + 1] ?? '';
+    const match = /proyecto «([^»]+)»(?:, escena «([^»]+)»)?/.exec(promptArg);
+    const projectId = match?.[1];
+    let sceneId = match?.[2];
+    const baseUrl = process.env.PASO_SERVICE_URL;
+    const token = process.env.PASO_SESSION_TOKEN;
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Paso-Actor': 'mcp' };
+    init({ tools: ['mcp__paso__read_scene', 'mcp__paso__add_elements', 'mcp__paso__create_step'] });
+    if (projectId && baseUrl && token) {
+      if (!sceneId) {
+        const scenesRes = await fetch(`${baseUrl}/api/projects/${projectId}/scenes`, { headers });
+        const scenesData = await scenesRes.json();
+        sceneId = scenesData.scenes?.[0]?.document?.id;
+      }
+      if (sceneId) {
+        assistant([{ type: 'tool_use', id: 't-read', name: 'mcp__paso__read_scene', input: { projectId, sceneId } }]);
+        const stepsRes = await fetch(`${baseUrl}/api/projects/${projectId}/scenes/${sceneId}/steps`, { headers });
+        const stepsData = await stepsRes.json();
+        out({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't-read', content: [{ type: 'text', text: 'ok' }] }] } });
+        const firstStep = stepsData.steps?.[0];
+        if (firstStep) {
+          assistant([{ type: 'tool_use', id: 't-edit', name: 'mcp__paso__add_elements', input: { projectId, sceneId, stepId: firstStep.document.id } }]);
+          await fetch(`${baseUrl}/api/projects/${projectId}/scenes/${sceneId}/steps/${firstStep.document.id}`, {
+            method: 'PUT',
+            headers: { ...headers, 'If-Match': `"${firstStep.revision}"` },
+            body: JSON.stringify({
+              ...firstStep.document,
+              title: 'Paso editado por agente',
+              elements: [
+                ...firstStep.document.elements,
+                { id: 'agent-rect-1', type: 'rectangle', x: 80, y: 120, width: 180, height: 90, strokeColor: '#1e1e1e', backgroundColor: '#e3f5cf', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid', roughness: 0, opacity: 100, angle: 0, seed: 1, version: 1, versionNonce: 1, isDeleted: false, groupIds: [], frameId: null, boundElements: null, updated: 1, link: null, locked: false },
+              ],
+            }),
+          });
+          out({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't-edit', content: [{ type: 'text', text: 'ok' }] }] } });
+        }
+        const createdRes = await fetch(`${baseUrl}/api/projects/${projectId}/scenes/${sceneId}/steps`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            title: 'Paso creado por agente',
+            elements: [
+              { id: 'agent-rect-2', type: 'rectangle', x: 320, y: 120, width: 180, height: 90, strokeColor: '#1e1e1e', backgroundColor: '#cce5ff', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid', roughness: 0, opacity: 100, angle: 0, seed: 2, version: 1, versionNonce: 2, isDeleted: false, groupIds: [], frameId: null, boundElements: null, updated: 1, link: null, locked: false },
+            ],
+          }),
+        });
+        const createdStep = await createdRes.json();
+        assistant([{ type: 'tool_use', id: 't-create', name: 'mcp__paso__create_step', input: { projectId, sceneId, stepId: createdStep.document?.id } }]);
+        out({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't-create', content: [{ type: 'text', text: 'ok' }] }] } });
+      }
+    }
+    delta('He actualizado '); delta('la escena.');
+    assistant([{ type: 'text', text: 'He actualizado la escena.' }]);
+    result();
+    break;
+  }
   default: init(); result();
 }

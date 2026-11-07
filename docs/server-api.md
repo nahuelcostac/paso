@@ -343,8 +343,11 @@ and leaves the session usable.
 
 ### Run hooks
 
-`SessionManager` has one place where a run starts and ends. An embedder passes
-hooks in `startServer({ agent: { hooks } })`:
+`SessionManager` has one place where a run starts and ends. `startServer`
+automatically connects `beforeRun` and `afterRun` to `RunStore` (starting a
+restore point with `id: runId` and `label: "${harness}:${sessionId}"` before the
+turn and finishing it when the turn ends), and also calls any custom hooks
+passed in `startServer({ agent: { hooks } })`:
 
 ```ts
 hooks: {
@@ -353,10 +356,10 @@ hooks: {
 }
 ```
 
-`beforeRun` runs after the run is accepted and before anything starts, so a
-restore point (AG-03) can be created there. `afterRun` runs after the terminal
-event and before the session can accept another message, so the point can be
-closed. The hooks do not depend on any restore-point code.
+`beforeRun` runs after the run is accepted and before anything starts, so the
+restore point is created there. `afterRun` runs after the terminal event and
+before the session can accept another message, so the restore point is closed
+before the session becomes `idle`.
 
 ### Configuration
 
@@ -399,7 +402,8 @@ Before an agent run starts, `POST /api/projects/:p/runs` (with optional
 `{ id?, label? }`) saves a baseline restore point of the project's scenes,
 steps, order lists and exact content revisions, and returns `{ run }` with
 status 201 (`status: "running"`). Starting a run is an explicit route outside
-the MCP tools. Only one run may be active per project at a time; starting a
+the MCP tools (and is called automatically by `SessionManager` around each
+session turn). Only one run may be active per project at a time; starting a
 second while one is `running` returns `409 RUN_IN_PROGRESS`.
 
 While a run is `running`, the service records only agent-created scenes and

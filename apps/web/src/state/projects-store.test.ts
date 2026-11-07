@@ -49,6 +49,36 @@ describe('ProjectsStore', () => {
     expect(rows[2].kind).toBe('error');
   });
 
+  it('keeps a rename when a re-read that started before it answers after it', async () => {
+    const api = new ApiClient({ baseUrl: service.url, token });
+    const read = api.getProject.bind(api);
+    let gate: Promise<void> | undefined;
+    let answered!: () => void;
+    const held = new Promise<void>((resolve) => { answered = resolve; });
+    // While a gate is set, a re-read takes its answer now and delivers it only when the gate opens.
+    api.getProject = async (id) => {
+      const wait = gate;
+      const answer = await read(id);
+      if (wait) { answered(); await wait; }
+      return answer;
+    };
+    store.dispose();
+    store = new ProjectsStore(api);
+    store.start();
+    await until(() => store.getState().phase === 'ready');
+    const id = await store.create('Antes');
+    let open!: () => void;
+    gate = new Promise((resolve) => { open = resolve; });
+    const late = store.refresh(id);
+    await held;
+    gate = undefined;
+    await store.update(id, { name: 'Después' });
+    open();
+    await late;
+    const row = store.getState().rows.find((candidate) => candidate.id === id);
+    expect(row?.kind === 'ok' && row.project.name).toBe('Después');
+  });
+
   it('turns a stale revision into a clear failure and refreshes the row', async () => {
     store.start();
     await until(() => store.getState().phase === 'ready');

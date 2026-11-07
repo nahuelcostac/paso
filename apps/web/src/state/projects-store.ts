@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Project } from '@paso/shared';
-import { ApiClient, ApiRequestError, UnavailableError, type ProjectListItem } from '../lib/api';
+import { ApiClient, ApiRequestError, UnavailableError, type AgentEvent, type ProjectListItem } from '../lib/api';
 
 export type ProjectRow =
   | { kind: 'ok'; id: string; project: Project; revision: string; scenes: number; steps: number }
@@ -25,7 +25,20 @@ const sortRows = (rows: ProjectRow[]) => [...rows].sort((a, b) => {
   return a.id < b.id ? -1 : 1;
 });
 
-export type ServiceEvent = { type: string; kind?: string; projectId?: string; sceneId?: string; id?: string; revision?: string | null; message?: string };
+export type ServiceEvent = {
+  type: string;
+  kind?: string;
+  projectId?: string;
+  sceneId?: string;
+  id?: string;
+  revision?: string | null;
+  message?: string;
+  sessionId?: string;
+  runId?: string;
+  seq?: number;
+  at?: string;
+  event?: AgentEvent;
+};
 
 /**
  * Keeps the project list in step with the service. It opens the event stream first, waits for
@@ -185,6 +198,9 @@ export class ProjectsStore {
     throw new ActionError('Inténtalo de nuevo.');
   }
 
+  /** A write's own answer is newer than any re-read already on its way, which must not overwrite it. */
+  private supersede(id: string) { this.versions.set(id, (this.versions.get(id) ?? 0) + 1); }
+
   private okRow(id: string) {
     const row = this.state.rows.find((candidate) => candidate.id === id);
     if (row?.kind !== 'ok') throw new ActionError('Este proyecto no se puede editar.');
@@ -194,6 +210,7 @@ export class ProjectsStore {
   async create(name: string) {
     try {
       const { document, revision } = await this.api.createProject({ name });
+      this.supersede(document.id);
       this.setRows((rows) => [...rows.filter((row) => row.id !== document.id), { kind: 'ok', id: document.id, project: document, revision, scenes: 0, steps: 0 }]);
       return document.id;
     } catch (error) { return this.fail(error); }
@@ -202,6 +219,7 @@ export class ProjectsStore {
     const row = this.okRow(id);
     try {
       const { document, revision } = await this.api.updateProject(id, row.revision, input);
+      this.supersede(id);
       this.setRows((rows) => rows.map((existing) => existing.id === id && existing.kind === 'ok' ? { ...existing, project: document, revision } : existing));
     } catch (error) { return this.fail(error, id); }
   }
@@ -209,7 +227,7 @@ export class ProjectsStore {
     const row = this.okRow(id);
     try {
       await this.api.deleteProject(id, row.revision);
-      this.versions.set(id, (this.versions.get(id) ?? 0) + 1);
+      this.supersede(id);
       this.setRows((rows) => rows.filter((existing) => existing.id !== id));
     } catch (error) { return this.fail(error, id); }
   }

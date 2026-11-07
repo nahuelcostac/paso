@@ -17,7 +17,7 @@ export function SceneSelector({ scenes, currentId, busy, onSelect, onCreate }: P
   const [open, setOpen] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const items = () => [...(list.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])];
-  // The popover is hidden until it has been placed, and a hidden element cannot take focus: wait one frame.
+  // The menu mounts in the same commit that sets `open`: wait one frame so its items exist.
   useEffect(() => {
     if (!open) return;
     const frame = requestAnimationFrame(() => (items().find((item) => item.getAttribute('aria-checked') === 'true') ?? items()[0])?.focus());

@@ -414,9 +414,11 @@ describe('run hooks and logging', () => {
     await service.close();
     await start({
       hooks: {
-        beforeRun: async ({ projectId, runId }) => {
-          const started = await api(`/api/projects/${projectId}/runs`, 'POST', { id: runId });
-          expect(started.status).toBe(201);
+        beforeRun: async ({ projectId }) => {
+          // The server opens the restore point after this custom hook returns.
+          const existing = await api(`/api/projects/${projectId}/runs`);
+          expect(existing.status).toBe(200);
+          expect(existing.data.runs).toEqual([]);
         },
         afterRun: async ({ projectId, runId }) => {
           const finished = await api(`/api/projects/${projectId}/runs/${runId}/finish`, 'POST', {});
@@ -480,5 +482,117 @@ describe('run hooks and logging', () => {
     } finally { for (const s of [...spies, ...writes]) s.mockRestore(); }
     expect(spies.flatMap((s) => s.mock.calls)).toEqual([]);
     expect(seen.join('')).not.toMatch(/PROMPT-CANARY|RESULT-SECRET|ARGUMENT-SECRET|test-session-token/);
+  });
+  it('automatically creates and finishes a RunStore restore point for each session turn and undoes it cleanly', async () => {
+    const p = await project();
+    const initialStep = await api(`/api/projects/${p}/scenes/s1/steps`, 'POST', { id: 'st1', title: 'Paso original' });
+    expect(initialStep.status).toBe(201);
+    const id = await session(p, { sceneId: 's1' });
+    const { runId, end } = await run(id, 'SCENARIO:edit');
+    expect(end).toEqual({ type: 'finished', reason: 'completed' });
+
+    const runRes = await api(`/api/projects/${p}/runs/${runId}`);
+    expect(runRes.status).toBe(200);
+    expect(runRes.data.run).toMatchObject({
+      id: runId,
+      projectId: p,
+      status: 'finished',
+      label: `claude:${id}`,
+    });
+    expect(runRes.data.run.changes.modifiedSteps).toHaveLength(1);
+    expect(runRes.data.run.changes.modifiedSteps[0].id).toBe('st1');
+    expect(runRes.data.run.changes.createdSteps).toHaveLength(1);
+
+    const preview = await api(`/api/projects/${p}/runs/${runId}/undo`);
+    expect(preview.status).toBe(200);
+    expect(preview.data.plan.requiresForce).toBe(false);
+    expect(preview.data.plan.warnings).toEqual([]);
+
+    const undone = await api(`/api/projects/${p}/runs/${runId}/undo`, 'POST', { confirm: preview.data.plan.confirmationToken });
+    expect(undone.status).toBe(200);
+    expect(undone.data.run.status).toBe('undone');
+
+    const stepsAfter = await api(`/api/projects/${p}/scenes/s1/steps`);
+    expect(stepsAfter.data.steps).toHaveLength(1);
+    expect(stepsAfter.data.steps[0].document.id).toBe('st1');
+    expect(stepsAfter.data.steps[0].document.title).toBe('Paso original');
+    expect(stepsAfter.data.steps[0].document.elements).toEqual([]);
+  });
+  it('warns with requiresForce: true when a person edited a step after the session run, and undoes with force: true', async () => {
+    const p = await project();
+    await api(`/api/projects/${p}/scenes/s1/steps`, 'POST', { id: 'st1', title: 'Paso original' });
+    const id = await session(p, { sceneId: 's1' });
+    const { runId } = await run(id, 'SCENARIO:edit');
+
+    const stepAfterAgent = await api(`/api/projects/${p}/scenes/s1/steps/st1`);
+    const humanEdit = await fetch(`${service.url}/api/projects/${p}/scenes/s1/steps/st1`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'If-Match': `"${stepAfterAgent.data.revision}"`,
+      },
+      body: JSON.stringify({ ...stepAfterAgent.data.document, title: 'Editado por persona' }),
+    });
+    expect(humanEdit.status).toBe(200);
+
+    const preview = await api(`/api/projects/${p}/runs/${runId}/undo`);
+    expect(preview.status).toBe(200);
+    expect(preview.data.plan.requiresForce).toBe(true);
+    expect(preview.data.plan.warnings).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'STEP_MODIFIED_AFTER_RUN', id: 'st1' })]),
+    );
+
+    const withoutForce = await api(`/api/projects/${p}/runs/${runId}/undo`, 'POST', { confirm: preview.data.plan.confirmationToken });
+    expect(withoutForce.status).toBe(409);
+    expect(withoutForce.data.error.code).toBe('FORCE_REQUIRED');
+
+    const withForce = await api(`/api/projects/${p}/runs/${runId}/undo`, 'POST', { confirm: preview.data.plan.confirmationToken, force: true });
+    expect(withForce.status).toBe(200);
+    expect(withForce.data.run.status).toBe('undone');
+
+    const restored = await api(`/api/projects/${p}/scenes/s1/steps/st1`);
+    expect(restored.data.document.title).toBe('Paso original');
+  });
+  it('finishes the restore point of a cancelled turn and of a crashed one, so the next turn can start', async () => {
+    const p = await project();
+    const id = await session(p);
+    const sent = await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'SCENARIO:hang' });
+    const runId = sent.data.runId as string;
+    await waitFor(async () => (await api(`/api/projects/${p}/runs/${runId}`)).data.run?.status === 'running' || undefined, 'the run to open');
+    await api(`/api/agent/sessions/${id}/cancel`, 'POST');
+    await waitFor(async () => (await api(`/api/agent/sessions/${id}`)).data.state === 'idle' || undefined, 'idle');
+    expect((await api(`/api/projects/${p}/runs/${runId}`)).data.run.status).toBe('finished');
+
+    const crashed = await run(id, 'SCENARIO:crash');
+    expect(crashed.end).toMatchObject({ type: 'failed', code: 'crashed' });
+    expect((await api(`/api/projects/${p}/runs/${crashed.runId}`)).data.run.status).toBe('finished');
+    expect((await run(id, 'SCENARIO:ok')).end).toEqual({ type: 'finished', reason: 'completed' });
+    expect((await api(`/api/projects/${p}/runs`)).data.runs.map((r: { status: string }) => r.status)).toEqual(['finished', 'finished', 'finished']);
+  });
+  it('refuses a turn while another restore point is open, and leaves that one alone', async () => {
+    const p = await project();
+    const manual = await api(`/api/projects/${p}/runs`, 'POST', { label: 'otra herramienta' });
+    expect(manual.status).toBe(201);
+    const id = await session(p);
+    const refused = await run(id, 'SCENARIO:ok');
+    expect(refused.end).toMatchObject({ type: 'failed', code: 'blocked' });
+    expect(runs()).toHaveLength(0);
+    const listed = (await api(`/api/projects/${p}/runs`)).data.runs as { id: string; status: string }[];
+    expect(listed).toEqual([expect.objectContaining({ id: manual.data.run.id, status: 'running' })]);
+    await api(`/api/projects/${p}/runs/${manual.data.run.id}/finish`, 'POST');
+    expect((await run(id, 'SCENARIO:ok')).end).toEqual({ type: 'finished', reason: 'completed' });
+  });
+  it('finishes the restore point when the service closes during a turn', async () => {
+    const p = await project();
+    const id = await session(p);
+    const sent = await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'SCENARIO:hang' });
+    const runId = sent.data.runId as string;
+    await waitFor(async () => (await api(`/api/projects/${p}/runs/${runId}`)).data.run?.status === 'running' || undefined, 'the run to open');
+    await waitFor(() => runs().length > 0 || undefined, 'the harness to start');
+    await service.close();
+    await start();
+    // Closed cleanly as part of shutdown, not left to be found "interrupted" at the next start.
+    expect((await api(`/api/projects/${p}/runs/${runId}`)).data.run.status).toBe('finished');
   });
 });

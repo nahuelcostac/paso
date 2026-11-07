@@ -10,6 +10,10 @@ type Props = {
   saveState?: 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
   /** A failed action that has no other place to be said. */
   notice?: React.ReactNode;
+  /** Who is changing which step, with Detener, wherever the agent panel is not in view. */
+  agentStatus?: React.ReactNode;
+  /** Opens the agent panel as a drawer on a narrow Storyboard. */
+  agentToggle?: React.ReactNode;
   /** Presentar, on the Lienzo only. Elsewhere its room stays reserved. */
   presentar?: React.ReactNode;
   view: View; onViewChange: (view: View) => void; panelOpen: boolean; onTogglePanel: () => void;
@@ -21,7 +25,7 @@ const SAVE_LABELS = { saved: 'Guardado', dirty: 'Cambios pendientes', saving: 'G
  * The right column is kept for the agent status and Presentar, which goes at its end. Without Presentar the
  * reserved slot holds its place, so nothing placed before it moves between views.
  */
-export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotice, sceneSelector, saveState, notice, presentar }: Props) {
+export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotice, sceneSelector, saveState, notice, agentStatus, agentToggle, presentar }: Props) {
   return (
     <header className="topbar">
       <div className="topbar__side">
@@ -39,7 +43,9 @@ export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotic
       <div className="topbar__side topbar__side--end">
         {notice}
         {saveNotice}
-        {presentar ?? <div className="topbar__presentar-slot" data-slot="presentar" aria-hidden="true" />}
+        {agentStatus}
+        {/* The Storyboard has no Presentar: on a narrow window the agent's toggle takes its room. */}
+        {presentar ?? agentToggle ?? <div className="topbar__presentar-slot" data-slot="presentar" aria-hidden="true" />}
       </div>
     </header>
   );

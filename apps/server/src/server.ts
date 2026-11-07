@@ -11,7 +11,9 @@ import { RunStore } from './runs.js';
 import { join, dirname, resolve } from 'node:path';
 import { handleAgentRoute } from './agent/api.js';
 import { SessionManager } from './agent/sessions.js';
-import type { AgentRunHooks, HarnessAdapter, HarnessId } from './agent/types.js';
+import type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId } from './agent/types.js';
+
+export type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId };
 
 export type AgentOptions = {
   /** Neutral, empty directory the agents run in. Default: `agent-workspace` next to the projects directory. */
@@ -82,7 +84,22 @@ export async function startServer(options: StartServerOptions) {
     }),
     workDir: agent.workDir ?? join(dirname(dataRoot), 'agent-workspace'), dataDir: dataRoot,
     sessionsPath: registryPath(options.dataDir, agent.sessionsPath ?? join(dirname(dataRoot), 'agent-sessions.json')),
-    hooks: agent.hooks, maxRunsPerProject: agent.maxRunsPerProject, maxRuns: agent.maxRuns,
+    hooks: {
+      beforeRun: async (context) => {
+        await agent.hooks?.beforeRun?.(context);
+        await runs.start(store, context.projectId, { id: context.runId, label: `${context.harness}:${context.sessionId}` });
+      },
+      afterRun: async (context, outcome) => {
+        try {
+          await runs.finish(store, context.projectId, context.runId);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.code === 'NOT_FOUND')) throw error;
+        } finally {
+          await agent.hooks?.afterRun?.(context, outcome);
+        }
+      },
+    },
+    maxRunsPerProject: agent.maxRunsPerProject, maxRuns: agent.maxRuns,
     idleTimeoutMs: agent.idleTimeoutMs, maxRunMs: agent.maxRunMs,
   });
   const allowedOrigins = new Set(options.allowedOrigins ?? []);

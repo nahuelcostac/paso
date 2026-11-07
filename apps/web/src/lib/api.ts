@@ -19,6 +19,93 @@ export class ApiRequestError extends Error {
 export type ProjectEnvelope = { document: Project; revision: string };
 export type ProjectListItem = ({ id: string } & ProjectEnvelope) | { id: string; error: { code: string; message: string } };
 
+export const harnessIds = ['claude', 'codex', 'agy'] as const;
+export type HarnessId = (typeof harnessIds)[number];
+export type HarnessSessionStatus = 'signed_in' | 'signed_out' | 'unknown';
+export type DetectedHarness = {
+  id: HarnessId;
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  session: HarnessSessionStatus;
+  message?: string;
+};
+
+export type ToolTarget = { projectId?: string; sceneId?: string; stepId?: string };
+export type AgentEvent =
+  | { type: 'started' }
+  | { type: 'session'; resumeToken: string; model?: string }
+  | { type: 'text_delta'; text: string }
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; tool: string; readOnly: boolean; target?: ToolTarget }
+  | { type: 'tool_result'; id: string; ok: boolean }
+  | { type: 'finished'; reason: 'completed' | 'cancelled' }
+  | { type: 'failed'; code: string; message: string };
+
+export type AgentSessionInfo = {
+  id: string;
+  harness: HarnessId;
+  projectId: string;
+  sceneId?: string;
+  model?: string;
+  state: 'idle' | 'running';
+  resumable: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentSessionEvent = {
+  sessionId: string;
+  runId: string;
+  seq: number;
+  at: string;
+  event: AgentEvent;
+};
+
+export type UndoWarning = {
+  code: 'STEP_MODIFIED_CONCURRENTLY' | 'STEP_MODIFIED_AFTER_RUN' | 'STEP_DELETED' | 'SCENE_DELETED' | 'SCENE_HAS_POST_RUN_STEPS' | 'ORDER_MODIFIED_AFTER_RUN';
+  kind: 'project' | 'scene' | 'step';
+  id: string;
+  sceneId?: string;
+  title?: string;
+  message: string;
+};
+
+export type UndoPlan = {
+  runId: string;
+  projectId: string;
+  status: 'running' | 'finished' | 'interrupted' | 'undone';
+  canUndo: boolean;
+  requiresForce: boolean;
+  confirmationToken: string;
+  changes: {
+    stepsToRestore: Array<{ id: string; sceneId: string; title?: string; currentRevision: string; restoreRevision: string }>;
+    stepsToRecreate: Array<{ id: string; sceneId: string; title?: string; restoreRevision: string }>;
+    stepsToDelete: Array<{ id: string; sceneId: string; title?: string; currentRevision: string }>;
+    scenesToDelete: Array<{ id: string; name: string; currentRevision: string }>;
+    scenesToKeepWithPostRunSteps: Array<{ id: string; name: string; retainedStepIds: string[] }>;
+    orderChanges: Array<{ kind: 'project' | 'scene'; id: string; currentIds: string[]; restoredIds: string[] }>;
+  };
+  warnings: UndoWarning[];
+};
+
+export type RunSummary = {
+  id: string;
+  projectId: string;
+  status: 'running' | 'finished' | 'interrupted' | 'undone';
+  label?: string;
+  startedAt: string;
+  finishedAt: string | null;
+  undoneAt: string | null;
+  changes: {
+    createdScenes: Array<{ id: string; name?: string; currentStatus: 'present' | 'deleted' }>;
+    createdSteps: Array<{ id: string; sceneId: string; title?: string; currentStatus: 'present' | 'modified_after_run' | 'deleted' }>;
+    modifiedSteps: Array<{ id: string; sceneId: string; title?: string; baselineRevision: string; runRevision: string; currentRevision: string | null; currentStatus: 'unchanged_since_run' | 'modified_concurrently' | 'modified_after_run' | 'deleted' }>;
+    orderChanged: { project: boolean; sceneIds: string[] };
+  };
+  warnings: UndoWarning[];
+};
+
 export function configFromPage(): ClientConfig {
   const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? '';
   return { baseUrl: window.location.origin, token };
@@ -123,6 +210,61 @@ export class ApiClient {
       const blob = await (await fetch(binary.dataURL)).blob();
       await this.asset(target.projectId, entry.path, { method: 'PUT', body: blob, keepalive });
     }
+  }
+
+  async detectHarnesses() {
+    return (await this.request<{ harnesses: DetectedHarness[] }>('/harnesses/detect')).harnesses;
+  }
+  async listHarnesses() {
+    return (await this.request<{ harnesses: DetectedHarness[] }>('/harnesses')).harnesses;
+  }
+  addHarness(id: HarnessId) {
+    return this.request<DetectedHarness>('/harnesses', { method: 'POST', body: { id } });
+  }
+  removeHarness(id: HarnessId) {
+    return this.request<void>(`/harnesses/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  createAgentSession(input: { harness: HarnessId; projectId: string; sceneId?: string; model?: string }) {
+    return this.request<AgentSessionInfo>('/agent/sessions', { method: 'POST', body: input });
+  }
+  async listAgentSessions(projectId?: string) {
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return (await this.request<{ sessions: AgentSessionInfo[] }>(`/agent/sessions${query}`)).sessions;
+  }
+  getAgentSession(id: string) {
+    return this.request<AgentSessionInfo>(`/agent/sessions/${encodeURIComponent(id)}`);
+  }
+  deleteAgentSession(id: string) {
+    return this.request<void>(`/agent/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+  sendAgentMessage(id: string, text: string) {
+    return this.request<{ runId: string }>(`/agent/sessions/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text } });
+  }
+  cancelAgentSession(id: string) {
+    return this.request<{ cancelled: boolean }>(`/agent/sessions/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+  }
+  resumeAgentSession(id: string) {
+    return this.request<AgentSessionInfo>(`/agent/sessions/${encodeURIComponent(id)}/resume`, { method: 'POST' });
+  }
+  getAgentSessionEvents(id: string, after = 0) {
+    return this.request<{ events: AgentSessionEvent[]; next: number }>(`/agent/sessions/${encodeURIComponent(id)}/events?after=${after}`);
+  }
+
+  async listProjectRuns(projectId: string) {
+    return (await this.request<{ runs: RunSummary[] }>(`/projects/${encodeURIComponent(projectId)}/runs`)).runs;
+  }
+  async getProjectRun(projectId: string, runId: string) {
+    return (await this.request<{ run: RunSummary }>(`/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}`)).run;
+  }
+  async previewUndoRun(projectId: string, runId: string) {
+    return (await this.request<{ plan: UndoPlan }>(`/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/undo`)).plan;
+  }
+  executeUndoRun(projectId: string, runId: string, confirm: string, force?: boolean) {
+    return this.request<{ run: RunSummary; plan: UndoPlan }>(
+      `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/undo`,
+      { method: 'POST', body: { confirm, ...(force ? { force: true } : {}) } },
+    );
   }
 
   /** WebSocket URL and subprotocols. The token never goes in the URL. */

@@ -44,7 +44,9 @@ beforeEach(async () => {
   dataDir = await mkdtemp(join(tmpdir(), 'paso-lienzo-'));
   window.history.replaceState(null, '', '/');
   window.matchMedia ??= ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
-  service = await startServer({ dataDir, port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100 });
+  service = await startServer({ dataDir, port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100,
+    // The agent panel asks which harnesses are installed: never run the real ones from a test.
+    harnessDetection: { searchPaths: [], loginShell: false } });
   config = { baseUrl: service.url, token }; api = new ApiClient(config); recovery = memory();
 });
 afterEach(async () => { cleanup(); await service.close(); await rm(dataDir, { recursive: true, force: true }); });
