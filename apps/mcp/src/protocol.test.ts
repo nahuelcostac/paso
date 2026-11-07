@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -16,6 +16,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const entry = join(root, 'apps/mcp/dist/cli.js');
 const token = randomBytes(32).toString('base64url');
 let dataDir: string;
+let testRoot: string;
 let service: ChildProcess;
 let url: string;
 let serviceLogs = '';
@@ -52,8 +53,9 @@ const target = (stepId = lastStepId) => ({ projectId: 'protocol', sceneId, stepI
 const path = (stepId = lastStepId) => `/api/projects/protocol/scenes/${sceneId}/steps/${stepId}`;
 
 beforeAll(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-ag01-protocol-'));
-  service = spawn(process.execPath, [join(root, 'apps/server/dist/cli.js')], { cwd: tmpdir(), env: { ...process.env, PASO_PORT: '0', PASO_DATA_DIR: dataDir, PASO_SESSION_TOKEN: token }, stdio: ['ignore', 'pipe', 'pipe'] });
+  testRoot = await mkdtemp(join(tmpdir(), 'paso-ag01-protocol-'));
+  dataDir = join(testRoot, 'projects');
+  service = spawn(process.execPath, [join(root, 'apps/server/dist/cli.js')], { cwd: tmpdir(), env: { ...process.env, PASO_PORT: '3107', PASO_DATA_DIR: dataDir, PASO_RUNS_DIR: join(testRoot, 'runs'), PASO_SESSION_TOKEN: token }, stdio: ['ignore', 'pipe', 'pipe'] });
   service.stderr!.on('data', (bytes) => { serviceLogs += bytes.toString(); });
   url = await new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Compiled service startup timed out.')), 10_000);
@@ -73,7 +75,7 @@ afterAll(async () => {
   await client?.close();
   await transport?.close();
   if (service && service.exitCode === null && service.signalCode === null) { const closed = once(service, 'exit'); service.kill('SIGTERM'); await closed; }
-  if (dataDir) await rm(dataDir, { recursive: true, force: true });
+  if (testRoot) await rm(testRoot, { recursive: true, force: true });
 });
 
 describe('compiled stdio MCP with a compiled local service', () => {
@@ -83,6 +85,50 @@ describe('compiled stdio MCP with a compiled local service', () => {
     expect(tools.every((tool) => tool.description && tool.inputSchema.additionalProperties === false)).toBe(true);
     const projects = await value<{ projects: { id: string }[] }>('list_projects');
     expect(projects.projects.some((project) => project.id === 'protocol')).toBe(true);
+  });
+  it.each(['human-only-A', 'agent-twice-B'])('undo attributes compiled MCP writes correctly, %s', async (scenario) => {
+    const projectId = `attribution-${scenario}`;
+    const p = `/api/projects/${projectId}`;
+    const s = `${p}/scenes/s`;
+    await api('/api/projects', 'POST', { id: projectId, name: 'Undo attribution' });
+    await api(`${p}/scenes`, 'POST', { id: 's', name: 'Scene' });
+    const a = await api<Envelope<Step>>(`${s}/steps`, 'POST', { id: 'a', title: 'A' });
+    const b = await api<Envelope<Step>>(`${s}/steps`, 'POST', { id: 'b', title: 'B' });
+    const diskFiles = async () => {
+      const dir = join(dataDir, projectId);
+      const files = (await readdir(dir, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile());
+      return new Map(await Promise.all(files.map(async (entry) => {
+        const path = join(entry.parentPath, entry.name);
+        return [path, await readFile(path)] as const;
+      })));
+    };
+    const before = await diskFiles();
+    await api(`${p}/runs`, 'POST', { id: 'run' });
+    let human = a;
+    if (scenario === 'human-only-A') human = await api(`${s}/steps/a`, 'PUT', { ...a.document, speakerNotes: 'Human work' }, a.revision);
+    const target = { projectId, sceneId: 's', stepId: 'b' };
+    const first = await value<{ revision: string }>('add_elements', { ...target, revision: b.revision, elements: [{ type: 'rectangle', id: 'rect', x: 10, y: 10 }] });
+    if (scenario === 'agent-twice-B') await value('update_elements', { ...target, revision: first.revision, elements: [{ id: 'rect', x: 80 }] });
+    await api(`${p}/runs/run/finish`, 'POST');
+    const { plan } = await api<{ plan: { requiresForce: boolean; warnings: unknown[]; confirmationToken: string; changes: { stepsToRestore: { id: string }[] } } }>(`${p}/runs/run/undo`);
+    expect(plan.requiresForce).toBe(false);
+    expect(plan.warnings).toEqual([]);
+    expect(plan.changes.stepsToRestore.map((step) => step.id)).toEqual(['b']);
+    const humanBytes = await readFile(join(dataDir, projectId, 'scenes/s/steps/a.json'));
+    await api(`${p}/runs/run/undo`, 'POST', { confirm: plan.confirmationToken });
+    expect(await api(`${s}/steps/a`)).toEqual(human);
+    expect(await api(`${s}/steps/b`)).toEqual(b);
+    const after = await diskFiles();
+    expect([...after.keys()].sort()).toEqual([...before.keys()].sort());
+    // Compare every file. Only updatedAt and the intentional human-only edit differ.
+    for (const [path, original] of before) {
+      const actual = after.get(path)!;
+      if (path.endsWith('/project.json')) {
+        const project = JSON.parse(actual.toString());
+        expect(project).toEqual({ ...JSON.parse(original.toString()), updatedAt: project.updatedAt });
+      } else if (path.endsWith('/steps/a.json')) expect(actual).toEqual(humanBytes);
+      else expect(actual).toEqual(original);
+    }
   });
   it('builds three progressive steps and edits the last without changing previous snapshots', async () => {
     const scene = await value<Envelope<Scene>>('create_scene', { projectId: 'protocol', id: 'scene', name: 'De entrada a resultado' });

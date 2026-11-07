@@ -6,6 +6,22 @@ local service API. The MCP process never opens project folders. It does not
 launch a harness, change harness permissions, make restore points, or expose
 shell commands or general file access.
 
+## Write attribution and undo
+
+The shared MCP HTTP client sends `X-Paso-Actor: mcp` on every write. Tool callers
+never set this header and do not pass an actor or run ID in tool arguments. The
+service attaches these writes to the one active run for the project. A write
+outside a run succeeds without creating or changing a restore point. Plain HTTP
+and web-client writes without this header remain person-authored.
+
+This also works with harness sessions that launch MCP with environment variables.
+The existing `PASO_SERVICE_URL` and `PASO_SESSION_TOKEN` are sufficient. No
+harness-specific opt-in is needed. The host must start the restore point before
+launching the harness and finish it after all its MCP processes stop. See the
+[runs API](server-api.md#agent-runs-and-restore-points) for conflict warnings and
+confirmation. Attribution is not an authorization boundary against a client
+that already has the full local-service token.
+
 ## Build and start
 
 Use the repository's Node and pnpm versions. From the repository root, run

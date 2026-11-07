@@ -44,14 +44,23 @@ const runTouchLogSchema = z.object({
     sceneId: idSchema,
     lastRevision: z.string(),
     hadConcurrentEdit: z.boolean().optional(),
+    deletedByRun: z.boolean().optional(),
   }).strict()),
   humanEditedSteps: z.record(idSchema, z.string()).optional(),
+  deletedScenes: z.array(idSchema).optional(),
+  humanChangedScenes: z.array(idSchema).optional(),
+  humanReorderedProject: z.boolean().optional(),
+  humanReorderedScenes: z.array(idSchema).optional(),
+  projectOrderBaseline: z.array(idSchema).optional(),
+  sceneOrderBaselines: z.record(idSchema, z.array(idSchema)).optional(),
   reorderedProject: z.boolean(),
   reorderedScenes: z.array(idSchema),
 }).strict();
 
 const storedRunSchema = z.object({
   schemaVersion: z.literal(1),
+  attributionVersion: z.literal(2).optional(),
+  observedState: runEndStateSchema.optional(),
   id: idSchema,
   projectId: idSchema,
   status: runStatusSchema,
@@ -67,7 +76,7 @@ const storedRunSchema = z.object({
 export type StoredRun = z.infer<typeof storedRunSchema>;
 
 export type UndoWarning = {
-  code: 'STEP_MODIFIED_CONCURRENTLY' | 'STEP_MODIFIED_AFTER_RUN' | 'STEP_DELETED' | 'SCENE_DELETED' | 'SCENE_HAS_POST_RUN_STEPS' | 'ORDER_MODIFIED_AFTER_RUN';
+  code: 'STEP_MODIFIED_CONCURRENTLY' | 'STEP_MODIFIED_AFTER_RUN' | 'STEP_DELETED' | 'SCENE_DELETED' | 'SCENE_HAS_POST_RUN_STEPS' | 'ORDER_MODIFIED_AFTER_RUN' | 'ORDER_MODIFIED_CONCURRENTLY' | 'SCENE_MODIFIED_CONCURRENTLY' | 'SCENE_MODIFIED_AFTER_RUN';
   kind: 'project' | 'scene' | 'step';
   id: string;
   sceneId?: string;
@@ -86,6 +95,7 @@ export type UndoPlan = {
     stepsToRestore: Array<{ id: string; sceneId: string; title?: string; currentRevision: string; restoreRevision: string }>;
     stepsToRecreate: Array<{ id: string; sceneId: string; title?: string; restoreRevision: string }>;
     stepsToDelete: Array<{ id: string; sceneId: string; title?: string; currentRevision: string }>;
+    scenesToRecreate: Array<{ id: string; name: string }>;
     scenesToDelete: Array<{ id: string; name: string; currentRevision: string }>;
     scenesToKeepWithPostRunSteps: Array<{ id: string; name: string; retainedStepIds: string[] }>;
     orderChanges: Array<{ kind: 'project' | 'scene'; id: string; currentIds: string[]; restoredIds: string[] }>;
@@ -132,6 +142,23 @@ export function runsDirectoryPath(dataDir: string, configured?: string) {
 
 function sameIds(a: string[], b: string[]) {
   return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+function relativeOrderChanged(a: string[], b: string[]) {
+  const shared = new Set(a.filter((id) => b.includes(id)));
+  return !sameIds(a.filter((id) => shared.has(id)), b.filter((id) => shared.has(id)));
+}
+
+/** Restore deleted items beside a surviving baseline neighbour, preserving all live order. */
+function insertRestoredIds(baseline: string[], current: string[], restored: Set<string>) {
+  const result = current.filter((id) => !restored.has(id));
+  for (const id of baseline.filter((id) => restored.has(id))) {
+    const index = baseline.indexOf(id);
+    const next = baseline.slice(index + 1).find((other) => result.includes(other));
+    if (next) result.splice(result.indexOf(next), 0, id);
+    else result.push(id);
+  }
+  return result;
 }
 
 async function snapshotTree(store: Store, tree: ProjectTree, records: Map<string, RecordFile>): Promise<z.infer<typeof runSnapshotSchema>> {
@@ -339,75 +366,102 @@ export class RunStore {
     }
   }
 
-  async recordMutation(projectId: string, mutation: {
-    action: 'createScene' | 'createStep' | 'duplicate' | 'updateStep' | 'orderScenes' | 'orderSteps' | 'rename' | 'delete';
-    actor?: 'mcp' | 'user';
-    sceneId?: string;
-    stepId?: string;
-    createdId?: string;
-    previousRevision?: string;
-    newRevision?: string;
-    previousStep?: Step;
-    newStep?: Step;
-  }) {
-    const active = this.activeRuns.get(projectId);
-    if (!active || active.status !== 'running') return;
-    let changed = false;
-    if (mutation.action === 'createScene' && mutation.createdId) {
-      if (!active.touched.createdScenes.includes(mutation.createdId)) {
-        active.touched.createdScenes.push(mutation.createdId);
+  hasActiveRun(projectId: string) { return this.activeRuns.has(projectId); }
+
+  /** Track unmediated disk edits before a service operation, under the project lock. */
+  async observeState(store: Store, tree: ProjectTree, records: Map<string, RecordFile>) {
+    const run = this.activeRuns.get(tree.project.id);
+    if (!run) return;
+    const current = captureEndState(tree, records);
+    const previous = run.observedState;
+    let changed = JSON.stringify(previous) !== JSON.stringify(current);
+    if (previous) this.recordHumanDifferences(run, previous, current);
+    // A person can create an item, then the agent can edit or delete it. Keep its
+    // first observed snapshot without classifying its creation as an agent write.
+    for (const { scene, steps } of tree.scenes) {
+      if (!run.baseline.scenes[scene.id] && !run.touched.createdScenes.includes(scene.id)) {
+        const revision = records.get(`${run.projectId}/scenes/${scene.id}/scene.json`)!.revision;
+        run.baseline.scenes[scene.id] = { document: structuredClone(scene), revision };
+        changed = true;
       }
-      active.touched.reorderedProject = true;
-      changed = true;
-    } else if ((mutation.action === 'createStep' || mutation.action === 'duplicate') && mutation.createdId && mutation.sceneId) {
-      active.touched.createdSteps[mutation.createdId] = mutation.sceneId;
-      if (mutation.newRevision) {
-        active.touched.touchedSteps[mutation.createdId] = {
-          sceneId: mutation.sceneId,
-          lastRevision: mutation.newRevision,
+      for (const step of steps) {
+        if (run.baseline.steps[step.id] || run.touched.createdSteps[step.id]) continue;
+        const path = `${run.projectId}/scenes/${scene.id}/steps/${step.id}.json`;
+        run.baseline.steps[step.id] = {
+          sceneId: scene.id, document: structuredClone(step), revision: records.get(path)!.revision,
+          rawText: (await store.disk.read(path)).toString('utf8'),
+        };
+        changed = true;
+      }
+    }
+    run.observedState = current;
+    if (changed) await this.writeRunFile(run);
+  }
+
+  private recordHumanDifferences(run: StoredRun, before: z.infer<typeof runEndStateSchema>, after: z.infer<typeof runEndStateSchema>) {
+    const human = run.touched.humanEditedSteps ??= {};
+    for (const id of new Set([...Object.keys(before.stepRevisions), ...Object.keys(after.stepRevisions)])) {
+      if (before.stepRevisions[id] !== after.stepRevisions[id]) human[id] = after.stepRevisions[id] ?? 'deleted';
+    }
+    for (const id of new Set([...Object.keys(before.scenes), ...Object.keys(after.scenes)])) {
+      if (before.scenes[id]?.name !== after.scenes[id]?.name) {
+        const changed = run.touched.humanChangedScenes ??= [];
+        if (!changed.includes(id)) changed.push(id);
+      }
+    }
+    // Additions and deletions alone do not reorder surviving items.
+    if (relativeOrderChanged(before.projectSceneIds, after.projectSceneIds)) run.touched.humanReorderedProject = true;
+    for (const [id, scene] of Object.entries(before.scenes)) {
+      if (after.scenes[id] && relativeOrderChanged(scene.stepIds, after.scenes[id].stepIds)) {
+        const reordered = run.touched.humanReorderedScenes ??= [];
+        if (!reordered.includes(id)) reordered.push(id);
+      }
+    }
+  }
+
+  async recordMutation(actor: 'mcp' | 'user', action: string, before: Map<string, RecordFile>, tree: ProjectTree, records: Map<string, RecordFile>, sceneId?: string) {
+    const run = this.activeRuns.get(tree.project.id);
+    if (!run) return;
+    const current = captureEndState(tree, records);
+    if (actor === 'user') {
+      this.recordHumanDifferences(run, run.observedState!, current);
+    } else {
+      for (const [path, record] of records) {
+        if (record.kind === 'scene' && !before.has(path) && !run.baseline.scenes[record.id]) {
+          if (!run.touched.createdScenes.includes(record.id)) run.touched.createdScenes.push(record.id);
+        }
+        if (record.kind !== 'step' || before.get(path)?.revision === record.revision) continue;
+        if (!before.has(path) && !run.baseline.steps[record.id]) run.touched.createdSteps[record.id] = record.sceneId!;
+        run.touched.touchedSteps[record.id] = {
+          sceneId: record.sceneId!, lastRevision: record.revision,
+          hadConcurrentEdit: Boolean(run.touched.humanEditedSteps?.[record.id]),
         };
       }
-      if (!active.touched.reorderedScenes.includes(mutation.sceneId)) {
-        active.touched.reorderedScenes.push(mutation.sceneId);
-      }
-      changed = true;
-    } else if (mutation.action === 'updateStep' && mutation.stepId && mutation.sceneId && mutation.newRevision) {
-      const existingTouch = active.touched.touchedSteps[mutation.stepId];
-      const baseStep = active.baseline.steps[mutation.stepId];
-      // Check if this step was already modified by a person during the run before this edit:
-      // 1) An external edit happened before this API call (previousRevision !== expected lastRevision/baseline)
-      const expectedPrevRev = existingTouch?.lastRevision ?? baseStep?.revision;
-      const hadPriorExternalEdit = Boolean(expectedPrevRev && mutation.previousRevision && mutation.previousRevision !== expectedPrevRev);
-      // 2) Both a user edit and an agent edit touched this step, or a user edited speakerNotes/title/appState/non-MCP fields after another edit during the run
-      const prevHadConcurrent = Boolean(existingTouch?.hadConcurrentEdit);
-      let isConcurrentHumanAndAgent = prevHadConcurrent || hadPriorExternalEdit;
-
-      if (existingTouch && existingTouch.lastRevision !== (baseStep?.revision ?? '')) {
-        // The step was already modified at least once during this run.
-        // Check if one edit was human-authored (e.g., speakerNotes/title/appState changed or actor === 'user') and another was agent-authored.
-        if (mutation.actor === 'user') {
-          isConcurrentHumanAndAgent = true;
+      for (const [path, record] of before) {
+        if (records.has(path)) continue;
+        if (record.kind === 'step') {
+          run.touched.touchedSteps[record.id] = {
+            sceneId: record.sceneId!, lastRevision: record.revision, deletedByRun: true,
+            hadConcurrentEdit: Boolean(run.touched.humanEditedSteps?.[record.id]),
+          };
+        } else if (record.kind === 'scene' && !run.touched.createdScenes.includes(record.id)) {
+          const deleted = run.touched.deletedScenes ??= [];
+          if (!deleted.includes(record.id)) deleted.push(record.id);
         }
       }
-
-      active.touched.touchedSteps[mutation.stepId] = {
-        sceneId: mutation.sceneId,
-        lastRevision: mutation.newRevision,
-        ...(isConcurrentHumanAndAgent ? { hadConcurrentEdit: true } : {}),
-      };
-      changed = true;
-    } else if (mutation.action === 'orderScenes') {
-      active.touched.reorderedProject = true;
-      changed = true;
-    } else if (mutation.action === 'orderSteps' && mutation.sceneId) {
-      if (!active.touched.reorderedScenes.includes(mutation.sceneId)) {
-        active.touched.reorderedScenes.push(mutation.sceneId);
+      const previous = run.observedState!;
+      if (action === 'orderScenes' && relativeOrderChanged(previous.projectSceneIds, current.projectSceneIds)) {
+        run.touched.projectOrderBaseline ??= computeRestoredOrder(run.baseline.project.sceneIds, previous.projectSceneIds, new Set());
+        run.touched.reorderedProject = true;
       }
-      changed = true;
+      if (action === 'orderSteps' && sceneId && relativeOrderChanged(previous.scenes[sceneId].stepIds, current.scenes[sceneId].stepIds)) {
+        const baselines = run.touched.sceneOrderBaselines ??= {};
+        baselines[sceneId] ??= computeRestoredOrder(run.baseline.scenes[sceneId]?.document.stepIds ?? previous.scenes[sceneId].stepIds, previous.scenes[sceneId].stepIds, new Set());
+        if (!run.touched.reorderedScenes.includes(sceneId)) run.touched.reorderedScenes.push(sceneId);
+      }
     }
-    if (changed) {
-      await this.writeRunFile(active);
-    }
+    run.observedState = current;
+    await this.writeRunFile(run);
   }
 
   async deleteProjectRuns(projectId: string) {
@@ -436,6 +490,8 @@ export class RunStore {
       const baseline = await snapshotTree(store, tree, records);
       const run: StoredRun = {
         schemaVersion: 1,
+        attributionVersion: 2,
+        observedState: captureEndState(tree, records),
         id: runId,
         projectId,
         status: 'running',
@@ -537,6 +593,7 @@ export class RunStore {
         plan.changes.stepsToRestore.length > 0 ||
         plan.changes.stepsToRecreate.length > 0 ||
         plan.changes.stepsToDelete.length > 0 ||
+        plan.changes.scenesToRecreate.length > 0 ||
         plan.changes.scenesToDelete.length > 0 ||
         plan.changes.orderChanges.length > 0;
 
@@ -566,6 +623,9 @@ export class RunStore {
   }
 
   private async assertCanAnalyzeOrUndo(projectId: string, run: StoredRun) {
+    if (run.attributionVersion !== 2) {
+      throw new ApiError(409, 'RUN_ATTRIBUTION_UNKNOWN', 'This restore point predates reliable write attribution and cannot be undone safely.');
+    }
     const active = this.activeRuns.get(projectId);
     if (active && active.status === 'running' && active.id !== run.id) {
       throw new ApiError(409, 'RUN_IN_PROGRESS', `Another run ("${active.id}") is currently in progress.`);
@@ -591,42 +651,19 @@ export class RunStore {
       currentScenes.set(scene.id, { scene, steps: new Map(steps.map((s) => [s.id, s])) });
     }
 
-    // Created scenes: recorded in touched.createdScenes, or if interrupted/finished, any scene in endState not in baseline
     const createdSceneIds = new Set<string>(run.touched.createdScenes);
-    if (run.endState) {
-      for (const sceneId of Object.keys(run.endState.scenes)) {
-        if (!Object.hasOwn(run.baseline.scenes, sceneId)) createdSceneIds.add(sceneId);
-      }
-    } else {
-      for (const { scene } of tree.scenes) {
-        if (!Object.hasOwn(run.baseline.scenes, scene.id) && run.touched.createdScenes.includes(scene.id)) {
-          createdSceneIds.add(scene.id);
-        }
-      }
-    }
-
-    // Created steps: recorded in touched.createdSteps
     const createdStepsMap = new Map<string, string>(Object.entries(run.touched.createdSteps));
-    if (run.endState) {
-      for (const [sceneId, sceneEnd] of Object.entries(run.endState.scenes)) {
-        for (const stepId of sceneEnd.stepIds) {
-          if (!Object.hasOwn(run.baseline.steps, stepId) && run.touched.createdSteps[stepId]) {
-            createdStepsMap.set(stepId, sceneId);
-          }
-        }
-      }
-    }
 
     // Modified baseline steps: baseline steps that the run touched
     const modifiedBaselineSteps = new Map<string, { sceneId: string; baselineRevision: string; runRevision: string; hadConcurrentEdit: boolean }>();
     for (const [stepId, baseStep] of Object.entries(run.baseline.steps)) {
       const touched = run.touched.touchedSteps[stepId];
-      if (touched && touched.lastRevision !== baseStep.revision) {
+      if (touched && (touched.deletedByRun || touched.lastRevision !== baseStep.revision || run.touched.humanEditedSteps?.[stepId])) {
         modifiedBaselineSteps.set(stepId, {
           sceneId: baseStep.sceneId,
           baselineRevision: baseStep.revision,
           runRevision: touched.lastRevision,
-          hadConcurrentEdit: Boolean(touched.hadConcurrentEdit),
+          hadConcurrentEdit: Boolean(touched.hadConcurrentEdit || run.touched.humanEditedSteps?.[stepId]),
         });
       }
     }
@@ -674,7 +711,7 @@ export class RunStore {
       if (!currStep || !rec) {
         currentStatus = 'deleted';
       } else if (rec.revision !== info.runRevision) {
-        if (endRev && endRev !== info.runRevision && rec.revision === endRev) {
+        if (info.hadConcurrentEdit && (!endRev || rec.revision === endRev)) {
           currentStatus = 'modified_concurrently';
         } else {
           currentStatus = 'modified_after_run';
@@ -718,6 +755,20 @@ export class RunStore {
 
   private computeUndo(run: StoredRun, tree: ProjectTree, records: Map<string, RecordFile>): { plan: UndoPlan; nextTree: ProjectTree } {
     const { currentScenes, createdSceneIds, createdStepsMap, modifiedBaselineSteps } = this.deriveRunChanges(run, tree);
+    // Recreate only scenes deleted by the agent. Human-deleted scenes stay deleted.
+    const scenesToRecreate: UndoPlan['changes']['scenesToRecreate'] = [];
+    const workingTree = structuredClone(tree);
+    for (const id of run.touched.deletedScenes ?? []) {
+      if (currentScenes.has(id)) continue;
+      const baseline = run.baseline.scenes[id];
+      if (!baseline) continue;
+      const scene = { ...structuredClone(baseline.document), stepIds: [] as string[] };
+      workingTree.scenes.push({ scene, steps: [] });
+      workingTree.project.sceneIds.push(id);
+      currentScenes.set(id, { scene, steps: new Map() });
+      scenesToRecreate.push({ id, name: scene.name });
+    }
+    workingTree.project.sceneIds = insertRestoredIds(run.baseline.project.sceneIds, workingTree.project.sceneIds, new Set(scenesToRecreate.map((s) => s.id)));
 
     const warnings: UndoWarning[] = [];
     const stepsToRestore: UndoPlan['changes']['stepsToRestore'] = [];
@@ -751,15 +802,14 @@ export class RunStore {
       }
 
       if (!currStep || !rec) {
-        requiresForce = true;
-        warnings.push({
-          code: 'STEP_DELETED',
-          kind: 'step',
-          id: stepId,
-          sceneId: info.sceneId,
-          ...(title ? { title } : {}),
-          message: `Step "${stepId}" was modified by the run and later deleted by a person. Undoing will recreate its baseline snapshot.`,
-        });
+        if (!run.touched.touchedSteps[stepId]?.deletedByRun || info.hadConcurrentEdit) {
+          requiresForce = true;
+          warnings.push({
+            code: 'STEP_DELETED', kind: 'step', id: stepId, sceneId: info.sceneId,
+            ...(title ? { title } : {}),
+            message: `Step "${stepId}" was edited or deleted by both the run and a person. Undoing will recreate its baseline snapshot and revert the person's changes.`,
+          });
+        }
         stepsToRecreate.push({
           id: stepId,
           sceneId: info.sceneId,
@@ -773,7 +823,7 @@ export class RunStore {
       const endRev = run.endState?.stepRevisions[stepId];
       if (rec.revision !== info.runRevision) {
         requiresForce = true;
-        if (endRev && endRev !== info.runRevision && rec.revision === endRev) {
+        if (info.hadConcurrentEdit && (!endRev || rec.revision === endRev)) {
           warnings.push({
             code: 'STEP_MODIFIED_CONCURRENTLY',
             kind: 'step',
@@ -828,10 +878,11 @@ export class RunStore {
       }
       const title = currStep.title;
       const expectedRev = run.touched.touchedSteps[stepId]?.lastRevision ?? run.endState?.stepRevisions[stepId];
-      if (expectedRev && rec.revision !== expectedRev) {
+      const humanDuringRun = Boolean(run.touched.humanEditedSteps?.[stepId]);
+      if (humanDuringRun || (expectedRev && rec.revision !== expectedRev)) {
         requiresForce = true;
         warnings.push({
-          code: 'STEP_MODIFIED_AFTER_RUN',
+          code: humanDuringRun ? 'STEP_MODIFIED_CONCURRENTLY' : 'STEP_MODIFIED_AFTER_RUN',
           kind: 'step',
           id: stepId,
           sceneId,
@@ -870,6 +921,16 @@ export class RunStore {
           retainedStepIds: remainingStepIds,
         });
       } else {
+        const humanDuringRun = run.touched.humanChangedScenes?.includes(sceneId);
+        const expectedName = run.observedState?.scenes[sceneId]?.name;
+        if (humanDuringRun || (expectedName !== undefined && expectedName !== currScene.scene.name)) {
+          requiresForce = true;
+          warnings.push({
+            code: humanDuringRun ? 'SCENE_MODIFIED_CONCURRENTLY' : 'SCENE_MODIFIED_AFTER_RUN',
+            kind: 'scene', id: sceneId,
+            message: `Scene "${sceneId}" was created by the run and edited by a person. Undoing will delete the scene and lose those edits.`,
+          });
+        }
         sceneIdsToRemove.add(sceneId);
         scenesToDelete.push({
           id: sceneId,
@@ -880,10 +941,10 @@ export class RunStore {
     }
 
     // 4. Construct nextTree and evaluate order restorations
-    const nextProject: Project = structuredClone(tree.project);
+    const nextProject: Project = structuredClone(workingTree.project);
     const nextScenes: Array<{ scene: Scene; steps: Step[] }> = [];
 
-    for (const { scene, steps } of tree.scenes) {
+    for (const { scene, steps } of workingTree.scenes) {
       if (sceneIdsToRemove.has(scene.id)) continue;
       const nextScene = structuredClone(scene);
       const nextSteps: Step[] = [];
@@ -910,21 +971,28 @@ export class RunStore {
       }
 
       const baseScene = run.baseline.scenes[scene.id];
-      const runTouchedSceneOrder = run.touched.reorderedScenes.includes(scene.id) ||
-        stepsToRecreate.some((s) => s.sceneId === scene.id);
+      const runTouchedSceneOrder = run.touched.reorderedScenes.includes(scene.id);
+      if (!runTouchedSceneOrder && baseScene) {
+        const recreated = new Set([...stepsToRecreateDocs].filter(([, value]) => value.sceneId === scene.id).map(([id]) => id));
+        const placed = insertRestoredIds(baseScene.document.stepIds, currentOrderAfterRemovals, recreated);
+        currentOrderAfterRemovals.splice(0, currentOrderAfterRemovals.length, ...placed);
+      }
 
-      if (baseScene && runTouchedSceneOrder) {
-        const endOrder = run.endState?.scenes[scene.id]?.stepIds;
-        if (endOrder && !sameIds(scene.stepIds, endOrder)) {
+      const baselineOrder = run.touched.sceneOrderBaselines?.[scene.id] ?? baseScene?.document.stepIds;
+      if (baselineOrder && runTouchedSceneOrder) {
+        const endOrder = (run.endState ?? run.observedState)?.scenes[scene.id]?.stepIds;
+        const humanDuringRun = run.touched.humanReorderedScenes?.includes(scene.id);
+        if (humanDuringRun || (endOrder && relativeOrderChanged(scene.stepIds, endOrder))) {
+          requiresForce = true;
           warnings.push({
-            code: 'ORDER_MODIFIED_AFTER_RUN',
+            code: humanDuringRun ? 'ORDER_MODIFIED_CONCURRENTLY' : 'ORDER_MODIFIED_AFTER_RUN',
             kind: 'scene',
             id: scene.id,
             sceneId: scene.id,
-            message: `Step order in scene "${scene.id}" was changed after the run.`,
+            message: `Restoring step order in scene "${scene.id}" will also revert a person's order changes.`,
           });
         }
-        const restoredStepIds = computeRestoredOrder(baseScene.document.stepIds, currentOrderAfterRemovals, stepIdsToRemove);
+        const restoredStepIds = computeRestoredOrder(baselineOrder, currentOrderAfterRemovals, stepIdsToRemove);
         if (!sameIds(scene.stepIds, restoredStepIds)) {
           orderChanges.push({
             kind: 'scene',
@@ -956,16 +1024,18 @@ export class RunStore {
 
     const currentProjectOrderAfterRemovals = nextProject.sceneIds.filter((id) => !sceneIdsToRemove.has(id));
     if (run.touched.reorderedProject) {
-      const endSceneOrder = run.endState?.projectSceneIds;
-      if (endSceneOrder && !sameIds(tree.project.sceneIds, endSceneOrder)) {
+      const endSceneOrder = (run.endState ?? run.observedState)?.projectSceneIds;
+      const humanDuringRun = run.touched.humanReorderedProject;
+      if (humanDuringRun || (endSceneOrder && relativeOrderChanged(tree.project.sceneIds, endSceneOrder))) {
+        requiresForce = true;
         warnings.push({
-          code: 'ORDER_MODIFIED_AFTER_RUN',
+          code: humanDuringRun ? 'ORDER_MODIFIED_CONCURRENTLY' : 'ORDER_MODIFIED_AFTER_RUN',
           kind: 'project',
           id: tree.project.id,
-          message: `Scene order in project "${tree.project.id}" was changed after the run.`,
+          message: `Restoring scene order in project "${tree.project.id}" will also revert a person's order changes.`,
         });
       }
-      const restoredSceneIds = computeRestoredOrder(run.baseline.project.sceneIds, currentProjectOrderAfterRemovals, sceneIdsToRemove);
+      const restoredSceneIds = computeRestoredOrder(run.touched.projectOrderBaseline ?? run.baseline.project.sceneIds, currentProjectOrderAfterRemovals, sceneIdsToRemove);
       if (!sameIds(tree.project.sceneIds, restoredSceneIds)) {
         orderChanges.push({
           kind: 'project',
@@ -999,6 +1069,7 @@ export class RunStore {
       stepsToRecreate,
       stepsToDelete,
       scenesToDelete,
+      scenesToRecreate,
       scenesToKeepWithPostRunSteps,
       orderChanges,
     };
