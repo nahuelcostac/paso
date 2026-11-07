@@ -11,7 +11,35 @@ const fonts = join(dirname(require.resolve('@excalidraw/excalidraw')), 'fonts');
 
 export default defineConfig(({ command }) => ({
   define: { 'process.env.IS_PREACT': JSON.stringify('false') },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Excalidraw's worker and the app share this generated helper module.
+          // Keep it out of the browser entry, which cannot execute in a worker.
+          if (id.includes('/@excalidraw/excalidraw/dist/prod/chunk-SRAX5OIU.js')) return 'excalidraw-runtime-helpers';
+        },
+      },
+    },
+  },
   plugins: [react(), {
+    name: 'paso-check-subsetting-worker',
+    generateBundle(_options, bundle) {
+      const chunks = Object.values(bundle).filter((item) => item.type === 'chunk');
+      const worker = chunks.find((chunk) => chunk.facadeModuleId?.endsWith('/subset-worker.chunk.js'));
+      if (!worker) throw new Error('Excalidraw subsetting worker is missing from the build');
+      const visited = new Set<string>();
+      const check = (fileName: string) => {
+        if (visited.has(fileName)) return;
+        visited.add(fileName);
+        const chunk = bundle[fileName];
+        if (!chunk || chunk.type !== 'chunk') return;
+        if (chunk.isEntry) throw new Error(`Subsetting worker depends on app entry ${fileName}`);
+        for (const dependency of [...chunk.imports, ...chunk.dynamicImports]) check(dependency);
+      };
+      check(worker.fileName);
+    },
+  }, {
     name: 'paso-offline-excalidraw-fonts',
     async writeBundle(options) { await cp(fonts, resolve(options.dir ?? 'dist', 'excalidraw/fonts'), { recursive: true }); },
     configureServer(server) {
