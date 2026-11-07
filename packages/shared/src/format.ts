@@ -12,10 +12,15 @@ const schemaVersionSchema = z.literal(SCHEMA_VERSION, {
 export const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const timestampSchema = z.iso.datetime({ offset: true });
 
+// A Lucide icon name in kebab case, such as "folder" or "chart-scatter". Only the shape is
+// checked: the list of icons belongs to the app, so new Lucide releases need no format change.
+export const iconNameSchema = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'An icon name uses lowercase letters, digits and single hyphens.');
+
 export const projectSchema = z.object({
   schemaVersion: schemaVersionSchema,
   id: idSchema,
   name: z.string().min(1),
+  icon: iconNameSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
   sceneIds: z.array(idSchema),

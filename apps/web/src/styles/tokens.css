@@ -74,6 +74,10 @@
     0 1px 2px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.3)),
     0 10px 30px light-dark(rgb(74 56 28 / 0.1), rgb(0 0 0 / 0.28));
 
+  /* Behind a modal dialog, and the lift of a popover above the panels. */
+  --scrim: light-dark(rgb(40 30 14 / 0.28), rgb(0 0 0 / 0.5));
+  --shadow-popover: light-dark(rgb(74 56 28 / 0.2), rgb(0 0 0 / 0.5));
+
   /* Soft fill for hover, selected rows and the user's chat bubble. */
   --table-well: light-dark(rgb(74 56 28 / 0.1), rgb(255 245 225 / 0.1));
 

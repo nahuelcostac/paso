@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs';
 import {
   createProject, createScene, createStep, duplicateStep, idSchema, parseProject, parseScene, parseStep,
-  validateProjectTree, stepSchema, type ProjectTree, type Step,
+  validateProjectTree, stepSchema, iconNameSchema, type ProjectTree, type Step,
 } from '@paso/shared';
 import { z } from 'zod';
 import { Disk, assetName, hash, jsonBytes, type Document, type RecordFile } from './disk.js';
@@ -15,6 +15,10 @@ export type ChangeEvent = {
 export type Envelope = { document: Document; revision: string };
 const namedInput = z.object({ id: idSchema.optional(), name: z.string().min(1) }).strict();
 const renameInput = z.object({ name: z.string().min(1) }).strict();
+const projectCreateInput = z.object({ id: idSchema.optional(), name: z.string().min(1), icon: iconNameSchema.optional() }).strict();
+// A project can be renamed, given an icon, or both. A null icon removes it.
+const projectPatchInput = z.object({ name: z.string().min(1).optional(), icon: iconNameSchema.nullable().optional() }).strict()
+  .refine((data) => data.name !== undefined || data.icon !== undefined, { message: 'Send a name, an icon, or both.' });
 const orderInput = z.object({ ids: z.array(idSchema) }).strict();
 const stepInput = stepSchema.omit({ schemaVersion: true }).partial().strict();
 const duplicateInput = z.object({ id: idSchema.optional() }).strict();
@@ -190,8 +194,8 @@ export class Store {
     });
   }
   async create(input: unknown) {
-    const data = namedInput.parse(input);
-    const project = createProject(data.name, { id: data.id });
+    const data = projectCreateInput.parse(input);
+    const project = createProject(data.name, { id: data.id, icon: data.icon });
     return this.lock(project.id, async () => {
       if (await this.disk.exists(project.id)) throw new ApiError(409, 'ALREADY_EXISTS', 'Project ID already exists.');
       await this.disk.write(projectPath(project.id), jsonBytes(project));
@@ -210,9 +214,13 @@ export class Store {
       const entry = tree.scenes.find(({ scene }) => scene.id === sceneId);
       let resultPath = path;
       if (action === 'rename') {
-        const { name } = renameInput.parse(input);
-        if (sceneId) entry!.scene = parseScene({ ...entry!.scene, name });
-        else tree.project = parseProject({ ...tree.project, name });
+        if (sceneId) entry!.scene = parseScene({ ...entry!.scene, name: renameInput.parse(input).name });
+        else {
+          const { name = tree.project.name, icon = tree.project.icon } = projectPatchInput.parse(input);
+          const next = { ...tree.project, name };
+          if (icon) next.icon = icon; else delete next.icon;
+          tree.project = parseProject(next);
+        }
       } else if (action === 'createScene') {
         const data = namedInput.parse(input);
         const scene = createScene(data.name, { id: data.id });
