@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sceneBounds } from './thumbnail-bounds';
+import { sceneBounds, unionBounds } from './thumbnail-bounds';
 describe('scene thumbnail camera', () => {
   it('uses the mockup camera for an empty scene', () => { expect(sceneBounds([])).toEqual([0, 0, 1000, 625]); });
   it('contains every step, adds padding and keeps 16:10 for wide or tall scenes', () => {
@@ -9,4 +9,7 @@ describe('scene thumbnail camera', () => {
       for (const box of bounds) { expect(camera[0]).toBeLessThanOrEqual(box[0] - 32); expect(camera[1]).toBeLessThanOrEqual(box[1] - 32); expect(camera[2]).toBeGreaterThanOrEqual(box[2] + 32); expect(camera[3]).toBeGreaterThanOrEqual(box[3] + 32); }
     }
   });
+});
+describe('the box around a scene', () => {
+  it('holds every step, with no padding or aspect of its own', () => { expect(unionBounds([[0, 0, 100, 100], [-400, -50, 1200, 80]])).toEqual([-400, -50, 1200, 100]); });
 });

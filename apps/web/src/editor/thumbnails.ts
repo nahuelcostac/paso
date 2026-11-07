@@ -1,6 +1,7 @@
 import type { ApiClient } from '../lib/api';
 import { loadFiles } from './assets';
-import { canvasElements, canvasFiles, excalidraw, loadDrawingFonts } from './excalidraw-runtime';
+import { canvasFiles, excalidraw } from './excalidraw-runtime';
+import { restoreSceneContent } from './scene-content';
 import { sceneBounds, type Bounds } from './thumbnail-bounds';
 
 export type Thumbnail = { stepId: string; title?: string; revision: string; bounds: Bounds; svg: string };
@@ -19,10 +20,9 @@ export class ThumbnailCache {
     const cached = this.cache.get(key);
     if (cached) return cached;
     const render = (async () => {
-      const { restoreElements, getCommonBounds, convertToExcalidrawElements, exportToSvg } = await excalidraw();
-      await loadDrawingFonts(steps.map(({ document }) => document));
-      const restored = steps.map(({ document }) => restoreElements(canvasElements(document), null, { refreshDimensions: true }).filter((element) => !element.isDeleted));
-      const bounds = sceneBounds(restored.filter((elements) => elements.length > 0).map((elements) => getCommonBounds(elements)));
+      const { convertToExcalidrawElements, exportToSvg } = await excalidraw();
+      const { elements: restored, bounds: stepBounds } = await restoreSceneContent(steps.map(({ document }) => document));
+      const bounds = sceneBounds(stepBounds);
       const [left, top, right, bottom] = bounds;
       const anchor = convertToExcalidrawElements([{ type: 'rectangle', x: left, y: top, width: right - left, height: bottom - top, opacity: 0, strokeWidth: 0, strokeColor: 'transparent', backgroundColor: 'transparent' }]);
       return Promise.all(steps.map(async ({ document, revision }, index) => {

@@ -10,16 +10,18 @@ type Props = {
   saveState?: 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
   /** A failed action that has no other place to be said. */
   notice?: React.ReactNode;
+  /** Presentar, on the Lienzo only. Elsewhere its room stays reserved. */
+  presentar?: React.ReactNode;
   view: View; onViewChange: (view: View) => void; panelOpen: boolean; onTogglePanel: () => void;
 };
 const SAVE_LABELS = { saved: 'Guardado', dirty: 'Cambios pendientes', saving: 'Guardando…' } as const;
 
 /**
  * Three columns with equal outer ones, so the selector sits on the window's true centre in both views.
- * The right column is kept for the agent status and Presentar (LYP-03): the reserved slot at its end is where
- * Presentar goes, so nothing placed before it takes its room.
+ * The right column is kept for the agent status and Presentar, which goes at its end. Without Presentar the
+ * reserved slot holds its place, so nothing placed before it moves between views.
  */
-export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotice, sceneSelector, saveState, notice }: Props) {
+export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotice, sceneSelector, saveState, notice, presentar }: Props) {
   return (
     <header className="topbar">
       <div className="topbar__side">
@@ -37,7 +39,7 @@ export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotic
       <div className="topbar__side topbar__side--end">
         {notice}
         {saveNotice}
-        <div className="topbar__presentar-slot" data-slot="presentar" aria-hidden="true" />
+        {presentar ?? <div className="topbar__presentar-slot" data-slot="presentar" aria-hidden="true" />}
       </div>
     </header>
   );
