@@ -138,7 +138,7 @@ beforeEach(async () => {
     dataDir: join(rootDir, 'projects'), port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 80,
     harnessRegistryPath, runsDir: join(rootDir, 'runs'),
     harnessDetection: { searchPaths: [binDir], loginShell: false },
-    agent: { workDir: join(rootDir, 'work'), sessionsPath: join(rootDir, 'state', 'sessions.json'), adapters: { claude: adapter } },
+    agent: { workDir: join(rootDir, 'work'), sessionsPath: join(rootDir, 'state', 'sessions.json'), adapters: { claude: adapter, codex: { ...adapter, id: 'codex' } } },
   });
   config = { baseUrl: service.url, token };
   await seedProject();
@@ -151,7 +151,7 @@ afterEach(async () => {
 });
 
 describe('agent and model picker', () => {
-  it('asks once to add Claude Code, shows the other harnesses as detected but unavailable, and passes the chosen model', async () => {
+  it('asks once to add Claude Code, shows Codex as available, and passes the chosen model', async () => {
     await installHarness('codex', 'codex-cli 0.80.0');
     const user = userEvent.setup();
     const panel = await openPanel();
@@ -166,7 +166,7 @@ describe('agent and model picker', () => {
     expect(within(panel).queryByText(/con tu propia sesión y tu cuota/)).not.toBeInTheDocument();
     expect(JSON.parse(await readFile(harnessRegistryPath, 'utf8'))).toEqual(['claude']);
 
-    // The picker is a menu on the body. Codex is found but cannot run a session yet; agy is not installed.
+    // The picker is a menu on the body. Codex is available; agy is not installed.
     await user.click(within(panel).getByRole('button', { name: 'Agente: Claude Code' }));
     const menu = await screen.findByRole('menu', { name: 'Elegir agente' });
     expect(panel.contains(menu)).toBe(false);
@@ -174,14 +174,16 @@ describe('agent and model picker', () => {
     expect(claude).toHaveFocus();
     expect(claude).toHaveTextContent('2.1.40 · Con tu sesión');
     const codex = within(menu).getByRole('menuitemradio', { name: /Codex/ });
-    expect(codex).toHaveAttribute('aria-disabled', 'true');
-    expect(codex).toHaveTextContent('0.80.0 · Todavía no disponible en Paso');
+    expect(codex).not.toHaveAttribute('aria-disabled', 'true');
+    expect(codex).toHaveTextContent('0.80.0');
     expect(within(menu).getByRole('menuitemradio', { name: /Antigravity/ })).toHaveTextContent('No instalado');
     await user.keyboard('{ArrowDown}');
     expect(codex).toHaveFocus();
     await user.click(codex);
-    expect(within(panel).getByRole('button', { name: 'Agente: Claude Code' })).toBeInTheDocument();
-    await user.keyboard('{Escape}');
+    expect(within(panel).getByRole('button', { name: 'Agente: Codex' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Añadir Codex' })).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: 'Agente: Codex' }));
+    await user.click(within(await screen.findByRole('menu', { name: 'Elegir agente' })).getByRole('menuitemradio', { name: /Claude Code/ }));
 
     // Models: the account's own, without Fable.
     await user.click(within(panel).getByRole('button', { name: 'Modelo: Predeterminado' }));
@@ -194,6 +196,21 @@ describe('agent and model picker', () => {
     await send(panel, user, 'Hola');
     expect(await within(panel).findByText('Paso 1 actualizado.', {}, patience)).toBeInTheDocument();
     expect(requests[0].model).toBe('claude-haiku-5-5');
+  });
+
+  it('adds Codex and sends a turn through the common panel', async () => {
+    await installHarness('codex', 'codex-cli 0.166.0');
+    const user = userEvent.setup();
+    const panel = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: 'Agente: Claude Code' }));
+    const menu = await screen.findByRole('menu', { name: 'Elegir agente' });
+    await user.click(await within(menu).findByRole('menuitemradio', { name: /Codex/ }, patience));
+    await user.click(await within(panel).findByRole('button', { name: 'Añadir Codex' }, patience));
+    await send(panel, user, 'Dibuja con Codex');
+    expect(await within(panel).findByText('Paso 1 actualizado.', {}, patience)).toBeInTheDocument();
+    expect(requests).toHaveLength(1);
+    expect(await within(panel).findByRole('button', { name: 'Deshacer ejecución' }, patience)).toBeInTheDocument();
+    expect(JSON.parse(await readFile(harnessRegistryPath, 'utf8'))).toEqual(['codex']);
   });
 
   it('says so when Claude Code is signed out', async () => {
@@ -372,7 +389,7 @@ describe('undoing a run', () => {
     const dialog = await screen.findByRole('alertdialog', { name: '¿Deshacer esta ejecución?' }, patience);
     expect(dialog).toHaveTextContent('Un paso vuelve a como estaba antes.');
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus(), patience);
     // Nothing changes until it is confirmed.
     expect(await within(scene1).findByRole('button', { name: 'Paso 1: Editado por agente' }, patience)).toBeInTheDocument();
     expect(screen.getByRole('alertdialog')).toBe(dialog);

@@ -6,6 +6,7 @@ import { idSchema } from '@paso/shared';
 import { z } from 'zod';
 import { ApiError, isMissing } from '../errors.js';
 import { claudeAdapter, failureMessage } from './claude.js';
+import { codexAdapter } from './codex.js';
 import { harnessIds, type AgentEvent, type AgentRunHooks, type AgentRunRequest, type FailureCode, type HarnessAdapter, type HarnessId } from './types.js';
 
 export type SessionInfo = {
@@ -72,7 +73,7 @@ export class SessionManager {
   private readonly workDir: string;
 
   constructor(private options: SessionManagerOptions) {
-    this.adapters = options.adapters ?? { claude: claudeAdapter };
+    this.adapters = options.adapters ?? { claude: claudeAdapter, codex: codexAdapter };
     this.workDir = checkWorkDir(options.workDir, options.dataDir);
   }
 

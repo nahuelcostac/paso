@@ -39,8 +39,10 @@ export type ProcessEnd = {
 };
 export type ProcessSpec = {
   file: string; args: string[]; cwd: string; env: Record<string, string>;
-  /** Written to stdin followed by a newline, then stdin is closed. */
+  /** Initial stdin content. Stdin closes after the newline unless keepStdinOpen is set. */
   input: string;
+  /** Keep stdin open for request/response protocols such as Codex app-server. */
+  keepStdinOpen?: boolean;
 };
 export type ProcessOptions = {
   onLine(line: string): void;
@@ -48,6 +50,7 @@ export type ProcessOptions = {
   signal: AbortSignal;
 };
 export type ManagedProcess = {
+  write(line: string): void;
   /** Ends the process tree. Resolves when nothing of it is left. Safe to call more than once. */
   stop(): Promise<void>;
   done: Promise<ProcessEnd>;
@@ -108,7 +111,7 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
     });
   } catch (error) {
     settle({ reason: 'spawn-error', code: null, signal: null, stderrTail: '', spawnErrorCode: (error as NodeJS.ErrnoException).code });
-    return { stop: async () => {}, done };
+    return { write: () => {}, stop: async () => {}, done };
   }
   const pid = child.pid;
   if (pid !== undefined) live.add(pid);
@@ -144,7 +147,8 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
   child.stdin!.on('error', () => {});
   child.stdout!.on('error', () => {});
   child.stderr!.on('error', () => {});
-  child.stdin!.end(spec.input + '\n');
+  if (spec.keepStdinOpen) { if (spec.input) child.stdin!.write(spec.input + '\n'); }
+  else child.stdin!.end(spec.input + '\n');
 
   child.once('error', (error: NodeJS.ErrnoException) => {
     if (pid !== undefined) return; // A failure after start still ends through `close`.
@@ -164,5 +168,5 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
       settle({ reason: wanted ?? 'exit', code, signal, stderrTail });
     })();
   });
-  return { stop: () => stop('stopped'), done };
+  return { write: (line) => { if (!wanted && !child.stdin!.destroyed) child.stdin!.write(line + '\n'); }, stop: () => stop('stopped'), done };
 }
