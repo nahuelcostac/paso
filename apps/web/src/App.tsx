@@ -12,6 +12,7 @@ import { AgentPanel } from './components/AgentPanel';
 import { ThumbnailCache } from './editor/thumbnails';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { TopBar } from './components/TopBar';
+import { PanelResizer, useAgentWidth } from './components/PanelResizer';
 import { SceneSelector } from './components/SceneSelector';
 import { PresentButton } from './present/PresentButton';
 import { useScenes } from './state/scenes';
@@ -80,6 +81,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const [creating, setCreating] = useState(false);
   const narrow = useMediaQuery(AGENT_NARROW);
   const [agentOpen, setAgentOpen] = useState(false);
+  const agentWidth = useAgentWidth(panelOpen, narrow);
 
   const row = state.rows.find((candidate) => candidate.id === route.projectId);
   const openProject = row?.kind === 'ok' ? row : undefined;
@@ -104,10 +106,14 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const failedStep = steps.unresolved().find((session) => targetKey(session.target) !== showing);
   const here = steps.current();
   const saveState = lienzo && here && targetKey(here.target) === showing ? here.status : undefined;
-  // The open step, for the Lienzo's second row: its number in the scene and, once it is loaded, its title.
+  // The open step, for the Lienzo's second row: its number in the scene and, once it is loaded, its title to edit.
   const openScene = lienzo ? scenes?.find((item) => item.document.id === route.sceneId)?.document : undefined;
   const stepAt = openScene && route.stepId ? openScene.stepIds.indexOf(route.stepId) : -1;
-  const openStep = stepAt >= 0 ? { number: stepAt + 1, title: here && targetKey(here.target) === showing ? here.document.title : undefined } : undefined;
+  const loaded = here && targetKey(here.target) === showing ? here : undefined;
+  const openStep = stepAt >= 0 && route.stepId ? {
+    id: route.stepId, number: stepAt + 1, title: loaded?.document.title,
+    onRename: loaded ? (title: string) => steps.retitle(loaded, title) : undefined,
+  } : undefined;
 
   // No project in the address: open the first one that can be opened.
   useEffect(() => {
@@ -139,7 +145,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   })() : undefined;
 
   return (
-    <div className={`app${panelOpen ? '' : ' app--panel-closed'}${storyboard ? ' app--agent' : ''}`}>
+    <div className={`app${panelOpen ? '' : ' app--panel-closed'}${storyboard ? ' app--agent' : ''}`} style={{ '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}>
       <TopBar
         view={route.view}
         onViewChange={(view) => navigate({ ...route, view })}
@@ -204,6 +210,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
             store={agentStore} projectId={row.id} projectName={row.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
             narrow={narrow} open={agentOpen} onClose={() => { setAgentOpen(false); document.querySelector<HTMLElement>('.agent-toggle')?.focus(); }}
             onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'lienzo', sceneId: id, stepId })}
+            resizer={<PanelResizer width={agentWidth.width} min={agentWidth.min} max={agentWidth.max} onChange={agentWidth.choose} controls="agent-panel" />}
           />
         </>
       ) : <MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} />}

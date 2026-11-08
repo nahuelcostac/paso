@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { PanelLeft } from 'lucide-react';
 import type { View } from '../lib/route';
 import { Brand } from './Brand';
@@ -8,8 +9,9 @@ type Props = {
   saveNotice?: React.ReactNode;
   /** The scene switcher, on the Lienzo only. It opens the bar's second row. */
   sceneSelector?: React.ReactNode;
-  /** The open step on the Lienzo: its position in the scene, from 1, and its optional title. */
-  step?: { number: number; title?: string };
+  /** The open step on the Lienzo: its id, its position in the scene from 1, and its optional title.
+   * With onRename, once the step has loaded, the title is a field the person types into. */
+  step?: { id: string; number: number; title?: string; onRename?: (title: string) => void };
   /** The current step's save state, on the Lienzo only. Failures are told once, by the Lienzo's own notice. */
   saveState?: 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
   /** A failed action that has no other place to be said. */
@@ -22,6 +24,35 @@ type Props = {
   presentar?: React.ReactNode;
   view: View; onViewChange: (view: View) => void; panelOpen: boolean; onTogglePanel: () => void;
 };
+/**
+ * The open step's title, typed in place. Enter or leaving the field keeps it, Escape puts the last one back, and an empty
+ * field removes it. It is saved with the drawing, so «Guardado» covers it. A title the agent writes shows up here unless
+ * the person is typing.
+ */
+function StepTitle({ title, onRename }: { title?: string; onRename: (title: string) => void }) {
+  const [value, setValue] = useState(title ?? '');
+  const [editing, setEditing] = useState(false);
+  const cancelled = useRef(false);
+  useEffect(() => { if (!editing) setValue(title ?? ''); }, [title, editing]);
+  return (
+    <input
+      className="topbar__step-title topbar__step-input" value={value} maxLength={120} placeholder="Añade un título" aria-label="Título del paso"
+      title={value || undefined} spellCheck
+      onFocus={() => { cancelled.current = false; setEditing(true); }}
+      onChange={(event) => setValue(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+        else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelled.current = true; event.currentTarget.blur(); }
+      }}
+      onBlur={() => {
+        setEditing(false);
+        if (cancelled.current) setValue(title ?? '');
+        else onRename(value);
+      }}
+    />
+  );
+}
+
 const SAVE_LABELS = { saved: 'Guardado', dirty: 'Cambios pendientes', saving: 'Guardando…' } as const;
 
 /**
@@ -57,7 +88,8 @@ export function TopBar({ view, onViewChange, panelOpen, onTogglePanel, saveNotic
           {step && (
             <p className="topbar__step">
               <span className="eyebrow">Paso {pad(step.number)}</span>
-              {step.title && <span className="topbar__step-title" title={step.title}>{step.title}</span>}
+              {step.onRename ? <StepTitle key={step.id} title={step.title} onRename={step.onRename} />
+                : step.title && <span className="topbar__step-title" title={step.title}>{step.title}</span>}
             </p>
           )}
         </div>

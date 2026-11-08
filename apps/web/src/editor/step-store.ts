@@ -90,7 +90,7 @@ export class StepStore {
         return;
       }
       if (current?.revision === fresh.revision) return;
-      const restored = draft && signature(draft.document) !== signature(fresh.document) ? draft : undefined;
+      const restored = draft && (signature(draft.document) !== signature(fresh.document) || draft.document.title !== fresh.document.title) ? draft : undefined;
       const session: Session = {
         ...(restored ?? { document: parseStep(fresh.document), revision: fresh.revision, binaries: {} }),
         target: { ...target }, status: restored ? (restored.revision === fresh.revision ? 'dirty' : 'conflict') : 'saved',
@@ -139,6 +139,21 @@ export class StepStore {
     }
     session.document = candidate;
     session.binaries = retained;
+    session.generation++;
+    if (session.status !== 'conflict') session.status = 'dirty';
+    this.persist(session);
+    this.emit();
+    this.schedule(session);
+  }
+  /** Names the step. It is saved like a drawing change: debounced, with the same save state and recovery. An empty title removes it. */
+  retitle(session: Session, title: string) {
+    const key = targetKey(session.target);
+    if (this.removed.has(key) || this.sessions.get(key) !== session) return;
+    const next = title.trim();
+    if ((session.document.title ?? '') === next) return;
+    const document: Step = { ...session.document };
+    if (next) document.title = next; else delete document.title;
+    session.document = document;
     session.generation++;
     if (session.status !== 'conflict') session.status = 'dirty';
     this.persist(session);

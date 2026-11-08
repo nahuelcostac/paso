@@ -61,6 +61,7 @@
   --ink-3: light-dark(#667085, #959cab);
   --muted: light-dark(#8a91a0, #757c8c);
   --on-accent: #ffffff; /* text on an --accent fill */
+  --on-ink: light-dark(#ffffff, #161a22); /* text on an --ink fill: the view selector's chosen option */
 
   /* The accent: one violet for selection, focus and the primary action (Presentar). */
   --accent: #7260d5;
@@ -115,7 +116,7 @@
 
   /* -------------------------------------------------------------------- layout */
   --panel-projects: 240px;
-  --panel-agent: 360px;
+  --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
   --topbar-h: 60px;
   --subbar-h: 48px;
   --carousel-h: 108px;
@@ -127,7 +128,7 @@
   --radius-md: 8px; /* buttons, inputs, menu items, project tiles */
   --radius-card: 10px; /* step cards, scene and composer cards, Excalidraw islands */
   --radius-lg: 14px; /* dialogs, popovers */
-  --radius-pill: 999px; /* chips */
+  --radius-pill: 999px; /* chips, the view selector */
 
   --border: 1px solid var(--line);
 

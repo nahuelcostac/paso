@@ -24,6 +24,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onOpenStep: (sceneId: string, stepId: string) => void;
+  /** The handle on the panel's left edge that changes its width. */
+  resizer?: React.ReactNode;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -170,7 +172,7 @@ function harnessSubtitle(info: HarnessInfo | undefined) {
 }
 
 /** The agent panel: a conversation with the person's own harness about this project, and what the agent does in it. */
-export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep }: Props) {
+export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, resizer }: Props) {
   const state = useAgent(store);
   const [input, setInput] = useState('');
   const [menu, setMenu] = useState<{ kind: 'target' | 'harness' | 'model'; anchor: HTMLButtonElement } | null>(null);
@@ -301,6 +303,7 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
       id="agent-panel" className="agent" aria-label="Agente" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
     >
+      {resizer}
       <div className="agent__head">
         <button
           type="button" className="agent__target" aria-haspopup="menu" aria-expanded={menu?.kind === 'target'}

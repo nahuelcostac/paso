@@ -49,6 +49,11 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .topbar__sub { display: flex; align-items: center; gap: var(--space-4); height: var(--subbar-h); padding: 0 var(--space-4); border-top: var(--border); min-width: 0; }
 .topbar__step { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .topbar__step-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-semibold); }
+/* The title is a field that reads as text: a quiet fill on hover, a bordered field while typing. It grows with its words. */
+.topbar__step-input { width: 28ch; field-sizing: content; min-width: 14ch; max-width: min(48ch, 100%); height: var(--control-h); margin-left: calc(-1 * var(--space-2)); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-md); background: none; color: var(--ink); }
+.topbar__step-input::placeholder { color: var(--ink-3); font-weight: var(--weight-regular); }
+.topbar__step-input:hover { background: var(--surface-sunken); }
+.topbar__step-input:focus-visible, .topbar__step-input:focus { background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent-line), var(--focus-ring) !important; outline: none; }
 
 .brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .brand__mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-ink); }
@@ -78,11 +83,11 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .topbar__error-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar__error { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; padding: 0 var(--space-1) 0 var(--space-3); height: var(--control-h); border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); font-size: var(--text-12); }
 
-/* Selector: a grey track, the selected option a raised white segment in violet. */
-.selector { display: inline-flex; gap: 2px; height: 42px; padding: 4px; border-radius: var(--radius-card); background: var(--surface-sunken); border: var(--border); }
-.selector button { min-width: 120px; padding: 0 var(--space-5); border-radius: var(--radius-md); color: var(--ink-2); font-weight: var(--weight-semibold); }
-.selector button:hover { color: var(--ink); }
-.selector button[aria-checked='true'] { background: var(--surface); color: var(--accent-ink); box-shadow: var(--shadow-md); }
+/* Selector: a white capsule, the selected option an inverted pill in ink, as before IN-05. */
+.selector { display: inline-flex; gap: 2px; height: 40px; padding: 3px; border-radius: var(--radius-pill); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-md); }
+.selector button { padding: 0 var(--space-5); border-radius: var(--radius-pill); color: var(--ink-2); font-weight: var(--weight-semibold); }
+.selector button:hover { background: var(--surface-sunken); color: var(--ink); }
+.selector button[aria-checked='true'] { background: var(--ink); color: var(--on-ink); }
 
 /* Buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 0 var(--space-3); border-radius: var(--radius-md); color: var(--ink); font-weight: var(--weight-semibold); white-space: nowrap; }
@@ -226,6 +231,6 @@ button.project__tile:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(
 /* A narrower window: the selector and the top bar's padding shrink before anything else does. */
 @media (max-width: 1099px) {
   .topbar__main { padding-left: var(--space-4); gap: var(--space-3); }
-  .selector button { min-width: 0; padding: 0 var(--space-4); }
+  .selector button { padding: 0 var(--space-4); }
   .board { padding: var(--space-6) var(--space-5) var(--space-7); }
 }

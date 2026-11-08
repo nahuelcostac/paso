@@ -36,9 +36,38 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative;
   background: var(--surface);
   border-left: var(--border);
 }
+/* The left edge can be dragged to change the chat's width. A thin violet line shows where, on hover, focus and while dragging. */
+.resizer {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+.resizer:hover::after, .resizer[data-dragging]::after { opacity: 1; }
+/* Focus shows as the same line in the focus colour: a ring around a full-height strip would read as a border. */
+.resizer:focus-visible { box-shadow: none !important; }
+.resizer:focus-visible::after { opacity: 1; background: var(--focus); }
+:root[data-resizing] { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+:root[data-resizing] iframe, :root[data-resizing] canvas { pointer-events: none; }
 .agent__head {
   display: flex;
   align-items: center;
