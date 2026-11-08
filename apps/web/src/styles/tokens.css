@@ -32,9 +32,16 @@
   /* ------------------------------------------------------------------ colour
      Each pair is light-dark(light, dark). Use the names, never raw values. */
 
-  /* The page: the warm beige table of Paso before IN-05. Dark is a warm near-black. */
-  --page: light-dark(#ece5d7, #1b1916);
-  /* Surfaces: bars, panels, cards, dialogs, menus. A soft cream, solid, never translucent. */
+  /* The page: the white workspace behind the Storyboard and around the floating panels. Dark is a neutral near-black. */
+  --page: light-dark(#f7f8fa, #141414);
+  /* The Storyboard's own neutrals: white cards with thin cool lines, as the board was before the warm chrome.
+     .board swaps them in for --surface, --surface-sunken, --surface-hover, --line and --line-strong. */
+  --work-surface: light-dark(#ffffff, #1d1d1d);
+  --work-sunken: light-dark(#f1f3f6, #262626);
+  --work-hover: light-dark(#e9ecf1, #2e2e2e);
+  --work-line: light-dark(#e6e8ee, #2c2c2c);
+  --work-line-strong: light-dark(#d3d7df, #3b3b3b);
+  /* Surfaces: the warm chrome. The header, the floating panels, dialogs and menus are a soft cream, solid, never translucent. */
   --surface: light-dark(#fbf8f2, #2a2621);
   /* Lighter than a surface: what you type into inside a panel (the chat's composer). */
   --surface-raised: light-dark(#ffffff, #36322b);
@@ -63,9 +70,9 @@
   --ink-3: light-dark(#665d4f, #b3aa9a);
   --muted: light-dark(#8f8676, #8a8172);
   --on-accent: #ffffff; /* text on an --accent fill */
-  --on-ink: light-dark(#fffdf8, #1d1a15); /* text on an --ink fill: the view selector, the chat's send button */
+  --on-ink: light-dark(#fffdf8, #1d1a15); /* text on an --ink fill: the view selector, Presentar, the chat's send button */
 
-  /* The accent: one violet for selection, focus and the primary action (Presentar). */
+  /* The accent: one violet for selection and focus. */
   --accent: #7260d5;
   --accent-strong: light-dark(#5d4bb9, #8574e3); /* hover and pressed */
   --accent-ink: light-dark(#5d4bb9, #b2a7f6); /* accent as text or icon on a surface */

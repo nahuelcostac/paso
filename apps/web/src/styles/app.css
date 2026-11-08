@@ -22,7 +22,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* The small spaced uppercase label above a title: «TU EXPLICACIÓN, PASO A PASO», «ESCENA 1 DE 3», «PASO 01». */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
-/* Shell: a cream header across the window, then the projects and the chat as floating cards on the beige table. */
+/* Shell: a cream header across the window, then the projects and the chat as cream cards floating on the white workspace. */
 .app {
   display: grid; height: 100%;
   grid-template: auto minmax(0, 1fr) / var(--panel-projects) minmax(0, 1fr);
@@ -92,12 +92,12 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* Buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 0 var(--space-3); border-radius: var(--radius-md); color: var(--ink); font-weight: var(--weight-semibold); white-space: nowrap; }
 .btn:hover:not(:disabled) { background: var(--surface-sunken); }
-/* The secondary button: white, with a thin border. */
+/* The secondary button: a surface with a thin border. */
 .btn--soft, .btn--outline { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
 .btn--soft:hover:not(:disabled), .btn--outline:hover:not(:disabled) { background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--line-strong); }
-/* The one violet action on a screen. */
-.btn--primary { flex: none; height: 38px; padding: 0 var(--space-4) 0 var(--space-3); background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-sm); }
-.btn--primary:hover:not(:disabled) { background: var(--accent-strong); }
+/* The one primary action on a screen (Presentar): ink, like the chosen view in the selector. */
+.btn--primary { flex: none; height: 38px; padding: 0 var(--space-4) 0 var(--space-3); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-sm); }
+.btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 84%, var(--surface)); }
 .btn--primary svg.i { fill: currentColor; }
 .btn--large { height: 38px; padding: 0 var(--space-4); }
 .btn--danger { background: var(--danger-soft); color: var(--danger-ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger-ink) 22%, transparent); }
@@ -197,7 +197,14 @@ button.project__tile:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(
 
 /* Main area. The Storyboard scrolls inside its own column. It contains its absolutely placed live regions: placed by the
    window instead, they sat at the foot of a long board and made the whole document scroll. */
-.board { position: relative; grid-column: -2 / -1; grid-row: 2; overflow: hidden auto; min-width: 0; padding: 44px 56px var(--space-7); }
+/* The Storyboard is the white workspace: its cards and lines take the cool neutrals, while the header and the panels
+   around it stay warm. Tokens that are built from others are rebuilt here, or they would keep the warm values. */
+.board {
+  --surface: var(--work-surface); --surface-sunken: var(--work-sunken); --surface-hover: var(--work-hover);
+  --line: var(--work-line); --line-strong: var(--work-line-strong);
+  --border: 1px solid var(--line); --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus);
+  position: relative; grid-column: -2 / -1; grid-row: 2; overflow: hidden auto; min-width: 0; padding: 44px 56px var(--space-7);
+}
 .board__head { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
 .board__heading { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .board__title { font-size: var(--text-28); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); overflow-wrap: anywhere; }

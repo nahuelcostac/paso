@@ -46,5 +46,5 @@
 .board__empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); max-width: 420px; margin: 8vh auto 0; text-align: center; }
 .board__empty p { color: var(--ink-2); line-height: var(--leading-prose); }
 .board__empty-title { font-size: var(--text-20); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); }
-.board__empty .btn--soft { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-sm); }
-.board__empty .btn--soft:hover:not(:disabled) { background: var(--accent-strong); box-shadow: var(--shadow-sm); }
+.board__empty .btn--soft { background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-sm); }
+.board__empty .btn--soft:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 84%, var(--surface)); box-shadow: var(--shadow-sm); }
