@@ -1,4 +1,4 @@
-/** Paso's mark: a rising step on a soft violet tile, and the name with a violet full stop. */
+/** Paso's mark: a rising step on an ink tile, and the name with its full stop. */
 export function Brand() {
   return (
     <div className="brand">

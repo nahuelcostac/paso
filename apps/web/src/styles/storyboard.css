@@ -26,7 +26,7 @@
 .board[data-dragging] { user-select: none; cursor: grabbing; }
 .board[data-dragging] .scene__grip { cursor: grabbing; }
 .scene[data-dragging] { opacity: 0.45; }
-/* Where a dragged scene will land: a violet line in the space between scenes. */
+/* Where a dragged scene will land: an ink line in the space between scenes. */
 .scene[data-drop]::before { content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: var(--accent); pointer-events: none; z-index: 1; }
 .scene[data-drop='before']::before { top: calc(var(--space-6) / -2 - 2px); }
 .scene[data-drop='after']::before { bottom: calc(var(--space-6) / -2 - 2px); }

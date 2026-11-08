@@ -6,7 +6,7 @@ export type StepFrameProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 
   number: number;
   /** The step's optional title. */
   title?: string;
-  /** The step open in the Lienzo: a violet edge and a violet number. */
+  /** The step open in the Lienzo: an ink edge and an ink number. */
   current?: boolean;
   /** Whether the agent is changing this step right now or changed it in an active run. */
   agentState?: 'working' | 'changed';

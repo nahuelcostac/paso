@@ -42,7 +42,7 @@
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
 }
-/* The left edge can be dragged to change the chat's width. A thin violet line shows where, on hover, focus and while dragging. */
+/* The left edge can be dragged to change the chat's width. A thin ink line shows where, on hover and while dragging (the focus colour with the keyboard). */
 .resizer {
   position: absolute;
   z-index: 2;

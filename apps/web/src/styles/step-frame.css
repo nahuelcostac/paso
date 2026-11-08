@@ -17,12 +17,12 @@
 .frame__title--empty { color: var(--ink-3); font-weight: var(--weight-regular); }
 .frame__title--empty::before { content: 'Sin título'; }
 .frame:hover { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-md); }
-/* The step open in the Lienzo: a violet edge and a violet number. */
-.frame[aria-current='step'] { box-shadow: 0 0 0 1px var(--accent-line), 0 0 0 4px var(--accent-soft); }
+/* The step open in the Lienzo: an ink edge and an ink number. */
+.frame[aria-current='step'] { box-shadow: 0 0 0 2px var(--accent); }
 .frame[aria-current='step'] .frame__num { background: var(--accent); color: var(--on-accent); box-shadow: none; }
-/* The agent is changing it now: a pink edge, which wins over the violet one. */
+/* The agent is changing it now: a pink edge, which wins over the ink one. */
 .frame.frame--agent-working { box-shadow: 0 0 0 2px var(--agent), var(--shadow-sm); }
-.frame.frame--agent-working[aria-current='step'] { box-shadow: 0 0 0 2px var(--agent), 0 0 0 5px var(--accent-soft); }
+.frame.frame--agent-working[aria-current='step'] { box-shadow: 0 0 0 2px var(--agent), 0 0 0 4px var(--accent); }
 
 /* In the carousel: the drawing alone, the number below it. */
 .frame--carousel { background: none; border-radius: 0; box-shadow: none; overflow: visible; }
