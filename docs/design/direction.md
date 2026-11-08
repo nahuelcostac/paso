@@ -2,17 +2,17 @@
 
 Tokens are in `apps/web/src/styles/tokens.css`. Screenshots of the app are in `screens/`, and side-by-side comparisons with the older app this look comes from are in `compare/`.
 
-## The idea: a calm, light workspace with one violet
+## The idea: a calm, warm workspace with one violet
 
-This look comes from an earlier version of Paso (IN-05). It is quiet and familiar, so the drawings stand out.
+The layout and type come from an earlier version of Paso (IN-05). The colours, the floating panels and the chat keep the soft, warm look Paso had just before it. It is quiet and familiar, so the drawings stand out.
 
-- **A light grey page, white surfaces.** The page is `#f7f8fa`. The header, panels, cards, dialogs and menus are white, docked to the window and separated by thin `#e6e8ee` lines. Shadows are subtle and used only for things that float: popovers, dialogs and the hover state of a card.
-- **Drawings are the paper.** The canvas fills its column edge to edge. Thumbnails sit at the top of white step cards.
-- **One accent, violet `#7260d5`.** It marks selection (the open step, the current project, selected tools in Excalidraw), keyboard focus and the primary action: Presentar, the agent's send button, and the button that creates a project's first scene.
+- **A beige table, cream surfaces.** The page is a warm beige (`#ece5d7`). The header, cards, dialogs and menus are a soft cream (`#fbf8f2`) with thin warm lines. The projects and the chat are cream cards that float on the table, with an 8px gutter and 20px corners. Shadows are warm and subtle: the floating panels, popovers, dialogs and the hover state of a card. Everything is solid: no translucency or blur.
+- **Drawings are the paper.** White is kept for drawings: the canvas fills its column edge to edge, the Lienzo's step strip below it stays white, and thumbnails sit at the top of the cream step cards.
+- **One accent, violet `#7260d5`.** It marks selection (the open step, the current project, selected tools in Excalidraw), keyboard focus and the primary action: Presentar and the button that creates a project's first scene.
 - **One marker, pink `--agent`.** Whatever the agent touched gets a pink fill behind dark text, and the step it is changing right now gets a pink edge. Pink and violet are kept apart in role: violet means *you are here*, pink means *the agent did this*. Anyone should be able to scan a board and find the agent's work.
-- **Dark theme** is the same layout on deep navy (`#12151c` page, `#1b1f29` surfaces) with the same violet and pink. Both themes are complete. Neither is derived from the other at runtime.
+- **Dark theme** is the same layout on warm near-black (`#1b1916` page, `#2a2621` surfaces) with the same violet and pink. Both themes are complete. Neither is derived from the other at runtime.
 
-Excalidraw's own controls wear the same white cards, thin borders and violet, so the app reads as one object. The hand-drawn look stays inside drawings: no sketchy borders and no Excalifont in the chrome.
+Excalidraw's own controls wear the same cream cards, thin borders and violet, so the app reads as one object. The hand-drawn look stays inside drawings: no sketchy borders and no Excalifont in the chrome.
 
 **Type:** Inter for everything, with tabular figures so step numbers line up. It is SIL OFL 1.1, from `@fontsource-variable/inter` 5.3.0 (weight axis, latin and latin-ext). It is vendored in `apps/web/src/styles/fonts/` with its licence (`OFL-inter.txt`), so the app works offline. Code inside agent messages uses the system monospace.
 
@@ -31,18 +31,20 @@ Excalidraw's own controls wear the same white cards, thin borders and violet, so
 | Header, panel, card, dialog, menu | `--surface`, edged with `--line` (`--border`) |
 | Hover, the pager, a quiet fill | `--surface-sunken` (`--surface-hover` on top of it) |
 | Hovered card, input edge, dashed slot | `--line-strong` |
-| Canvas and thumbnails | `--paper` |
+| Canvas, thumbnails, the Lienzo's step strip | `--paper` |
+| What you type into inside a panel (the chat's composer) | `--surface-raised` |
+| Send and stop in the chat, the chosen view | `--ink` fill with `--on-ink` |
 | Text | `--ink`, then `--ink-2`, then `--ink-3`; all pass AA on the page and on surfaces |
-| Icons, disabled text | `--muted` (`#8a91a0`, the reference's muted grey; it is below AA for text) |
+| Icons, disabled text | `--muted` (below AA for text) |
 | Selected thing | `--accent-soft` fill, `--accent-line` edge, `--accent-ink` text |
 | Primary action | `--accent` fill with `--on-accent` text, `--accent-strong` on hover |
 | Agent's change | `--agent` fill with `--on-agent` text; `--agent-ink` if there is no fill |
 | Saved | a 6px `--ok` dot before «Guardado» |
 | Errors | `--danger-ink` on `--danger-soft` |
 | Keyboard focus | `box-shadow: var(--focus-ring)` on `:focus-visible` |
-| Lift | `--shadow-sm` (cards), `--shadow-md` (hover, the view selector), `--shadow-lg` (popovers, dialogs) |
+| Lift | `--shadow-sm` (cards), `--shadow-md` (hover, the view selector, the floating panels), `--shadow-lg` (popovers, dialogs, the chat drawer) |
 
-**Radii:** `--radius-sm` 6px (badges, small controls, carousel thumbnails), `--radius-md` 8px (buttons, inputs, menu items, project tiles), `--radius-card` 10px (step cards, composer, Excalidraw islands), `--radius-lg` 14px (dialogs). Pills (`--radius-pill`) are only for the agent chip and the view selector.
+**Radii:** `--radius-panel` 20px (the floating projects and chat), `--radius-sm` 6px (badges, small controls, carousel thumbnails), `--radius-md` 8px (buttons, inputs, menu items, project tiles), `--radius-card` 10px (step cards, Excalidraw islands), `--radius-lg` 14px (dialogs, the chat's bubbles and composer). Pills (`--radius-pill`) are only for the agent chip, the view selector and the chat's send button.
 
 **Type scale:** 11px for the spaced uppercase eyebrow only, 12px meta, 13px default, 15px, 20px for scene and dialog titles, 28px for the project title. Weights 400, 500, 600 and 700. Titles use `--tracking-title` (-0.02em); eyebrows use `--tracking-eyebrow` (0.16em).
 
@@ -50,18 +52,18 @@ Excalidraw's own controls wear the same white cards, thin borders and violet, so
 
 ## Component rules
 
-**Header.** A white bar across the window, under a thin line. Its first row is a three-column grid with equal outer columns, so the view selector sits on the window's true centre in both views. Left: the «Paso.» mark (a violet tile with Paso's step glyph, the name with a violet full stop), a divider and the projects toggle. Right: on the Lienzo, «Guardado» with its dot, then the agent status, then Presentar; on the Storyboard, the agent status and Presentar's reserved slot, or the `Agente` toggle on a narrow window.
+**Header.** A cream bar across the window, under a thin line. Its first row is a three-column grid with equal outer columns, so the view selector sits on the window's true centre in both views. Left: the «Paso.» mark (a violet tile with Paso's step glyph, the name with a violet full stop), a divider and the projects toggle. Right: on the Lienzo, «Guardado» with its dot, then the agent status, then Presentar; on the Storyboard, the agent status and Presentar's reserved slot, or the `Agente` toggle on a narrow window.
 
 On the Lienzo the header has a **second row**: the scene selector (a bordered button with the scene's number and name), then «PASO 03» as an eyebrow and the step's title. The title is where a step is named: a field that reads as text (a quiet fill on hover, «Añade un título» when empty) and becomes a bordered field while typing. Enter or leaving it keeps the title, Escape puts the last one back, and clearing it removes the title. It saves with the drawing, so «Guardado» covers it.
 
-**Selector (Storyboard/Lienzo).** A white capsule with a thin line and a soft shadow. The selected option is an inverted pill: `--ink` with `--on-ink` text. It stays neutral on purpose: violet means "the step you are on", and the view is not a selection of content. It is a `role="radiogroup"`, moved with the arrow keys.
+**Selector (Storyboard/Lienzo).** A cream capsule with a thin line and a soft shadow. The selected option is an inverted pill: `--ink` with `--on-ink` text. It stays neutral on purpose: violet means "the step you are on", and the view is not a selection of content. It is a `role="radiogroup"`, moved with the arrow keys.
 
-**Projects.** A white column docked on the left, 240px. «PROYECTOS» is an eyebrow. Each project is a 34px icon tile, its name and its size (`4 escenas · 17 pasos`). The current project has a violet-tinted row with a violet edge, and its tile is solid violet. Clicking the tile opens the icon picker. The footer says «Guardado en este equipo» after a green dot.
+**Projects.** A cream card floating on the left, 232px wide inside an 8px gutter, with 20px corners. «PROYECTOS» is an eyebrow. Each project is a 34px icon tile, its name and its size (`4 escenas · 17 pasos`). The current project has a violet-tinted row with a violet edge, and its tile is solid violet. Clicking the tile opens the icon picker. The footer says «Guardado en este equipo» after a green dot.
 
-**Storyboard.** Under the header, on the grey page:
+**Storyboard.** Under the header, on the beige table:
 - The project: the eyebrow «TU EXPLICACIÓN, PASO A PASO», the title at 28px, and its size. «Nueva escena» is a bordered secondary button on the right.
 - Each scene sits under a thin rule: the eyebrow «ESCENA 2 DE 3», the title at 20px, and the step count in a small bordered counter. The drag handle and menu appear on hover or focus.
-- Steps are white cards in a grid (minimum 208px wide): the thumbnail on top, with the step number in a small bordered badge on its top-left corner, then the title. An untitled step reads «Sin título» in `--ink-3`; it is named in the Lienzo's second row.
+- Steps are cream cards in a grid (minimum 208px wide): the thumbnail on top, with the step number in a small bordered badge on its top-left corner, then the title. An untitled step reads «Sin título» in `--ink-3`; it is named in the Lienzo's second row.
 - The last cell of every scene is the dashed «El siguiente paso» card, with a violet `+` tile. It is always shown.
 
 **Thumbnails.**
@@ -72,7 +74,7 @@ On the Lienzo the header has a **second row**: the scene selector (a bordered bu
 
 **Lienzo.** The canvas fills its column edge to edge, on `--paper`.
 
-**Carousel.** A 108px white bar under a thin line, in normal flow below the Excalidraw container. It must never overlap the container. Frames are 104×65, and the strip's left edge lines up with Excalidraw's zoom controls above. Next come the pager «03 / 06» on a grey pill (current number in bold violet), then «Añadir paso» and «Duplicar paso», pinned right.
+**Carousel.** A 108px white bar under a thin line (it keeps `--paper`, like the canvas, while the rest of the chrome is cream), in normal flow below the Excalidraw container. It must never overlap the container. Frames are 104×65, and the strip's left edge lines up with Excalidraw's zoom controls above. Next come the pager «03 / 06» on a soft beige pill (current number in bold violet), then «Añadir paso» and «Duplicar paso», pinned right.
 
 **Carousel behaviour.** The strip scrolls and keeps the open step in view; Añadir and Duplicar stay pinned. Both start from the open step and both put the new step right after it:
 - *Añadir paso* copies the drawing (same element IDs) and starts without title or speaker notes, because it is a new beat.
@@ -80,23 +82,25 @@ On the Lienzo the header has a **second row**: the scene selector (a bordered bu
 - Arrow keys, Home and End move between steps while focus is in the strip. Alt and the arrows move the step; Delete asks before removing it; a thumbnail can also be dragged. A new canvas does not take focus from the keyboard while the strip is in use.
 - Deleting the open step opens the next one, or the previous one when it was the last. Deleting the last step leaves an empty scene with *Añadir paso* ready.
 
-**Agent chat.** A white column docked on the right of the Storyboard, 360px to start, with a header row for the target (a scene or the whole project) and «Nueva conversación».
+**Agent chat.** As before IN-05: a cream card floating on the right of the Storyboard, 360px to start with its gutter, with 20px corners. Its head (the target, a scene or the whole project, and «Nueva conversación») has no rule under it: space separates.
 - Its left edge is a separator the person drags to change the width, between 320px and 720px; the board always keeps 440px. A thin violet line marks the edge on hover and while dragging (`--focus` when it has keyboard focus, where the arrow keys move it). A double click goes back to 360px. The width is remembered in this browser, and the narrow drawer uses it too.
-- The person's message: right-aligned, 82% maximum width, `--accent-soft`. No name or avatar.
+- The person's message: right-aligned, 80% maximum width, on `--surface-sunken`, 14px corners. No name or avatar.
 - The agent's text: bare, on the panel. No bubble.
 - Tool activity: one 26px row per tool, a 16px Lucide icon, muted detail after the label. The step number is a pink chip that jumps to that step.
-- Composer: a white card with a `--line-strong` edge that takes the focus ring while its text has focus. Agent and model pickers are ghost controls in its footer. The square 32px button on the right sends (violet) and becomes stop (ink, never red) while the agent works.
-- `Deshacer ejecución` sits in violet in the meta line under each finished run, with its time and how many changes it covers. The undo dialog lists what will happen in a grey box, then the warnings.
+- The empty state is plain text on the panel, with no box.
+- Composer: a lighter card (`--surface-raised`) with a thin line, which takes the focus ring while its text has focus. Agent and model pickers are ghost controls in its footer. The round 32px ink button on the right sends, and becomes stop (still ink, never red) while the agent works.
+- `Deshacer ejecución` is a ghost button in the meta line under each finished run, with its time and how many changes it covers. The undo dialog lists what will happen as plain text, then the warnings.
+- On a narrow window the `Agente` toggle turns ink while the drawer is open, and the drawer is the same floating card over the board.
 - Before the first message, adding a harness is asked once, in a notice in the panel.
 
 On the Lienzo there is no panel, so the header shows who is changing which step, with `Detener`. Under 1160px only the chip and `Detener` remain. **Under 1100px** the Storyboard keeps no column for the panel: a bordered `Agente` button takes Presentar's slot and opens the panel as a drawer from the right edge, under the header; Escape or its close button hides it.
 
-**Presentar.** The drawing fills the screen on `--paper`. A minimal frame floats over it: the «Paso.» mark top left and «Salir Esc» top right; the step's title bottom left, «← → para navegar» bottom right. All of this fades out with the pointer, after two seconds. The pager stays: centred at the bottom on a grey pill, with ticks (violet for the current step) and «03 / 06». «Salir» is reached with the mouse; Esc stays the keyboard's way out, because Tab is kept from wandering to the app underneath.
+**Presentar.** The drawing fills the screen on `--paper`. A minimal frame floats over it: the «Paso.» mark top left and «Salir Esc» top right; the step's title bottom left, «← → para navegar» bottom right. All of this fades out with the pointer, after two seconds. The pager stays: centred at the bottom on a soft beige pill, with ticks (violet for the current step) and «03 / 06». «Salir» is reached with the mouse; Esc stays the keyboard's way out, because Tab is kept from wandering to the app underneath.
 - One camera per scene, from the union of all its steps and the screen (`present/framing.ts`), so whatever stays still between steps stays still on screen. Margins are 5% and 6% of the screen, never less than 32px and 48px. A scene under 480×300 is framed as if it were that size, so a small sketch is not blown up to the edges.
 - A step with its own canvas colour fills the screen with it, through the same dark filter as its drawing.
 - Above 24 steps, or under 480px wide, the pager drops the ticks and keeps the numbers.
 
-**Dialogs and menus.** Dialogs are white, 14px radius, with a large shadow over a dim scrim. They have a 20px title and the actions on the right under a thin rule; the destructive action is red text on a pale red fill. Menus and popovers are white cards with a thin line and a large shadow. Items have 6px radius and a grey hover, and a checked item is violet-tinted.
+**Dialogs and menus.** Dialogs are cream, 14px radius, with a large shadow over a dim scrim. They have a 20px title and the actions on the right under a thin rule; the destructive action is red text on a pale red fill. Menus and popovers are cream cards with a thin line and a large shadow. Items have 6px radius and a soft beige hover, and a checked item is violet-tinted.
 
 ## Excalidraw: measured on 0.18.1, not assumed
 
@@ -119,7 +123,7 @@ Measured by running the real component in a 1184×724 container, positioned as i
 - **Vite.** Add `define: { 'process.env.IS_PREACT': JSON.stringify('false') }`, or the component does not render.
 - **Inherited type.** Excalidraw inherits `font-size` and `line-height`, and its panel spacing drifts if an ancestor sets them. Reset both on its wrapper: `font-size: 16px; line-height: normal`.
 - **Text before fonts.** Text measured before Excalifont has loaded gets clipped on the canvas. Load the font before creating or converting text elements, which matters for agent-written scenes.
-- **Theme.** `tokens.css` maps Excalidraw's primary colours to Paso's violet, its islands and corner buttons to white cards with a thin line, and its UI font to Inter. One variable drives both the active tool and all selected options in the properties panel. It is the soft violet tint (`--accent-soft`), as in Excalidraw's own default, so a panel full of selected options stays calm.
+- **Theme.** `tokens.css` maps Excalidraw's primary colours to Paso's violet, its islands and corner buttons to cream cards with a thin line, and its UI font to Inter. One variable drives both the active tool and all selected options in the properties panel. It is the soft violet tint (`--accent-soft`), as in Excalidraw's own default, so a panel full of selected options stays calm.
 - **Selection colour.** `--color-selection` goes straight to the canvas, which rejects `light-dark()` and silently draws black, so each theme sets a literal: `#7260d5` in light, and `#6957c9` in dark. The dark canvas runs through Excalidraw's filter, which turns `#6957c9` into about `#9d8ef0`.
 - **Main menu.** The default includes Excalidraw's GitHub, X and Discord links. Replace it with a custom `<MainMenu>` holding only what Paso needs.
 - **Untranslated text.** With `es-ES`, the hint has an English flowchart fragment. The Lienzo hides `.HintViewer`.
@@ -127,7 +131,8 @@ Measured by running the real component in a 1184×724 container, positioned as i
 
 ## What to avoid
 
-- Translucency, blur and glass, and warm or beige neutrals. Neutrals are cool greys.
+- Translucency, blur and glass. The warm neutrals are solid colours.
+- Cool greys, and white chrome. White is for drawings and the strip under the canvas.
 - More colours in the chrome. Violet and pink are the only hues; green appears only as the saved dot, and red only for errors and destructive actions.
 - Violet for the agent's work or pink for selection. Each has one meaning.
 - Heavy shadows on things that rest on the page. Cards get `--shadow-sm` at most; lift is for hover and for what floats.

@@ -32,36 +32,38 @@
   /* ------------------------------------------------------------------ colour
      Each pair is light-dark(light, dark). Use the names, never raw values. */
 
-  /* The page: light grey behind everything. Dark is a deep navy. */
-  --page: light-dark(#f7f8fa, #12151c);
-  /* Surfaces: bars, panels, cards, dialogs, menus. Solid, never translucent. */
-  --surface: light-dark(#ffffff, #1b1f29);
-  /* A sunken fill: hover, the selector's track, the user's chat bubble, the pager. */
-  --surface-sunken: light-dark(#f1f3f6, #242935);
+  /* The page: the warm beige table of Paso before IN-05. Dark is a warm near-black. */
+  --page: light-dark(#ece5d7, #1b1916);
+  /* Surfaces: bars, panels, cards, dialogs, menus. A soft cream, solid, never translucent. */
+  --surface: light-dark(#fbf8f2, #2a2621);
+  /* Lighter than a surface: what you type into inside a panel (the chat's composer). */
+  --surface-raised: light-dark(#ffffff, #36322b);
+  /* A sunken fill: hover, the user's chat bubble, the pager. */
+  --surface-sunken: light-dark(#f1eadd, #332f29);
   /* Hover on a sunken fill. */
-  --surface-hover: light-dark(#e9ecf1, #2c3240);
+  --surface-hover: light-dark(#e8dfcf, #3d3830);
 
-  /* Paper: drawings only. Dark value is Excalidraw's own. */
+  /* Paper: drawings only, and the Lienzo's step strip, which stays white beside the canvas. Dark value is Excalidraw's own. */
   --paper: light-dark(#ffffff, #121212);
 
   /* Lines: thin borders between surfaces and around cards. */
-  --line: light-dark(#e6e8ee, #2a303d);
+  --line: light-dark(#e2d9c8, #3a352e);
   /* Stronger edge: hovered cards, inputs, dashed slots. */
-  --line-strong: light-dark(#d3d7df, #3a4150);
+  --line-strong: light-dark(#cfc3ae, #4e473d);
 
-  /* Behind a modal dialog, and the lift of popovers and dialogs. */
-  --scrim: light-dark(rgb(23 28 40 / 0.32), rgb(4 6 10 / 0.62));
-  --shadow-sm: 0 1px 2px light-dark(rgb(23 28 40 / 0.05), rgb(0 0 0 / 0.3));
-  --shadow-md: 0 1px 2px light-dark(rgb(23 28 40 / 0.06), rgb(0 0 0 / 0.3)), 0 4px 12px light-dark(rgb(23 28 40 / 0.06), rgb(0 0 0 / 0.25));
-  --shadow-lg: 0 2px 6px light-dark(rgb(23 28 40 / 0.06), rgb(0 0 0 / 0.3)), 0 16px 40px light-dark(rgb(23 28 40 / 0.14), rgb(0 0 0 / 0.5));
+  /* Behind a modal dialog, and the lift of popovers, dialogs and the floating panels. Warm, like the table. */
+  --scrim: light-dark(rgb(40 30 14 / 0.28), rgb(0 0 0 / 0.55));
+  --shadow-sm: 0 1px 2px light-dark(rgb(74 56 28 / 0.06), rgb(0 0 0 / 0.3));
+  --shadow-md: 0 1px 2px light-dark(rgb(74 56 28 / 0.07), rgb(0 0 0 / 0.3)), 0 4px 12px light-dark(rgb(74 56 28 / 0.07), rgb(0 0 0 / 0.25));
+  --shadow-lg: 0 2px 6px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.3)), 0 16px 40px light-dark(rgb(74 56 28 / 0.16), rgb(0 0 0 / 0.5));
 
-  /* Text. --ink-3 passes AA on the page and on surfaces; --muted is for icons and disabled text only. */
-  --ink: light-dark(#27303f, #e7eaf1);
-  --ink-2: light-dark(#4b5466, #b7bdca);
-  --ink-3: light-dark(#667085, #959cab);
-  --muted: light-dark(#8a91a0, #757c8c);
+  /* Text: warm inks. --ink-3 passes AA on the page and on surfaces; --muted is for icons and disabled text only. */
+  --ink: light-dark(#1d1a15, #f2ede3);
+  --ink-2: light-dark(#4b453a, #d9d3c6);
+  --ink-3: light-dark(#665d4f, #b3aa9a);
+  --muted: light-dark(#8f8676, #8a8172);
   --on-accent: #ffffff; /* text on an --accent fill */
-  --on-ink: light-dark(#ffffff, #161a22); /* text on an --ink fill: the view selector's chosen option */
+  --on-ink: light-dark(#fffdf8, #1d1a15); /* text on an --ink fill: the view selector, the chat's send button */
 
   /* The accent: one violet for selection, focus and the primary action (Presentar). */
   --accent: #7260d5;
@@ -73,12 +75,12 @@
   /* The agent marker: what the agent touched. A pink fill behind --on-agent text, so a board can be scanned for the
      agent's work at a glance. Pink sits opposite the violet in warmth, so the two never read as one colour. */
   --agent: #f472b6;
-  --on-agent: #27303f;
+  --on-agent: #1d1a15;
   --agent-ink: light-dark(#be185d, #f9a8d4); /* agent text with no fill behind it */
 
   --ok: light-dark(#3a9d6e, #5cc293); /* the «Guardado» dot */
   --danger-ink: light-dark(#b42318, #ff9a8f);
-  --danger-soft: light-dark(#fdf0ef, #3a2124);
+  --danger-soft: light-dark(#fbece6, #3d2621);
   --focus: light-dark(#8f80e6, #a99cf5);
 
   /* ---------------------------------------------------------------- typography
@@ -127,7 +129,8 @@
   --radius-sm: 6px; /* small controls, badges, thumbnails in the carousel */
   --radius-md: 8px; /* buttons, inputs, menu items, project tiles */
   --radius-card: 10px; /* step cards, scene and composer cards, Excalidraw islands */
-  --radius-lg: 14px; /* dialogs, popovers */
+  --radius-lg: 14px; /* dialogs, popovers, the chat's bubbles and composer */
+  --radius-panel: 20px; /* the floating projects and chat panels */
   --radius-pill: 999px; /* chips, the view selector */
 
   --border: 1px solid var(--line);

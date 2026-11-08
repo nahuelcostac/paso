@@ -22,7 +22,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* The small spaced uppercase label above a title: «TU EXPLICACIÓN, PASO A PASO», «ESCENA 1 DE 3», «PASO 01». */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
-/* Shell: a white header across the window, then panels docked to its edges with thin lines between them. */
+/* Shell: a cream header across the window, then the projects and the chat as floating cards on the beige table. */
 .app {
   display: grid; height: 100%;
   grid-template: auto minmax(0, 1fr) / var(--panel-projects) minmax(0, 1fr);
@@ -106,7 +106,8 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .icon-btn:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
 
 /* Projects: a white column docked to the left. Each project is an icon tile, a name and its size. */
-.projects { grid-column: 1; grid-row: 2 / -1; display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-right: var(--border); position: relative; }
+/* Projects: a floating cream card on the table, like the chat on the right. */
+.projects { grid-column: 1; grid-row: 2 / -1; display: flex; flex-direction: column; min-height: 0; margin: var(--space-2) 0 var(--space-2) var(--space-2); border-radius: var(--radius-panel); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-md); overflow: hidden; position: relative; }
 .projects__head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-2) var(--space-2) var(--space-4); }
 .projects__head h2 { font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-3); }
 .projects__body { flex: 1; min-height: 0; overflow: hidden auto; }

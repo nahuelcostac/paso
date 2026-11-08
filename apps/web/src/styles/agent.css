@@ -29,24 +29,26 @@
   height: 12px;
 }
 
-/* Agent panel on the Storyboard: a white column docked to the right. */
+/* Agent panel on the Storyboard: a floating cream card, as before IN-05. No rule under its head: space separates. */
 .agent {
   grid-column: -2 / -1;
   grid-row: 2;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  margin: var(--space-2) var(--space-2) var(--space-2) 0;
   position: relative;
+  border-radius: var(--radius-panel);
   background: var(--surface);
-  border-left: var(--border);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
 }
 /* The left edge can be dragged to change the chat's width. A thin violet line shows where, on hover, focus and while dragging. */
 .resizer {
   position: absolute;
   z-index: 2;
-  top: 0;
-  bottom: 0;
-  left: -5px;
+  top: var(--radius-panel);
+  bottom: var(--radius-panel);
+  left: -6px;
   width: 9px;
   cursor: col-resize;
   touch-action: none;
@@ -58,6 +60,7 @@
   bottom: 0;
   left: 3px;
   width: 3px;
+  border-radius: 2px;
   background: var(--accent);
   opacity: 0;
   transition: opacity var(--motion-fast);
@@ -72,9 +75,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  height: 52px;
-  padding: 0 var(--space-2) 0 var(--space-3);
-  border-bottom: var(--border);
+  height: 48px;
+  padding: var(--space-1) var(--space-2) 0 var(--space-3);
   flex: none;
 }
 .agent__target {
@@ -84,7 +86,7 @@
   flex: 0 1 auto;
   margin-right: auto;
   min-width: 0;
-  height: var(--control-h);
+  height: 30px;
   padding: 0 var(--space-2);
   border-radius: var(--radius-md);
   text-align: left;
@@ -97,7 +99,7 @@
 .agent__target svg.i {
   width: 14px;
   height: 14px;
-  color: var(--muted);
+  color: var(--ink-3);
 }
 .agent__target .agent__title {
   flex: 0 1 auto;
@@ -114,27 +116,24 @@
 }
 .agent__scene-num {
   font-size: var(--text-12);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-regular);
   color: var(--ink-3);
 }
 
 .agent__log {
   flex: 1;
   overflow: hidden auto;
-  padding: var(--space-4) var(--space-4) var(--space-3);
+  padding: var(--space-1) var(--space-3) var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-height: 0;
 }
 .agent__empty {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--radius-card);
-  background: var(--page);
-  box-shadow: inset 0 0 0 1px var(--line);
+  padding: var(--space-4) var(--space-2);
   color: var(--ink-2);
   line-height: var(--leading-prose);
 }
@@ -154,10 +153,10 @@
 }
 .msg-user {
   align-self: flex-end;
-  max-width: 82%;
+  max-width: 80%;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-card);
-  background: var(--accent-soft);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
   color: var(--ink);
   line-height: var(--leading-prose);
   overflow-wrap: anywhere;
@@ -186,12 +185,12 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 26px;
+  min-height: 24px;
   color: var(--ink-2);
   white-space: nowrap;
 }
 .work svg.i {
-  color: var(--muted);
+  color: var(--ink-3);
 }
 .work__detail {
   color: var(--ink-3);
@@ -219,15 +218,10 @@ button.chip:hover {
   font-size: var(--text-12);
 }
 .run-end .btn {
-  height: 26px;
+  height: 24px;
   padding: 0 var(--space-2) 0 6px;
   font-size: var(--text-12);
   margin-right: -8px;
-  color: var(--accent-ink);
-}
-.run-end .btn:hover:not(:disabled) {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
 }
 .run-end svg.i {
   width: 14px;
@@ -240,17 +234,17 @@ button.chip:hover {
   margin-top: -6px;
 }
 
-/* Composer: a white card with a thin border, which takes the focus ring when its text has focus. */
+/* Composer: a lighter card than the panel, with a thin line. It takes the focus ring while its text has focus. */
 .composer {
   flex: none;
-  margin: 0 var(--space-3) var(--space-3);
+  margin: 0 var(--space-2) var(--space-2);
   padding: 10px var(--space-2) var(--space-2);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-sm);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .composer:has(.composer__input:focus-visible) {
-  box-shadow: inset 0 0 0 1px var(--accent-line), var(--focus-ring);
+  box-shadow: inset 0 0 0 1px var(--line-strong), var(--focus-ring);
 }
 .composer__input {
   display: block;
@@ -282,11 +276,10 @@ button.chip:hover {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: 30px;
+  height: 28px;
   padding: 0 6px 0 var(--space-2);
   border-radius: var(--radius-md);
   color: var(--ink-2);
-  font-weight: var(--weight-medium);
   white-space: nowrap;
 }
 .composer__control:hover:not(:disabled) {
@@ -296,25 +289,18 @@ button.chip:hover {
 .composer__control svg.i {
   width: 14px;
   height: 14px;
-  color: var(--muted);
+  color: var(--ink-3);
 }
+/* Send and stop: one round ink button. */
 .composer__send {
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--on-accent);
-  flex: none;
-}
-.composer__send:hover:not(:disabled) {
-  background: var(--accent-strong);
-}
-/* Stop is ink, not red, so no third colour enters the chrome. */
-.composer__send[aria-label='Detener'] {
+  border-radius: var(--radius-pill);
   background: var(--ink);
-  color: var(--surface);
+  color: var(--on-ink);
+  flex: none;
 }
 .composer__send svg.i {
   fill: currentColor;
@@ -345,8 +331,8 @@ button.chip:hover {
 @keyframes agent-spin { to { rotate: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .i--spin { animation: none; } }
 
-/* Undo: what it does, then the warnings, plainly. */
-.dialog__list { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--page); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); line-height: var(--leading-prose); }
+/* Undo: what it does, then the warnings, plainly, as before IN-05. */
+.dialog__list { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); color: var(--ink-2); line-height: var(--leading-prose); }
 .undo__warnings { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .undo__warnings li { display: flex; gap: var(--space-2); align-items: flex-start; line-height: var(--leading-prose); }
 .undo__warnings svg.i { margin-top: 2px; color: var(--danger-ink); }
@@ -355,17 +341,17 @@ button.chip:hover {
 
 /* Under 1100px the Storyboard keeps no column for the panel: it opens over the board, from the top bar. */
 .agent-toggle { height: 38px; padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
-.agent-toggle svg.i { color: var(--accent-ink); }
-.agent-toggle[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.agent-toggle[aria-expanded='true'] { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--ink); box-shadow: none; }
 .agent[data-narrow] {
   display: none;
   position: fixed;
-  top: calc(var(--topbar-h) + 1px);
-  right: 0;
-  bottom: 0;
-  width: min(var(--panel-agent), 100vw);
+  top: calc(var(--topbar-h) + 1px + var(--space-2));
+  right: var(--space-2);
+  bottom: var(--space-2);
+  width: min(var(--panel-agent), calc(100vw - var(--space-2) * 2));
+  margin: 0;
   z-index: 6;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-lg);
 }
 .agent[data-narrow][data-open='true'] { display: flex; }
