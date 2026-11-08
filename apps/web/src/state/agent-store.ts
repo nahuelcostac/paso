@@ -16,7 +16,7 @@ import type { ServiceEvent } from './projects-store';
 
 export const HARNESS_NAMES: Record<HarnessId, string> = { claude: 'Claude Code', codex: 'Codex', agy: 'Antigravity' };
 /** Harnesses the service can run a session on today. The others are shown as detected but not available. */
-export const SUPPORTED_HARNESSES: readonly HarnessId[] = ['claude'];
+export const SUPPORTED_HARNESSES: readonly HarnessId[] = ['claude', 'codex'];
 
 export type ModelOption = { id: string; label: string };
 /**

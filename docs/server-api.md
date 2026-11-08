@@ -204,8 +204,8 @@ locations and the login shell, so a desktop host need not inherit a shell PATH.
 
 A session lets an agent run on the user's own harness and edit a project
 through the Paso board tools ([mcp.md](mcp.md)). Claude Code (`claude`) is
-supported. Codex (AG-06) and `agy` (AG-07) will plug into the same interface;
-until then they return 422 `HARNESS_NOT_SUPPORTED`. The harness must be
+supported, as is Codex (`codex`). `agy` (AG-07) will use the same interface;
+until then it returns 422 `HARNESS_NOT_SUPPORTED`. The harness must be
 installed and signed in on this machine with the user's own login. Paso never
 stores API keys, and `ANTHROPIC_*`, `CLAUDE_CODE_*` and other variables of the
 service's environment are not handed to the harness.
@@ -324,6 +324,72 @@ resume token.
 
 Paso does not log prompts, answers, tokens or harness output.
 
+### Codex policy and protocol
+
+Codex uses `codex app-server --listen stdio:// --strict-config`, with one process per turn.
+Paso sends `initialize`, `thread/start` or `thread/resume`, then `turn/start`.
+Assistant deltas and complete messages use the common events above. Cancellation
+stops both the app-server group and the separate board MCP group, and waits for
+them before publishing the terminal event. Resume works after restarting Paso.
+
+`exec --json` is simpler and has useful `--ignore-user-config` and
+`--ignore-rules` flags in the installed CLI. App-server was selected because
+its dynamic-tool requests let Paso validate every call **before** forwarding
+it to the board. Its richer protocol also supplies text deltas and effective
+sandbox and approval settings. The trade-off is an experimental protocol and
+more adapter code. The common `HarnessAdapter` interface is unchanged.
+
+This integration currently accepts **Codex CLI 0.166.0 only**. An unverified
+version fails with `unsupported_version` before a turn is submitted. Upgrade
+the adapter and rerun the real checks before accepting another version. Flags
+and schemas were checked using that executable's `--help` and
+`app-server generate-json-schema --experimental`.
+
+The controls act together.
+
+- A private `codex-home` directory beside the neutral workspace becomes
+  `CODEX_HOME`. It contains no global config, plugins, MCP definitions or
+  AGENTS.md. Unexpected config or instruction files cause
+  `unsafe_configuration`. `project_doc_max_bytes=0` also prevents project
+  instructions from loading. Skills, hooks, memories, plugins, apps, shell,
+  browser tools, web search, code execution and delegation are disabled.
+- The home contains only a symlink to the person's existing CLI `auth.json`
+  for authentication. Paso never reads or copies its contents and does not
+  accept API keys. `forced_login_method="chatgpt"` requires the person's
+  subscription login. The CLI owns authentication and refresh. Login lookup uses
+  the original `CODEX_HOME` environment value, or `~/.codex`. A login held only
+  in a keychain under another home has not been verified. Use the CLI's file
+  login for this integration. Windows symlink permissions have not been tested.
+- A Paso-owned model catalog removes shell tools, `apply_patch`, native code
+  execution, model-specified extension tools and multi-agent mode. Feature
+  flags alone are insufficient in this CLI because provider model metadata
+  can also enable tools. The catalog uses the requested model without fallback.
+  The default is `gpt-6.1-sol`; the API accepts another model through `model`.
+- `approval_policy="never"`, `sandbox_mode="read-only"`, disabled web search
+  and `environments: []` apply to every turn. In 0.166.0, `thread/resume` can
+  restore the neutral local environment. Paso clears it in `turn/start`
+  before submitting user content. Unexpected environments, instruction sources,
+  a writable sandbox or another approval policy stop the run.
+- Codex has **no configured MCP servers**. Paso connects the compiled
+  `apps/mcp` server itself and exposes exactly its eleven board tools as
+  app-server dynamic tools. It checks the tool list against a fixed allow-list.
+  Calls with another tool, namespace or thread, duplicate call IDs, native tool
+  events, approval requests and unexpected MCP servers stop the run with
+  `unsafe_configuration`. No approval is granted and no UI prompt is opened.
+- Only the MCP process receives `PASO_SESSION_TOKEN`, through its environment.
+  Codex receives neither the token nor a file or argument that holds it. The
+  existing MCP client sets `X-Paso-Actor: mcp`, so edits appear live and belong
+  to the turn's existing restore point.
+
+The catalog and CLI-owned transcripts live under `codex-home`, outside the
+project directory. The CLI persists prompts, answers and board data there for
+resume. Paso's session index still contains only IDs and resume tokens.
+Administrator-managed CLI requirements can still apply. Paso checks the
+reported effective policy and fails closed if it conflicts with this policy.
+
+The agent picker enables Codex with the same add, send, stop and undo controls
+as Claude Code. Adding it uses the person's local login and quota.
+
 ### Processes
 
 The harness runs without a shell, as an argument array, in its own process
@@ -371,18 +437,17 @@ and `maxRunMs`. The default MCP server is the compiled
 first). The CLI reads `PASO_AGENT_WORKDIR`, `PASO_AGENT_SESSIONS_PATH`,
 `PASO_MCP_ENTRY` and `PASO_MCP_BROWSER_EXECUTABLE`.
 
-### Adding Codex and agy
+### Adding another harness
 
 An adapter implements `HarnessAdapter.run(request, signal)` in
 `apps/server/src/agent/types.ts`: start one process for one turn, translate its
 output into the events above, end with exactly one terminal event, and use
 `harnessEnvironment` and `startProcess` for the environment and process tree.
-Both CLIs fit this shape: `codex exec --json` with `codex exec resume <id>`,
-`--ignore-user-config`, `-C` and `-s read-only` for confinement, and
-`agy -p --input-format stream-json --output-format stream-json
---conversation <id>`. These commands alone do not establish a board-only
-policy. Each adapter must establish and verify its own policy before enabling
-the harness.
+Codex implements this interface through app-server and its board bridge. The
+`agy` CLI provides `agy -p --input-format stream-json --output-format
+stream-json --conversation <id>`. These commands alone do not establish a
+board-only policy. Each adapter must establish and verify its own policy
+before enabling the harness.
 
 The installed `agy` 1.5.3 was investigated for AG-07. Its print-mode init
 event listed built-in shell, file and web tools even with `--sandbox` and
@@ -410,6 +475,21 @@ and a little quota:
 pnpm build
 PASO_TEST_REAL_CLAUDE=1 pnpm exec vitest run apps/server/src/agent/claude.real.test.ts
 ```
+
+Codex simulation tests use `agent/testing/fake-codex.mjs` with the real
+compiled board MCP server. They cover text, tool targets and results, resume,
+cancellation and child cleanup, failure codes, version rejection and unsafe
+configuration. The real test is opt-in because it spends the person's quota.
+
+```sh
+pnpm build
+PASO_TEST_REAL_CODEX=1 pnpm exec vitest run apps/server/src/agent/codex.real.test.ts
+```
+
+It defaults to `gpt-6-luna`. Set `PASO_TEST_CODEX_MODEL` if that model is not
+available with the person's account. It checks a disk edit, resume, refusal of
+shell/file/web requests and cancellation. The browser check is separate.
+
 ## Agent runs and restore points
 
 Before an agent run starts, `POST /api/projects/:p/runs` (with optional

@@ -69,7 +69,9 @@ This is a transport definition, not a complete provider-specific config file.
 Claude Code and `agy` hosts must place it in their supported MCP configuration
 or pass it through their launcher. Paso's own Claude Code launcher, with its
 board-only permissions, is described in [server-api.md](server-api.md#agent-sessions).
-The Codex and `agy` launchers and their board-only policies belong to AG-06 and AG-07.
+The Codex launcher uses a host-validated dynamic-tool bridge, described in
+[server-api.md](server-api.md#codex-policy-and-protocol). The `agy` policy belongs
+to AG-07.
 
 For Codex, a host can use the documented MCP server configuration in its
 private or temporary config. Inherit the two values instead of storing them.
