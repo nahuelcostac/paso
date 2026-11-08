@@ -88,7 +88,7 @@ On the Lienzo the header has a **second row**: the scene selector (a bordered bu
 - The person's message: right-aligned, 80% maximum width, on `--surface-sunken`, 14px corners. No name or avatar.
 - The agent's text: bare, on the panel. No bubble.
 - Tool activity: one 26px row per tool, a 16px Lucide icon, muted detail after the label. The step number is a pink chip that jumps to that step.
-- The empty state is plain text on the panel, with no box.
+- Before the first message the log is empty: the head already says what the agent receives, and the composer invites the request.
 - Composer: a lighter card (`--surface-raised`) with a thin line, which takes the focus ring while its text has focus. Agent and model pickers are ghost controls in its footer. The round 32px ink button on the right sends, and becomes stop (still ink, never red) while the agent works.
 - `Deshacer ejecución` is a ghost button in the meta line under each finished run, with its time and how many changes it covers. The undo dialog lists what will happen as plain text, then the warnings.
 - On a narrow window the `Agente` toggle turns ink while the drawer is open, and the drawer is the same floating card over the board.

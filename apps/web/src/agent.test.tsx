@@ -248,12 +248,12 @@ describe('a turn as it happens', () => {
     const panel = await openPanel();
     const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
 
-    // The target: what the agent receives is said before anything is sent.
-    expect(within(panel).getByText(/El agente recibe «Búsqueda binaria», todas sus escenas/)).toBeInTheDocument();
+    // The target: the panel's head says what the agent receives before anything is sent. The log starts empty.
+    expect(within(panel).getByRole('log', { name: 'Conversación con el agente' })).toBeEmptyDOMElement();
     await user.click(within(panel).getByRole('button', { name: /El agente recibe: Todo el proyecto/ }));
     const targets = await screen.findByRole('menu', { name: 'Qué recibe el agente' });
     await user.click(await within(targets).findByRole('menuitemradio', { name: /Partir en dos/ }, patience));
-    expect(within(panel).getByText(/El agente recibe «Búsqueda binaria», escena 2: «Partir en dos»/)).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'El agente recibe: Escena 2 · Partir en dos. Cambiar' })).toBeInTheDocument();
 
     await send(panel, user, 'Amplía la escena 2');
     expect(await within(panel).findByText('Amplía la escena 2')).toBeInTheDocument();

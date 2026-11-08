@@ -282,7 +282,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
   };
 
   const targetName = targetScene ? `Escena ${targetIndex + 1} · ${targetScene.name}` : 'Todo el proyecto';
-  const receives = targetScene ? `«${projectName}», escena ${targetIndex + 1}: «${targetScene.name}»` : `«${projectName}», todas sus escenas`;
 
   let harnessNotice: { text: string; action?: { label: string; run: () => void } } | undefined;
   if (state.harnesses.status === 'failed') {
@@ -325,14 +324,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
       </div>
 
       <div ref={log} className="agent__log" role="log" aria-label="Conversación con el agente">
-        {turns.length === 0 && (
-          <div className="agent__empty">
-            <p className="agent__empty-title">Pide una explicación paso a paso, o cambios en los pasos que ya hay.</p>
-            <p>El agente recibe {receives}.</p>
-            <p className="agent__empty-meta">Solo usa las herramientas del tablero: no ve tus archivos ni el terminal. Cada ejecución se puede deshacer.</p>
-          </div>
-        )}
-
         {undoTarget && !undoTargetShown && (
           <div className="run-end run-end--earlier">
             <span>Última ejecución · {clock(undoTarget.finishedAt)} · {plural(countRunChanges(undoTarget), 'cambio', 'cambios')}</span>
