@@ -397,3 +397,26 @@ describe('security', () => {
     expect((await fetch(`${service.url}${p}/assets/image.png`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: 'too big' })).status).toBe(413);
   });
 });
+
+describe('«Abrir carpeta»', () => {
+  it('opens the project folder, by its ID under the data directory, and nothing else', async () => {
+    await service.close();
+    const opened: string[] = [];
+    let fail = false;
+    service = await startServer({ dataDir, port: 0, sessionToken: token, pollIntervalMs: 100,
+      openFolder: async (path) => { if (fail) throw new Error('no file manager'); opened.push(path); } });
+    await project();
+    expect((await api(`${p}/reveal`, 'POST')).status).toBe(204);
+    expect(opened).toHaveLength(1);
+    expect(opened[0].endsWith(join('', 'p'))).toBe(true);
+    expect(await readFile(join(opened[0], 'project.json'), 'utf8')).toContain('"name": "Project"');
+    expect((await api('/api/projects/missing/reveal', 'POST')).status).toBe(404);
+    expect((await api(`${p}/reveal`, 'GET')).status).toBe(405);
+    expect((await api('/api/projects/..%2F..%2Fetc/reveal', 'POST')).status).toBe(400);
+    fail = true;
+    const failed = await api(`${p}/reveal`, 'POST');
+    expect(failed.status).toBe(500);
+    expect(failed.data.error.code).toBe('REVEAL_FAILED');
+    expect(opened).toHaveLength(1);
+  });
+});

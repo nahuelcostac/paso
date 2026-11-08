@@ -8,12 +8,15 @@ import { authorize } from './security.js';
 import { Store } from './store.js';
 import { HarnessRegistry, detectHarness, registryPath, type DetectionOptions } from './harnesses.js';
 import { RunStore } from './runs.js';
+import { openInFileManager, type OpenFolder } from './reveal.js';
 import { join, dirname, resolve } from 'node:path';
+import { realpath } from 'node:fs/promises';
 import { handleAgentRoute } from './agent/api.js';
 import { SessionManager } from './agent/sessions.js';
 import type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId } from './agent/types.js';
 
 export type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId };
+export type { OpenFolder } from './reveal.js';
 
 export type AgentOptions = {
   /** Neutral, empty directory the agents run in. Default: `agent-workspace` next to the projects directory. */
@@ -38,6 +41,9 @@ export type StartServerOptions = {
   harnessRegistryPath?: string; harnessDetection?: DetectionOptions;
   agent?: AgentOptions;
   runsDir?: string; runRetentionLimit?: number;
+  /** How «Abrir carpeta» shows a project's folder. Default: the system's file manager. A desktop host can pass its own,
+   * such as Electron's shell.openPath. */
+  openFolder?: OpenFolder;
 };
 
 async function body(request: IncomingMessage, limit: number) {
@@ -143,6 +149,13 @@ export async function startServer(options: StartServerOptions) {
         else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision, undefined, undefined, actor);
         else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, undefined, undefined, actor); status = 204; }
         else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+      } else if (parts.length === 4 && parts[3] === 'reveal') {
+        // «Abrir carpeta»: the project's own folder, named by its ID under the data directory.
+        if (method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+        await store.read(projectId);
+        try { await (options.openFolder ?? openInFileManager)(join(await realpath(options.dataDir), projectId)); }
+        catch { throw new ApiError(500, 'REVEAL_FAILED', 'Could not open the project folder.'); }
+        status = 204;
       } else if (parts[3] === 'runs') {
         if (parts.length === 4) {
           if (method === 'GET') result = await runs.list(store, projectId);

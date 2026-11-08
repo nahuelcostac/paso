@@ -161,6 +161,7 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
           name={named(menu.id)}
           onClose={() => setMenu(null)}
           onRename={() => { setNotice(null); setRenamingId(menu.id); }}
+          onReveal={() => { setNotice(null); void store.reveal(menu.id).catch(() => setNotice('No se pudo abrir la carpeta del proyecto.')); }}
           onDelete={() => { setDeleteError(null); setDeleting(rowById(menu.id) as Extract<Row, { kind: 'ok' }>); }}
         />
       )}

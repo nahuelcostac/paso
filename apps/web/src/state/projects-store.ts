@@ -223,6 +223,8 @@ export class ProjectsStore {
       this.setRows((rows) => rows.map((existing) => existing.id === id && existing.kind === 'ok' ? { ...existing, project: document, revision } : existing));
     } catch (error) { return this.fail(error, id); }
   }
+  /** Opens the project's folder in the system's file manager. */
+  reveal(id: string) { return this.api.revealProject(id); }
   async remove(id: string) {
     const row = this.okRow(id);
     try {

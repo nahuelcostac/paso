@@ -152,6 +152,10 @@ export class ApiClient {
   updateProject(id: string, revision: string, input: { name?: string; icon?: string | null }) {
     return this.request<ProjectEnvelope>(`/projects/${encodeURIComponent(id)}`, { method: 'PATCH', body: input, revision });
   }
+  /** «Abrir carpeta»: the service opens the project's folder in the system's file manager. */
+  revealProject(id: string) {
+    return this.request<void>(`/projects/${encodeURIComponent(id)}/reveal`, { method: 'POST' });
+  }
   deleteProject(id: string, revision: string) {
     return this.request<void>(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE', revision });
   }

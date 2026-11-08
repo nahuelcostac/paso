@@ -63,7 +63,7 @@ On the Lienzo the header has a **second row**: the scene selector (a bordered bu
 **Projects.** A cream card floating on the left, 232px wide inside an 8px gutter, with 20px corners. «PROYECTOS» is an eyebrow. Each project is a 34px icon tile, its name and its size (`4 escenas · 17 pasos`). The current project has a violet-tinted row with a violet edge, and its tile is solid violet. Clicking the tile opens the icon picker. The footer says «Guardado en este equipo» after a green dot.
 
 **Storyboard.** Under the header, on the white workspace:
-- The project: the eyebrow «TU EXPLICACIÓN, PASO A PASO», the title at 28px, and its size. «Nueva escena» is a bordered secondary button on the right.
+- The project: the title at 28px and its size, with no eyebrow above. «Nueva escena» is a bordered secondary button on the right.
 - Each scene sits under a thin rule: the eyebrow «ESCENA 2 DE 3», the title at 20px, and the step count in a small bordered counter. The drag handle and menu appear on hover or focus.
 - Steps are white cards in a grid (minimum 208px wide): the thumbnail on top, with the step number in a small bordered badge on its top-left corner, then the title. An untitled step reads «Sin título» in `--ink-3`; it is named in the Lienzo's second row.
 - The last cell of every scene is the dashed «El siguiente paso» card, with a violet `+` tile. It is always shown.

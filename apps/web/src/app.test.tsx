@@ -20,8 +20,12 @@ let service: Service;
 let dataDir: string;
 let config: ClientConfig;
 
+/** Folders «Abrir carpeta» asked to show. A test never opens the real file manager. */
+let opened: string[] = [];
+let openFails = false;
 async function start(port = 0) {
   service = await startServer({ dataDir, port, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100,
+    openFolder: async (path) => { if (openFails) throw new Error('no file manager'); opened.push(path); },
     // The agent panel asks which harnesses are installed: never run the real ones from a test.
     harnessDetection: { searchPaths: [], loginShell: false } });
   config = { baseUrl: service.url, token };
@@ -39,6 +43,7 @@ const patience = { timeout: 5000 };
 
 beforeEach(async () => {
   dataDir = await mkdtemp(join(tmpdir(), 'paso-web-'));
+  opened = []; openFails = false;
   window.history.replaceState(null, '', '/');
   window.matchMedia ??= ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
   await start();
@@ -163,12 +168,35 @@ describe('projects panel against the real service', () => {
       expect(renameItem).toHaveFocus();
       expect(visibilityAtFocus).toBe('');
       await user.keyboard('{ArrowDown}');
+      expect(screen.getByRole('menuitem', { name: 'Abrir carpeta' })).toHaveFocus();
+      await user.keyboard('{ArrowDown}');
       expect(screen.getByRole('menuitem', { name: /Eliminar/ })).toHaveFocus();
       await user.keyboard('{Escape}');
       expect(moreBtn).toHaveFocus();
     } finally {
       HTMLElement.prototype.focus = origFocus;
     }
+  });
+});
+
+describe('«Abrir carpeta»', () => {
+  it('sits under «Renombrar» and opens the project folder; a failure is told in the panel', async () => {
+    const user = userEvent.setup();
+    await seed('Carpeta', 'carpeta');
+    render(<App config={config} />);
+    await user.click(await screen.findByRole('button', { name: 'Más acciones de Carpeta' }, patience));
+    const items = (await screen.findAllByRole('menuitem')).map((item) => item.textContent);
+    expect(items).toEqual(['Renombrar', 'Abrir carpeta', 'Eliminar…']);
+    await user.click(screen.getByRole('menuitem', { name: 'Abrir carpeta' }));
+    await waitFor(() => expect(opened).toHaveLength(1));
+    expect(opened[0].endsWith('carpeta')).toBe(true);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    openFails = true;
+    await user.click(screen.getByRole('button', { name: 'Más acciones de Carpeta' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Abrir carpeta' }));
+    expect(await screen.findByText('No se pudo abrir la carpeta del proyecto.', {}, patience)).toBeInTheDocument();
+    expect(opened).toHaveLength(1);
   });
 });
 

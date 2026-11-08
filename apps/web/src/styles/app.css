@@ -19,7 +19,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 :focus-visible { outline: none; box-shadow: var(--focus-ring) !important; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* The small spaced uppercase label above a title: «TU EXPLICACIÓN, PASO A PASO», «ESCENA 1 DE 3», «PASO 01». */
+/* The small spaced uppercase label above a title: «ESCENA 1 DE 3», «PASO 01». */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
 /* Shell: a cream header across the window, then the projects and the chat as cream cards floating on the white workspace. */
@@ -206,10 +206,10 @@ button.project__tile:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(
   position: relative; grid-column: -2 / -1; grid-row: 2; overflow: hidden auto; min-width: 0; padding: 44px 56px var(--space-7);
 }
 .board__head { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
-.board__heading { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.board__heading { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .board__title { font-size: var(--text-28); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); overflow-wrap: anywhere; }
 .board__meta { color: var(--ink-3); font-size: var(--text-13); white-space: nowrap; }
-.board__head > .btn { margin-top: 18px; }
+.board__head > .btn { margin-top: 1px; }
 .canvas { grid-column: -2 / -1; grid-row: 2; position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; padding: var(--space-5); background: var(--paper); overflow: hidden; }
 .canvas__placeholder { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; color: var(--ink-3); }
 .canvas__placeholder h1 { color: var(--ink); font-size: var(--text-20); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); overflow-wrap: anywhere; }

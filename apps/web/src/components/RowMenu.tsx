@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { FolderOpen, Pencil, Trash2 } from 'lucide-react';
 import { Popover } from './Popover';
 
-type Props = { anchor: HTMLElement; name: string; onRename: () => void; onDelete: () => void; onClose: () => void };
+type Props = { anchor: HTMLElement; name: string; onRename: () => void; onReveal: () => void; onDelete: () => void; onClose: () => void };
 
-export function RowMenu({ anchor, name, onRename, onDelete, onClose }: Props) {
+export function RowMenu({ anchor, name, onRename, onReveal, onDelete, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const items = () => [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
   useEffect(() => { items()[0]?.focus(); }, []);
@@ -29,6 +29,7 @@ export function RowMenu({ anchor, name, onRename, onDelete, onClose }: Props) {
     >
       <div ref={ref}>
         <button type="button" role="menuitem" onClick={() => { onClose(); onRename(); }}><Pencil className="i" aria-hidden="true" />Renombrar</button>
+        <button type="button" role="menuitem" onClick={() => { onClose(); onReveal(); }}><FolderOpen className="i" aria-hidden="true" />Abrir carpeta</button>
         <button type="button" role="menuitem" className="menu__danger" onClick={() => { onClose(); onDelete(); }}><Trash2 className="i" aria-hidden="true" />Eliminar…</button>
       </div>
     </Popover>
