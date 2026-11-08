@@ -36,8 +36,8 @@ type Props = {
 };
 
 /**
- * A raised glass surface mounted on the body. Glass does not nest, so a popover must live outside
- * the blurred panel that opened it. Escape and a press outside close it and return focus to the anchor.
+ * A raised surface mounted on the body, so no panel's overflow or stacking can clip it.
+ * Escape and a press outside close it and return focus to the anchor.
  */
 export function Popover({ anchor, onClose, align = 'start', role, label, className = '', children, onKeyDown }: Props) {
   const ref = useRef<HTMLDivElement>(null);

@@ -55,7 +55,7 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
   const showList = state.phase === 'ready' && (state.rows.length > 0 || creating);
 
   return (
-    <aside className="projects glass" aria-label="Proyectos">
+    <aside className="projects" aria-label="Proyectos">
       <div className="projects__head">
         <h2>Proyectos</h2>
         <button type="button" className="icon-btn" aria-label="Nuevo proyecto" onClick={() => { setRenamingId(null); onCreatingChange(true); }}>

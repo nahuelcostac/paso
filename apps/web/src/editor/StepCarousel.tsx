@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { Copy, Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
-import { StepFrame } from '../components/StepFrame';
+import { pad, StepFrame } from '../components/StepFrame';
 import '../styles/carousel.css';
 
 type Props = {
@@ -112,8 +112,9 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
     finally { setDeleteBusy(false); }
   };
   const confirmingAt = confirming ? stepIds.indexOf(confirming) : -1;
+  const currentAt = currentId ? stepIds.indexOf(currentId) : -1;
 
-  return <footer className="carousel glass" aria-label="Pasos de la escena">
+  return <footer className="carousel" aria-label="Pasos de la escena">
     <span id="carousel-hint" className="visually-hidden">{HINT}</span>
     <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>
     <div className="carousel__frames" ref={scroller}>
@@ -137,6 +138,10 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
       ))}
       {stepIds.length === 0 && <p className="carousel__empty">Sin pasos</p>}
     </div>
+    {/* Where you are, at a glance. Screen readers get it from the current frame's aria-current. */}
+    {stepIds.length > 0 && <p className="carousel__pager" aria-hidden="true">
+      <span className="carousel__pager-now">{currentAt >= 0 ? pad(currentAt + 1) : '–'}</span> / {pad(stepIds.length)}
+    </p>}
     <div className="carousel__actions">
       <button type="button" className="btn" disabled={busy} onClick={onAdd} title="Un paso nuevo después del actual, que parte de su dibujo"><Plus className="i" aria-hidden="true" />Añadir paso</button>
       <button type="button" className="btn" disabled={busy || !currentId} onClick={onDuplicate} title="Una copia exacta del paso actual, justo después de él"><Copy className="i" aria-hidden="true" />Duplicar paso</button>

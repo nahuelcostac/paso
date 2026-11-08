@@ -11,7 +11,7 @@ type Props = {
   onCreate: () => void;
 };
 
-/** The scene switcher in the top bar: a glass pill with the scene's number and name, and a menu to switch or create one. */
+/** The scene switcher in the top bar: a bordered button with the scene's number and name, and a menu to switch or create one. */
 export function SceneSelector({ scenes, currentId, busy, onSelect, onCreate }: Props) {
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -29,7 +29,7 @@ export function SceneSelector({ scenes, currentId, busy, onSelect, onCreate }: P
   const current = scenes[at];
   // Nothing to switch between yet: the control is just the way to the first scene.
   if (scenes.length === 0) {
-    return <button type="button" className="select glass" disabled={busy} onClick={onCreate}><Plus className="i" aria-hidden="true" /><span className="select__name">Nueva escena</span></button>;
+    return <button type="button" className="select" disabled={busy} onClick={onCreate}><Plus className="i" aria-hidden="true" /><span className="select__name">Nueva escena</span></button>;
   }
   const move = (to: number | 'first' | 'last') => {
     const all = items();
@@ -38,7 +38,7 @@ export function SceneSelector({ scenes, currentId, busy, onSelect, onCreate }: P
   };
   return <>
     <button
-      type="button" ref={setAnchor} className="select glass" aria-haspopup="menu" aria-expanded={open}
+      type="button" ref={setAnchor} className="select" aria-haspopup="menu" aria-expanded={open}
       aria-label={`Escena: ${current?.name ?? 'sin elegir'}. Cambiar de escena`}
       title={current?.name} onClick={() => setOpen((value) => !value)} onKeyDown={(event) => { if (event.key === 'Escape' && open) { event.stopPropagation(); setOpen(false); } }}
     >

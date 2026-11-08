@@ -166,7 +166,7 @@ describe('moving through the presentation', () => {
     await expectShown(steps[1]); await expectIndicator('Paso 2 de 4');
     expect(document.querySelectorAll('.indicator__ticks i')).toHaveLength(4);
     expect(document.querySelectorAll('.indicator__ticks i.on')).toHaveLength(1);
-    expect(screen.getByText('2/4')).toBeInTheDocument();
+    expect(screen.getByText('02 / 04')).toBeInTheDocument();
     for (const [key, target] of [['{ArrowRight}', 2], ['{ArrowRight}', 3], ['{ArrowRight}', 3], ['{ArrowLeft}', 2], ['{PageUp}', 1], ['{PageDown}', 2], [' ', 3], ['{Home}', 0], ['{ArrowLeft}', 0], ['{End}', 3]] as const) {
       await user.keyboard(key);
       await expectShown(steps[target]);
@@ -178,6 +178,17 @@ describe('moving through the presentation', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Presentación' })).not.toBeInTheDocument());
     await waitFor(() => expect(hashStep()).toBe(steps[2]));
     await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', steps[2]));
+  });
+  it('leaves with «Salir» on the step last shown, and the click does not move the presentation first', async () => {
+    const user = userEvent.setup();
+    const { steps } = await open([[box('a')], [box('b')], [box('c')]], 1);
+    await start(user);
+    await expectShown(steps[1]);
+    const exit = screen.getByRole('button', { name: /Salir/ });
+    expect(exit).toHaveAttribute('tabindex', '-1');   // Tab stays in the presentation; Esc is the keyboard's way out.
+    await user.click(exit);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Presentación' })).not.toBeInTheDocument());
+    await waitFor(() => expect(hashStep()).toBe(steps[1]));
   });
   it('does not touch the address or the Lienzo while it presents', async () => {
     const user = userEvent.setup();
@@ -222,7 +233,7 @@ describe('moving through the presentation', () => {
     await waitFor(() => expect(mocks.renders).toHaveLength(5));
     expect(new Set(mocks.renders)).toEqual(new Set([steps[20], steps[21], steps[19], steps[22], steps[18]]));
     expect(document.querySelector('.indicator__ticks')).not.toBeInTheDocument();
-    expect(screen.getByText('21/40')).toBeInTheDocument();
+    expect(screen.getByText('21 / 40')).toBeInTheDocument();
     await user.keyboard('{End}');
     await expectShown(steps[39]);
   });

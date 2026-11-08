@@ -77,6 +77,20 @@ async function open(sizes: number[]) {
   return data;
 }
 
+describe('the second row of the top bar', () => {
+  it('names the open step: its number, and its title once it is loaded', async () => {
+    const user = userEvent.setup();
+    const { projectId, scenes } = await open([2]);
+    const row = () => document.querySelector('.topbar__sub')!;
+    await waitFor(() => expect(row()).toHaveTextContent('Paso 01'));
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: /Cambiar de escena/ })).toBeInTheDocument();
+    const step = await api.getStep({ projectId, sceneId: scenes[0].id, stepId: scenes[0].steps[1] });
+    await api.saveStep({ projectId, sceneId: scenes[0].id, stepId: scenes[0].steps[1] }, step.revision, { ...step.document, title: 'Mira en medio' });
+    await user.click(frames()[1]);
+    await waitFor(() => expect(row()).toHaveTextContent('Paso 02Mira en medio'), patience);
+  });
+});
+
 describe('scene selector', () => {
   it('replaces the temporary switcher: switches scene and creates one, from the top bar', async () => {
     const user = userEvent.setup();

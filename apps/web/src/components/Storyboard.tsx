@@ -209,11 +209,14 @@ export function Storyboard({ api, projectId, projectName, listedSize, events, th
   return (
     <main className="board" aria-label="Storyboard" aria-busy={state.phase === 'loading'} data-dragging={drag?.moved || undefined} ref={setBoard}>
       <div className="board__head">
-        <h1 className="board__title" tabIndex={-1} ref={title}>{projectName}</h1>
-        <p className="board__meta">{listedSize}</p>
+        <div className="board__heading">
+          <p className="eyebrow">Tu explicación, paso a paso</p>
+          <h1 className="board__title" tabIndex={-1} ref={title}>{projectName}</h1>
+          <p className="board__meta">{listedSize}</p>
+        </div>
         <span className="spacer" />
         {scenes.length > 0 && (
-          <button type="button" className="btn btn--bare" disabled={creating} onClick={() => void createScene()}>
+          <button type="button" className="btn btn--outline" disabled={creating} onClick={() => void createScene()}>
             <Plus className="i" aria-hidden="true" />Nueva escena
           </button>
         )}

@@ -104,6 +104,10 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const failedStep = steps.unresolved().find((session) => targetKey(session.target) !== showing);
   const here = steps.current();
   const saveState = lienzo && here && targetKey(here.target) === showing ? here.status : undefined;
+  // The open step, for the Lienzo's second row: its number in the scene and, once it is loaded, its title.
+  const openScene = lienzo ? scenes?.find((item) => item.document.id === route.sceneId)?.document : undefined;
+  const stepAt = openScene && route.stepId ? openScene.stepIds.indexOf(route.stepId) : -1;
+  const openStep = stepAt >= 0 ? { number: stepAt + 1, title: here && targetKey(here.target) === showing ? here.document.title : undefined } : undefined;
 
   // No project in the address: open the first one that can be opened.
   useEffect(() => {
@@ -145,10 +149,11 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           onSelect={(id) => navigate({ projectId: openProject!.id, view: 'lienzo', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
           onCreate={() => void createScene()}
         /> : undefined}
+        step={openStep}
         saveState={saveState}
         notice={sceneError ? <span className="topbar__error" role="alert">{sceneError}<button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setSceneError(undefined)}>×</button></span> : undefined}
         agentStatus={statusShown && working && openProject ? (
-          <div className="agent-status glass" role="status" aria-label="Agente trabajando">
+          <div className="agent-status" role="status" aria-label="Agente trabajando">
             <span className="agent-status__text">{HARNESS_NAMES[working.turn.harness]} está {workingAt ? 'cambiando el paso' : 'trabajando'}</span>
             {workingAt && (
               <button
@@ -163,7 +168,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           </div>
         ) : undefined}
         agentToggle={storyboard && narrow ? (
-          <button type="button" className="btn agent-toggle glass" aria-expanded={agentOpen} aria-controls="agent-panel" onClick={() => setAgentOpen(!agentOpen)}>
+          <button type="button" className="btn btn--outline agent-toggle" aria-expanded={agentOpen} aria-controls="agent-panel" onClick={() => setAgentOpen(!agentOpen)}>
             <Sparkles className="i" aria-hidden="true" />Agente
           </button>
         ) : undefined}

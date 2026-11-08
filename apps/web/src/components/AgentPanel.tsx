@@ -298,7 +298,7 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
 
   return (
     <aside
-      id="agent-panel" className="agent glass" aria-label="Agente" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
+      id="agent-panel" className="agent" aria-label="Agente" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
     >
       <div className="agent__head">

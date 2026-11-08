@@ -8,7 +8,7 @@ import { sceneKey, type SceneEntry, type StoryboardState, type StoryboardStore }
 import { useSceneThumbnails } from '../state/use-scene-thumbnails';
 import { ActionMenu } from './ActionMenu';
 import { NameField } from './NameField';
-import { pad, StepFrame } from './StepFrame';
+import { StepFrame } from './StepFrame';
 
 type Props = {
   scene: SceneEntry;
@@ -44,7 +44,7 @@ type Props = {
   registerGrip: (element: HTMLButtonElement | null) => void;
 };
 
-/** One scene: number, title and step count on a line, then its steps as a grid of numbered frames. */
+/** One scene: «Escena 1 de 3» over its title, its step count, then its steps as a grid of numbered cards. */
 export function SceneSection(props: Props) {
   const { scene, index, total, state, store, api, cache, theme, root, currentStepId, stepAgentStates, renaming, grabbed, dragging, dropMarker } = props;
   const section = useRef<HTMLElement>(null);
@@ -61,8 +61,6 @@ export function SceneSection(props: Props) {
 
   const count = scene.stepIds.length;
   const columns = useGridColumns(grid);
-  // A full last row would send the add slot onto a row of its own and push the next scene down on hover. It hangs in the gap instead.
-  const tail = count > 0 && count % columns === 0;
   const last = Math.min(active, count); // The add slot is the last stop.
 
   // After renaming, give focus back to the scene's menu, which the field replaced.
@@ -104,12 +102,14 @@ export function SceneSection(props: Props) {
       data-drop={dropMarker}
     >
       <div className="scene__head">
-        <span className="scene__num">{pad(index + 1)}</span>
-        {renaming ? (
-          <div className="scene__rename">
-            <NameField initial={name} label={`Nombre de la escena ${index + 1}`} onSave={props.onRename} onCancel={props.onRenameEnd} onAbandon={props.onRenameAbandon} />
-          </div>
-        ) : <h2 className="scene__title">{name}</h2>}
+        <div className="scene__heading">
+          <span className="eyebrow scene__num">Escena {index + 1} de {total}</span>
+          {renaming ? (
+            <div className="scene__rename">
+              <NameField initial={name} label={`Nombre de la escena ${index + 1}`} onSave={props.onRename} onCancel={props.onRenameEnd} onAbandon={props.onRenameAbandon} />
+            </div>
+          ) : <h2 className="scene__title">{name}</h2>}
+        </div>
         <span className="scene__meta">{formatSteps(count)}</span>
         {!renaming && (
           <span className="scene__tools">
@@ -154,15 +154,16 @@ export function SceneSection(props: Props) {
         <button
           ref={(element) => { items.current[count] = element; }}
           type="button"
-          className={`frame-add${tail ? ' frame-add--tail' : ''}${count === 0 ? ' frame-add--empty' : ''}`}
+          className={`frame-add${count === 0 ? ' frame-add--empty' : ''}`}
           aria-label={`Añadir paso a la escena ${index + 1}`}
           tabIndex={last === count ? 0 : -1}
           disabled={adding}
           onFocus={() => setActive(count)}
           onClick={() => void add()}
         >
-          <Plus className="i" aria-hidden="true" />
-          {count === 0 && <span className="frame-add__text">Añadir el primer paso</span>}
+          <span className="frame-add__icon"><Plus className="i" aria-hidden="true" /></span>
+          <span className="frame-add__text">{count === 0 ? 'Añadir el primer paso' : 'El siguiente paso'}</span>
+          <span className="frame-add__sub">Añade un paso a esta escena</span>
         </button>
       </div>
 
