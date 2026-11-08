@@ -380,8 +380,22 @@ output into the events above, end with exactly one terminal event, and use
 Both CLIs fit this shape: `codex exec --json` with `codex exec resume <id>`,
 `--ignore-user-config`, `-C` and `-s read-only` for confinement, and
 `agy -p --input-format stream-json --output-format stream-json
---conversation <id>`. Their board-only policy (AG-06, AG-07) is theirs to
-define and prove.
+--conversation <id>`. These commands alone do not establish a board-only
+policy. Each adapter must establish and verify its own policy before enabling
+the harness.
+
+The installed `agy` 1.5.3 was investigated for AG-07. Its print-mode init
+event listed built-in shell, file and web tools even with `--sandbox` and
+`--disable-slash-commands`; `--mode plan` had no effect with slash commands
+disabled. Its help does not document an empty built-in tool allow-list or a
+strict MCP configuration equivalent to Claude's. ACP supports streaming,
+resume, cancellation and client-provided MCP servers, but its session creation
+response did not provide a tool inventory or prove that global configuration
+and built-in tools were excluded. Neither route has yet been shown to satisfy
+Paso's board-only policy. Keep `agy` unsupported until those restrictions can
+be enforced and checked before any user prompt runs. A print-mode quota error
+observed during investigation included `RESOURCE_EXHAUSTED`, HTTP 429 and
+`Individual quota reached`; a future adapter must map it to `quota`.
 
 ### Tests
 
