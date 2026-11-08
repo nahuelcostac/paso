@@ -110,7 +110,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .projects { grid-column: 1; grid-row: 2 / -1; display: flex; flex-direction: column; min-height: 0; margin: var(--space-2) 0 var(--space-2) var(--space-2); border-radius: var(--radius-panel); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-md); overflow: hidden; position: relative; }
 .projects__head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-2) var(--space-2) var(--space-4); }
 .projects__head h2 { font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--ink-3); }
-.projects__body { flex: 1; min-height: 0; overflow: hidden auto; }
+.projects__body { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .project-list { padding: 0 var(--space-2); display: flex; flex-direction: column; gap: 2px; }
 .project { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px var(--space-2); border-radius: var(--radius-md); text-align: left; border: 1px solid transparent; }
 .project:hover { background: var(--surface-sunken); }
@@ -204,6 +204,8 @@ button.project__tile:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(
   --line: var(--work-line); --line-strong: var(--work-line-strong);
   --border: 1px solid var(--line); --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus);
   position: relative; grid-column: -2 / -1; grid-row: 2; overflow: hidden auto; min-width: 0; padding: 44px 56px var(--space-7);
+  /* A thin thumb with no track: a grey track would sit as a stripe against the chat's card. */
+  scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
 }
 .board__head { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
 .board__heading { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
@@ -224,7 +226,9 @@ button.project__tile:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(
 .main-message__details p { margin-top: var(--space-2); color: var(--ink-3); overflow-wrap: anywhere; text-align: left; max-height: 160px; overflow: auto; }
 
 /* Lienzo: the canvas fills its column edge to edge, the step strip below it. */
-.lienzo { grid-column: -2 / -1; grid-row: 2; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); }
+/* The Lienzo is a card too: the canvas and its step strip float on the workspace with the same gutter and corners as the
+   panels, so no edge-to-edge sheet meets a floating card. */
+.lienzo { grid-column: -2 / -1; grid-row: 2; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin: var(--space-2); border-radius: var(--radius-panel); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-md); overflow: hidden; }
 .save-state { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--ink-3); font-size: var(--text-12); white-space: nowrap; }
 .save-state::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
 .save-state[data-save-state='dirty']::before, .save-state[data-save-state='saving']::before { background: var(--muted); }

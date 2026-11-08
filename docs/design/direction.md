@@ -7,7 +7,7 @@ Tokens are in `apps/web/src/styles/tokens.css`. Screenshots of the app are in `s
 The layout and type come from an earlier version of Paso (IN-05), and the floating panels and the chat from the Paso just before it. The colours are one family: layers of the same warm paper, written on in ink, with pink as the only hue. It is quiet and familiar, so the drawings stand out.
 
 - **Layers of one paper.** The workspace behind the Storyboard and around the panels is a warm off-white (`#fbfaf8`). The chrome (the header, the projects, the chat, dialogs and menus) is the same paper one tone deeper (`#f4f1eb`), with thin warm lines and warm shadows. Step cards and what you type into are plain white (the `--work-*` tokens, swapped in on `.board`). The projects and the chat are cards that float with an 8px gutter and 20px corners. Everything is solid: no translucency or blur.
-- **Drawings are the paper.** The canvas fills its column edge to edge, the Lienzo's step strip below it stays white, and thumbnails sit at the top of the white step cards.
+- **Drawings are the paper.** In the Lienzo the canvas and its step strip are one white card, floating with the same 8px gutter and 20px corners as the panels, so nothing edge-to-edge meets a floating card. Thumbnails sit at the top of the white step cards.
 - **Ink is the accent.** `--accent` is `--ink`. The near-black marks actions (Presentar, the chat's send button, the button that creates a project's first scene), the chosen view, the open step (an ink edge and number) and the current project (an ink tile on a warm grey row). A selected option is a warm grey fill (`--accent-soft`). Focus is a warm grey ring.
 - **One marker, pink `--agent`.** Whatever the agent touched gets a pink fill behind dark text, and the step it is changing right now gets a pink edge. It is the only hue in the chrome: ink means *you are here* or *do this*, pink means *the agent did this*. Anyone should be able to scan a board and find the agent's work.
 - **Dark theme** mirrors the layers: the workspace is the deepest warm black (`#141210`), cards a step up (`#1d1a16`) and the chrome another (`#221f1a`), with light ink as the accent and the same pink. Both themes are complete. Neither is derived from the other at runtime.
@@ -73,7 +73,7 @@ On the Lienzo the header has a **second row**: the scene selector (a bordered bu
 - Current step: a 2px ink edge and a solid ink number badge. Agent changed it: a pink `agente` chip after the title. Agent is changing it now: a 2px pink edge and a chip reading `cambiando…` (`agente…` in the carousel). Current and agent states can coexist; the pink edge wins and the ink edge goes outside it.
 - In the carousel, which has no room for a title, the number sits under the thumbnail and the title goes in the tooltip.
 
-**Lienzo.** The canvas fills its column edge to edge, on `--paper`.
+**Lienzo.** The canvas and the carousel under it are one `--paper` card with 20px corners and a thin line, in an 8px gutter like the panels.
 
 **Carousel.** A 108px white bar under a thin line (it keeps `--paper`, like the canvas), in normal flow below the Excalidraw container. It must never overlap the container. Frames are 104×65, and the strip's left edge lines up with Excalidraw's zoom controls above. Next come the pager «03 / 06» on a warm grey pill (current number in bold ink), then «Añadir paso» and «Duplicar paso», pinned right.
 
@@ -136,6 +136,7 @@ Measured by running the real component in a 1184×724 container, positioned as i
 
 - Translucency, blur and glass. The warm neutrals are solid colours.
 - Cool greys or blues anywhere in the chrome: every neutral is warm paper. Mixing temperatures is what made the earlier palettes look unrelated.
+- A floating card next to an edge-to-edge area, and scrollbar tracks: both draw stray stripes along the gutters. Scrolling areas use a thin thumb with no track.
 - More colours in the chrome. Pink is the only hue; green appears only as the saved dot, and red only for errors and destructive actions.
 - Pink for anything but the agent's work, or ink for the agent's. Each has one meaning.
 - Heavy shadows on things that rest on the page. Cards get `--shadow-sm` at most; lift is for hover and for what floats.
