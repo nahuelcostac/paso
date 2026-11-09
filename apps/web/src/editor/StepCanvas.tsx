@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Excalidraw, MainMenu, restore } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import type { AppState, ExcalidrawImperativeAPI, ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types';
@@ -7,7 +7,8 @@ import { chooseTheme, useThemeChoice, type ThemeChoice } from '../lib/theme';
 import { canvasElements, canvasFiles, loadDrawingFonts } from './excalidraw-runtime';
 import { loadFiles } from './assets';
 import type { ApiClient } from '../lib/api';
-import type { Session, StepStore } from './step-store';
+import { targetKey, type Session, type StepStore } from './step-store';
+import { openingFit, type CanvasCamera } from './canvas-camera';
 import '../styles/editor.css';
 
 /** Zen and view mode are how the person is looking, not part of a step: they carry over from one step to the next.
@@ -43,13 +44,16 @@ function ThemeRow({ choice }: { choice: ThemeChoice }) {
   </div>;
 }
 
-export default function StepCanvas({ api, store, session, theme, keepFocus }: { api: ApiClient; store: StepStore; session: Session; theme: 'light' | 'dark'; keepFocus: () => boolean }) {
+export default function StepCanvas({ api, store, session, theme, keepFocus, camera }: { api: ApiClient; store: StepStore; session: Session; theme: 'light' | 'dark'; keepFocus: () => boolean; camera: RefObject<CanvasCamera | undefined> }) {
   const mounted = useRef(false);
   const focusCanvas = useRef(true);
   const [data, setData] = useState<ExcalidrawInitialDataState>();
   const [retry, setRetry] = useState(0);
   const [error, setError] = useState<string>();
   const [excalidraw, setExcalidraw] = useState<ExcalidrawImperativeAPI>();
+  const excalidrawRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const openingCamera = useRef(camera.current?.key === targetKey(session.target) ? camera.current : undefined);
+  const openOnce = useRef(openingFit(Boolean(openingCamera.current)));
   const [modes, setModes] = useState<Modes>({ grid: Boolean(session.document.appState.gridModeEnabled), ...looking });
   const themeChoice = useThemeChoice();
   const excalidrawTheme = useRef(theme);
@@ -68,7 +72,7 @@ export default function StepCanvas({ api, store, session, theme, keepFocus }: { 
       const restored = restore({ elements: canvasElements(session.document), appState: session.document.appState, files: canvasFiles(files) }, null, null, { refreshDimensions: true });
       // Excalidraw takes focus when it mounts. Not while the keyboard is moving through the carousel.
       focusCanvas.current = !keepFocus();
-      if (!cancelled) setData({ ...restored, appState: { ...restored.appState, zenModeEnabled: looking.zen, viewModeEnabled: looking.view }, scrollToContent: true });
+      if (!cancelled) setData({ ...restored, appState: { ...restored.appState, ...openingCamera.current, zenModeEnabled: looking.zen, viewModeEnabled: looking.view }, scrollToContent: !openingCamera.current });
     })().catch(() => { if (!cancelled) setError('No se pudo cargar el dibujo o una de sus imágenes.'); });
     return () => { cancelled = true; mounted.current = false; };
   }, [api, session, retry]);
@@ -77,9 +81,14 @@ export default function StepCanvas({ api, store, session, theme, keepFocus }: { 
   return <div className="step-canvas" data-step-id={session.target.stepId}>
     <Excalidraw initialData={data} theme={theme} langCode="es-ES" autoFocus={focusCanvas.current} handleKeyboardGlobally={false}
       validateEmbeddable={false} UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, toggleTheme: true, export: false } }} /* toggleTheme: Alt+Shift+D */
-      excalidrawAPI={setExcalidraw}
+      excalidrawAPI={(instance) => { excalidrawRef.current = instance; setExcalidraw(instance); }}
       onChange={(elements, appState, files) => {
         if (!mounted.current) return;
+        if (!appState.isLoading && excalidrawRef.current) {
+          if (!openOnce.current(excalidrawRef.current)) {
+            camera.current = { key: targetKey(session.target), scrollX: appState.scrollX, scrollY: appState.scrollY, zoom: appState.zoom };
+          }
+        }
         // The menu and Excalidraw's own shortcuts both land here: keep the menu's checks and the next step in step.
         const next = modesOf(appState);
         if (next.grid !== modes.grid || next.zen !== modes.zen || next.view !== modes.view) {
