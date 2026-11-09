@@ -371,7 +371,7 @@ The controls act together.
   before submitting user content. Unexpected environments, instruction sources,
   a writable sandbox or another approval policy stop the run.
 - Codex has **no configured MCP servers**. Paso connects the compiled
-  `apps/mcp` server itself and exposes exactly its eleven board tools as
+  `apps/mcp` server itself and exposes exactly its thirteen board tools as
   app-server dynamic tools. It checks the tool list against a fixed allow-list.
   Calls with another tool, namespace or thread, duplicate call IDs, native tool
   events, approval requests and unexpected MCP servers stop the run with

@@ -102,14 +102,16 @@ IDs for projects, scenes and steps are service IDs, not names or paths.
 | `read_step` | `projectId`, `sceneId`, `stepId`. Returns the revision and a simple layout, including labels, connections and potential overlaps. |
 | `create_scene` | `projectId`, `name`, optional `id`. Appends an empty scene and returns its service envelope. |
 | `create_step` | `projectId`, `sceneId`, optional `id`, `title`, `speakerNotes`. Appends an empty step and returns its envelope. |
-| `duplicate_step` | Step target, `revision`, optional new step `id`. Appends a full independent copy in the same scene, keeping element IDs, assets and unknown data. |
+| `duplicate_step` | Step target, `revision`, optional new step `id` and `title`. Appends a full independent copy in the same scene, keeping element IDs, assets and unknown data. |
+| `update_step` | Step target, `revision`, and at least one of `title` or `speakerNotes`. Changes metadata while preserving the rest of the snapshot. |
+| `delete_step` | Step target and `revision`. Deletes the step. Empty scenes are allowed, including after deleting their last step. |
 | `add_elements` | Step target, `revision`, `elements`. Adds one batch and returns the saved revision and layout. |
 | `update_elements` | Step target, `revision`, `elements` containing patches by `id`. Returns the saved revision and layout. |
 | `delete_elements` | Step target, `revision`, `ids`. Tombstones elements in this step. Deleting a shape also deletes bound labels and connected arrows. Cleans reciprocal bindings. |
 | `get_step_image` | Step target. Returns an MCP `image/png` content block and its source revision, or `isError` with a useful layout fallback. |
 
-There are deliberately no tools to create or delete a project, delete a scene
-or step, access harness credentials, or read or write arbitrary files. Project
+There are deliberately no tools to create or delete a project, delete a scene,
+access harness credentials, or read or write arbitrary files. Project
 creation stays with the user or host. The MCP token is a full local-service
 credential, not a service-enforced tool-specific capability. A host must not
 make that credential available to an untrusted model through another tool.

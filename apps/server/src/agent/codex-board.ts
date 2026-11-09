@@ -6,7 +6,7 @@ import type { AgentRunRequest } from './types.js';
 
 export const codexBoardTools = [
   'list_projects', 'read_project', 'read_scene', 'read_step', 'get_step_image',
-  'create_scene', 'create_step', 'duplicate_step', 'add_elements', 'update_elements', 'delete_elements',
+  'create_scene', 'create_step', 'duplicate_step', 'update_step', 'delete_step', 'add_elements', 'update_elements', 'delete_elements',
 ] as const;
 export const codexReadOnlyTools = new Set<string>(codexBoardTools.slice(0, 5));
 

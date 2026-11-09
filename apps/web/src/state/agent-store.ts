@@ -82,7 +82,7 @@ export type AgentState = {
 
 export const conversationKey = (projectId: string, sceneId?: string | null) => `${projectId}:${sceneId ?? ''}`;
 
-const writeTools = new Set(['create_scene', 'create_step', 'duplicate_step', 'add_elements', 'update_elements', 'delete_elements']);
+const writeTools = new Set(['create_scene', 'create_step', 'duplicate_step', 'update_step', 'delete_step', 'add_elements', 'update_elements', 'delete_elements']);
 const creatingTools = new Set(['create_step', 'duplicate_step']);
 
 /** What a run changed, counted the way a person would: each step or scene once, order only when nothing else explains it. */

@@ -7,7 +7,7 @@ import { elementInput, elementPatch, revisionSchema, targetShape, type Target } 
 import { renderStep } from './image.js';
 
 const textResult = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
-const conventions = 'Canvas units are pixels. x increases right, y down. x/y is the top-left, not the center. Width/height are positive minimum sizes. Labels use the bundled Excalifont font and grow containers to fit without wrapping; use \\n for line breaks. IDs are stable and unique within a step. Straight arrows bind shape IDs and follow moved shapes. New shapes and arrows use artist roughness. No raw Excalidraw properties are accepted.';
+const conventions = 'Canvas units are pixels. x increases right, y down. x/y is the top-left, not the center. Width/height are positive minimum sizes. Labels use the bundled Excalifont font and grow containers to fit without wrapping; use \\n for line breaks. IDs are stable and unique within a step. Straight arrows bind shape IDs and follow moved shapes. New shapes and arrows use artist roughness. Use update_step to fix titles or notes and delete_step to remove unwanted steps. No raw Excalidraw properties are accepted.';
 const stale = 'Pass the exact unquoted revision returned by read_step. On REVISION_CONFLICT read again and reconsider edits. Writes are atomic per step and never automatically retried.';
 
 export function createBoardMcp(config: Configuration) {
@@ -36,7 +36,14 @@ export function createBoardMcp(config: Configuration) {
   });
   tool('create_scene', 'Append an empty scene to an existing project. Optional id is project-wide unique. The service appends safely under its project lock. On uncertain transport failure, read_project before retrying.', { projectId: idSchema, name: z.string().min(1).max(500), id: idSchema.optional() }, false, ({ projectId, ...input }) => api.request(scenePath(projectId), 'POST', input));
   tool('create_step', 'Append an empty full-snapshot step to a scene. Optional id is project-wide unique. Use duplicate_step instead to build on a previous drawing. On uncertain transport failure, read_scene before retrying.', { projectId: idSchema, sceneId: idSchema, id: idSchema.optional(), title: z.string().max(500).optional(), speakerNotes: z.string().max(20_000).optional() }, false, ({ projectId, sceneId, ...input }) => api.request(`${scenePath(projectId, sceneId)}/steps`, 'POST', input));
-  tool('duplicate_step', `Append a full copy to the same scene. Keep all element IDs, unknown properties and assets. Optional id is the NEW step ID, not an element ID. ${stale}`, { ...targetShape, revision: revisionSchema, id: idSchema.optional() }, false, ({ revision, id, ...target }) => api.request(`${stepPath(target)}/duplicate`, 'POST', id ? { id } : {}, revision));
+  tool('duplicate_step', `Append a full copy to the same scene. Keep all element IDs, unknown properties and assets. Optional id is the NEW step ID, not an element ID. Optional title replaces the copied title. ${stale}`, { ...targetShape, revision: revisionSchema, id: idSchema.optional(), title: z.string().max(500).optional() }, false, ({ revision, id, title, ...target }) => api.request(`${stepPath(target)}/duplicate`, 'POST', { ...(id !== undefined ? { id } : {}), ...(title !== undefined ? { title } : {}) }, revision));
+  tool('update_step', `Change a step's title or speaker notes. Omitted fields stay unchanged. ${stale}`, { ...targetShape, revision: revisionSchema, title: z.string().max(500).optional(), speakerNotes: z.string().max(20_000).optional() }, false, async ({ revision, title, speakerNotes, ...target }) => {
+    if (title === undefined && speakerNotes === undefined) throw new Error('INVALID_INPUT. Supply title or speakerNotes.');
+    const current = await api.readStep(target);
+    if (current.revision !== revision) throw new Error('REVISION_CONFLICT. The step changed. Call read_step again. No change was written.');
+    return api.request(stepPath(target), 'PUT', { ...current.document, ...(title !== undefined ? { title } : {}), ...(speakerNotes !== undefined ? { speakerNotes } : {}) }, revision);
+  });
+  tool('delete_step', `Delete a step and its snapshot. ${stale}`, { ...targetShape, revision: revisionSchema }, false, ({ revision, ...target }) => api.request(stepPath(target), 'DELETE', undefined, revision), true);
   async function edit(target: Target, revision: string, change: (step: Step) => Step) {
     const current = await api.readStep(target);
     if (current.revision !== revision) throw new Error('REVISION_CONFLICT. The step changed. Call read_step again and reconsider your edits. No change was written.');
