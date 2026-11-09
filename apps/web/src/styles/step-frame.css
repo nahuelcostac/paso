@@ -1,23 +1,42 @@
-/* A numbered step thumbnail. Shared by the Storyboard and the carousel: see docs/design/direction.md, Thumbnails. */
-.frame { display: block; width: 100%; min-width: 0; text-align: left; border-radius: var(--radius-frame); }
-.frame__paper { position: relative; display: block; aspect-ratio: 16 / 10; background: var(--paper); border-radius: var(--radius-frame); box-shadow: var(--shadow-paper); overflow: hidden; }
-/* The drawing is exported for the current theme, so the --thumb-filter of the mockups is not applied. */
+/* A numbered step thumbnail. Shared by the Storyboard and the carousel: see docs/design/direction.md, Thumbnails.
+   On the Storyboard it is a card: the drawing on top with its number in the corner, the title below. */
+.frame { position: relative; display: flex; flex-direction: column; width: 100%; min-width: 0; text-align: left; background: var(--surface); border-radius: var(--radius-card); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); overflow: hidden; }
+.frame__paper { position: relative; display: block; aspect-ratio: 16 / 10; background: var(--paper); border-bottom: var(--border); overflow: hidden; }
+/* The drawing is exported for the current theme, so --thumb-filter is not applied. */
 .frame__paper img { display: block; width: 100%; height: 100%; }
 /* Quiet while the drawing renders: two faint lines where a title and a diagram would be. */
 .frame__placeholder { position: absolute; inset: 0; }
-.frame__placeholder::before, .frame__placeholder::after { content: ''; position: absolute; left: 7%; height: 6%; border-radius: 999px; background: var(--table-well); }
-.frame__placeholder::before { top: 12%; width: 34%; }
+.frame__placeholder::before, .frame__placeholder::after { content: ''; position: absolute; left: 9%; height: 6%; border-radius: 999px; background: var(--surface-sunken); }
+.frame__placeholder::before { top: 20%; width: 34%; }
 .frame__placeholder::after { top: 46%; width: 62%; height: 20%; border-radius: 6px; }
-.frame__label { display: flex; align-items: center; gap: var(--space-1); height: 18px; margin-top: 6px; padding-left: 2px; color: var(--ink-3); font: var(--text-12) / 1 var(--font-mono); min-width: 0; }
-.frame__num { flex: none; }
-.frame__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-ui); }
-.frame:hover .frame__paper { box-shadow: 0 0 0 2px var(--line-control), var(--shadow-paper); }
-.frame[aria-current='step'] .frame__paper { box-shadow: 0 0 0 2px var(--ink), var(--shadow-paper); }
-.frame[aria-current='step'] .frame__num { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; margin-left: -2px; border-radius: var(--radius-pill); background: var(--mark); color: var(--on-marker); font-weight: var(--weight-medium); }
-.frame.frame--agent-working .frame__paper { box-shadow: 0 0 0 2px var(--agent), var(--shadow-paper); }
-.frame--carousel .frame__paper { border-radius: var(--radius-frame-small); }
-.frame--carousel .frame__label { margin-top: 4px; }
+.frame__label { display: flex; align-items: center; gap: var(--space-2); min-width: 0; min-height: 46px; padding: var(--space-3) 14px; }
+/* The number sits on the drawing's top-left corner, as a small bordered badge. */
+.frame__num { position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: var(--radius-sm); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: 0.04em; line-height: 1; }
+.frame__title { order: -1; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: var(--weight-semibold); }
+/* An untitled step says so on the card, in CSS, so the button's text stays its number alone. */
+.frame__title--empty { color: var(--ink-3); font-weight: var(--weight-regular); }
+.frame__title--empty::before { content: 'Sin título'; }
+.frame:hover { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-md); }
+/* The step open in the Lienzo: an ink edge and an ink number. */
+.frame[aria-current='step'] { box-shadow: 0 0 0 2px var(--accent); }
+.frame[aria-current='step'] .frame__num { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+/* The agent is changing it now: a pink edge, which wins over the ink one. */
+.frame.frame--agent-working { box-shadow: 0 0 0 2px var(--agent), var(--shadow-sm); }
+.frame.frame--agent-working[aria-current='step'] { box-shadow: 0 0 0 2px var(--agent), 0 0 0 4px var(--accent); }
 
-/* Markers: a flat fill behind ink, like a highlighter stroke */
-.chip { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: var(--radius-pill); font: var(--weight-medium) var(--text-12) / 1 var(--font-mono); white-space: nowrap; flex: none; }
-.chip--agent { background: var(--agent); color: var(--on-marker); }
+/* In the carousel: the drawing alone, the number below it. */
+.frame--carousel { background: none; border-radius: 0; box-shadow: none; overflow: visible; }
+.frame--carousel:hover { box-shadow: none; }
+.frame--carousel .frame__paper { border: 0; border-radius: var(--radius-sm); box-shadow: 0 0 0 1px var(--line); }
+.frame--carousel .frame__label { min-height: 0; height: 18px; margin-top: 5px; padding: 0 0 0 1px; gap: var(--space-1); }
+.frame--carousel .frame__num { position: static; height: 18px; padding: 0 5px; margin-left: -1px; background: none; box-shadow: none; font-size: var(--text-12); letter-spacing: 0; }
+.frame--carousel:hover .frame__paper { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-md); }
+.frame--carousel[aria-current='step'] { box-shadow: none; }
+.frame--carousel[aria-current='step'] .frame__paper { box-shadow: 0 0 0 2px var(--accent); }
+.frame--carousel[aria-current='step'] .frame__num { background: var(--accent); color: var(--on-accent); }
+.frame--carousel.frame--agent-working, .frame--carousel.frame--agent-working[aria-current='step'] { box-shadow: none; }
+.frame--carousel.frame--agent-working .frame__paper { box-shadow: 0 0 0 2px var(--agent); }
+
+/* The agent marker: a flat pink fill behind ink, like a highlighter stroke. */
+.chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: var(--radius-pill); font-size: var(--text-12); font-weight: var(--weight-semibold); line-height: 1; white-space: nowrap; flex: none; }
+.chip--agent { background: var(--agent); color: var(--on-agent); }

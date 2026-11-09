@@ -55,7 +55,7 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
   const showList = state.phase === 'ready' && (state.rows.length > 0 || creating);
 
   return (
-    <aside className="projects glass" aria-label="Proyectos">
+    <aside className="projects" aria-label="Proyectos">
       <div className="projects__head">
         <h2>Proyectos</h2>
         <button type="button" className="icon-btn" aria-label="Nuevo proyecto" onClick={() => { setRenamingId(null); onCreatingChange(true); }}>
@@ -161,6 +161,7 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
           name={named(menu.id)}
           onClose={() => setMenu(null)}
           onRename={() => { setNotice(null); setRenamingId(menu.id); }}
+          onReveal={() => { setNotice(null); void store.reveal(menu.id).catch(() => setNotice('No se pudo abrir la carpeta del proyecto.')); }}
           onDelete={() => { setDeleteError(null); setDeleting(rowById(menu.id) as Extract<Row, { kind: 'ok' }>); }}
         />
       )}

@@ -77,6 +77,45 @@ async function open(sizes: number[]) {
   return data;
 }
 
+describe('the second row of the top bar', () => {
+  it('names the open step: its number, and its title once it is loaded', async () => {
+    const user = userEvent.setup();
+    const { projectId, scenes } = await open([2]);
+    const row = () => document.querySelector('.topbar__sub')!;
+    await waitFor(() => expect(row()).toHaveTextContent('Paso 01'));
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: /Cambiar de escena/ })).toBeInTheDocument();
+    const step = await api.getStep({ projectId, sceneId: scenes[0].id, stepId: scenes[0].steps[1] });
+    await api.saveStep({ projectId, sceneId: scenes[0].id, stepId: scenes[0].steps[1] }, step.revision, { ...step.document, title: 'Mira en medio' });
+    await user.click(frames()[1]);
+    await waitFor(() => expect(row()).toHaveTextContent('Paso 02'), patience);
+    await waitFor(() => expect(within(screen.getByRole('banner')).getByRole('textbox', { name: 'Título del paso' })).toHaveValue('Mira en medio'), patience);
+  });
+
+  it('names a step from the field in the second row: Enter keeps it, Escape puts it back, empty removes it', async () => {
+    const user = userEvent.setup();
+    const { projectId, scenes } = await open([2]);
+    const target = { projectId, sceneId: scenes[0].id, stepId: scenes[0].steps[0] };
+    const field = await screen.findByRole('textbox', { name: 'Título del paso' }, patience);
+    expect(field).toHaveValue('');
+    expect(field).toHaveAttribute('placeholder', 'Añade un título');
+    await user.click(field);
+    await user.type(field, 'La ventana{Enter}');
+    expect(field).not.toHaveFocus();
+    await waitFor(async () => expect((await api.getStep(target)).document.title).toBe('La ventana'), patience);
+    expect((await api.getStep(target)).document.elements.map((element) => element.id)).toEqual(['r1']);   // the drawing is untouched
+
+    await user.click(field);
+    await user.clear(field);
+    await user.type(field, 'Otra cosa{Escape}');
+    expect(field).toHaveValue('La ventana');
+    await user.click(field);
+    await user.clear(field);
+    await user.tab();
+    await waitFor(async () => expect((await api.getStep(target)).document.title).toBeUndefined(), patience);
+    expect(field).toHaveValue('');
+  });
+});
+
 describe('scene selector', () => {
   it('replaces the temporary switcher: switches scene and creates one, from the top bar', async () => {
     const user = userEvent.setup();

@@ -4,7 +4,7 @@ import { Popover } from './Popover';
 export type MenuAction = { label: string; icon: ReactNode; onSelect: () => void; danger?: boolean; disabled?: boolean };
 type Props = { anchor: HTMLElement; label: string; actions: MenuAction[]; onClose: () => void };
 
-/** A menu of actions in a glass popover. Arrow keys move, Home and End jump, Escape closes. */
+/** A menu of actions in a popover. Arrow keys move, Home and End jump, Escape closes. */
 export function ActionMenu({ anchor, label, actions, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const items = () => [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [])];

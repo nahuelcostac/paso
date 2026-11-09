@@ -1,13 +1,15 @@
 /* Agent panel and top-bar status: see docs/design/direction.md, Agent chat. */
 
-/* Agent status while looking at the canvas */
+/* Agent status while looking at the canvas: a bordered pill in the top bar. */
 .agent-status {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  height: var(--topbar-h);
-  padding: 0 var(--space-1) 0 var(--space-4);
-  border-radius: var(--radius-pill);
+  height: 38px;
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink-2);
   white-space: nowrap;
 }
@@ -18,7 +20,8 @@
   }
 }
 .agent-status .btn {
-  padding: 0 var(--space-3) 0 var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-2) 0 6px;
 }
 .agent-status svg.i {
   fill: currentColor;
@@ -26,21 +29,54 @@
   height: 12px;
 }
 
-/* Agent panel on the Storyboard */
+/* Agent panel on the Storyboard: a floating cream card, as before IN-05. No rule under its head: space separates. */
 .agent {
   grid-column: -2 / -1;
   grid-row: 2;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  margin: var(--space-2) var(--space-2) var(--space-2) 0;
+  position: relative;
   border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
 }
+/* The left edge can be dragged to change the chat's width. A thin ink line shows where, on hover and while dragging (the focus colour with the keyboard). */
+.resizer {
+  position: absolute;
+  z-index: 2;
+  top: var(--radius-panel);
+  bottom: var(--radius-panel);
+  left: -6px;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+.resizer:hover::after, .resizer[data-dragging]::after { opacity: 1; }
+/* Focus shows as the same line in the focus colour: a ring around a full-height strip would read as a border. */
+.resizer:focus-visible { box-shadow: none !important; }
+.resizer:focus-visible::after { opacity: 1; background: var(--focus); }
+:root[data-resizing] { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+:root[data-resizing] iframe, :root[data-resizing] canvas { pointer-events: none; }
 .agent__head {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  height: 44px;
-  padding: 0 var(--space-2) 0 var(--space-3);
+  height: 48px;
+  padding: var(--space-1) var(--space-2) 0 var(--space-3);
   flex: none;
 }
 .agent__target {
@@ -52,13 +88,13 @@
   min-width: 0;
   height: 30px;
   padding: 0 var(--space-2);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   text-align: left;
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   color: var(--ink);
 }
 .agent__target:hover:not(:disabled) {
-  background: var(--table-well);
+  background: var(--surface-sunken);
 }
 .agent__target svg.i {
   width: 14px;
@@ -69,17 +105,16 @@
   flex: 0 1 auto;
 }
 .msg-agent strong { font-weight: var(--weight-bold); }
-.msg-agent code { font-family: var(--font-mono); font-size: var(--text-12); padding: 1px 4px; border-radius: 4px; background: var(--table-well); }
+.msg-agent code { font-family: var(--font-mono); font-size: var(--text-12); padding: 1px 4px; border-radius: 4px; background: var(--surface-sunken); }
 .agent__title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
 }
 .agent__scene-num {
-  font-family: var(--font-mono);
   font-size: var(--text-12);
   font-weight: var(--weight-regular);
   color: var(--ink-3);
@@ -88,27 +123,13 @@
 .agent__log {
   flex: 1;
   overflow: hidden auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
   padding: var(--space-1) var(--space-3) var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
-}
-.agent__empty {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-2);
-  color: var(--ink-2);
-  line-height: var(--leading-prose);
-}
-.agent__empty-title {
-  color: var(--ink);
-  font-weight: var(--weight-medium);
-}
-.agent__empty-meta {
-  color: var(--ink-3);
-  font-size: var(--text-12);
 }
 
 .agent__turn {
@@ -120,8 +141,9 @@
   align-self: flex-end;
   max-width: 80%;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-card);
-  background: var(--table-well);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--ink);
   line-height: var(--leading-prose);
   overflow-wrap: anywhere;
 }
@@ -163,13 +185,13 @@
 }
 .work__now {
   color: var(--ink);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
 }
 .work .chip {
   margin: 0 -3px;
 }
 button.chip:hover {
-  box-shadow: inset 0 0 0 1px var(--on-marker);
+  box-shadow: inset 0 0 0 1px var(--on-agent);
 }
 
 .run-end {
@@ -198,14 +220,17 @@ button.chip:hover {
   margin-top: -6px;
 }
 
-/* Composer: --glass-raised is opaque enough without its own backdrop-filter inside .agent.glass */
+/* Composer: a lighter card than the panel, with a thin line. It takes the focus ring while its text has focus. */
 .composer {
   flex: none;
   margin: 0 var(--space-2) var(--space-2);
   padding: 10px var(--space-2) var(--space-2);
-  border-radius: var(--radius-card);
-  background: var(--glass-raised);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+.composer:has(.composer__input:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--line-strong), var(--focus-ring);
 }
 .composer__input {
   display: block;
@@ -237,14 +262,14 @@ button.chip:hover {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: var(--control-h);
+  height: 28px;
   padding: 0 6px 0 var(--space-2);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   color: var(--ink-2);
   white-space: nowrap;
 }
 .composer__control:hover:not(:disabled) {
-  background: var(--table-well);
+  background: var(--surface-sunken);
   color: var(--ink);
 }
 .composer__control svg.i {
@@ -252,6 +277,7 @@ button.chip:hover {
   height: 14px;
   color: var(--ink-3);
 }
+/* Send and stop: one round ink button. */
 .composer__send {
   display: grid;
   place-items: center;
@@ -267,17 +293,20 @@ button.chip:hover {
   width: 14px;
   height: 14px;
 }
+.composer__send[aria-label='Enviar'] svg.i {
+  fill: none;
+}
 
-/* Harness and model menus, on the body: glass does not nest. */
+/* Harness and model menus, on the body. */
 .menu--agent { min-width: 248px; max-width: min(320px, calc(100vw - 16px)); }
-.menu .menu__item--two-lines { height: auto; min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
+.menu .menu__item--two-lines { height: auto; min-height: 42px; padding-top: 6px; padding-bottom: 6px; }
 .menu__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .menu__sub { color: var(--ink-3); font-size: var(--text-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu button[aria-disabled='true'] { cursor: default; }
 .menu button[aria-disabled='true'] .menu__label { color: var(--ink-2); }
 .menu button[aria-disabled='true']:hover { background: none; }
-.menu button[aria-disabled='true']:focus-visible { background: var(--table-well); }
-.menu--agent hr { margin: var(--space-1) var(--space-2); border: 0; border-top: 1px solid var(--line); }
+.menu button[aria-disabled='true']:focus-visible { background: var(--surface-sunken); }
+.menu--agent hr { margin: var(--space-1) var(--space-2); border: 0; border-top: var(--border); }
 .menu__empty { padding: var(--space-2) 10px; color: var(--ink-3); font-size: var(--text-12); }
 .notice__error { color: var(--danger-ink); }
 
@@ -288,25 +317,27 @@ button.chip:hover {
 @keyframes agent-spin { to { rotate: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .i--spin { animation: none; } }
 
-/* Undo: what it does, then the warnings, plainly. */
+/* Undo: what it does, then the warnings, plainly, as before IN-05. */
 .dialog__list { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); color: var(--ink-2); line-height: var(--leading-prose); }
 .undo__warnings { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .undo__warnings li { display: flex; gap: var(--space-2); align-items: flex-start; line-height: var(--leading-prose); }
 .undo__warnings svg.i { margin-top: 2px; color: var(--danger-ink); }
-.undo__confirm { display: flex; gap: var(--space-2); align-items: flex-start; margin-top: var(--space-3); font-weight: var(--weight-medium); line-height: var(--leading-prose); cursor: pointer; }
-.undo__confirm input { margin: 3px 0 0; accent-color: var(--ink); flex: none; }
+.undo__confirm { display: flex; gap: var(--space-2); align-items: flex-start; margin-top: var(--space-3); font-weight: var(--weight-semibold); line-height: var(--leading-prose); cursor: pointer; }
+.undo__confirm input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
 
 /* Under 1100px the Storyboard keeps no column for the panel: it opens over the board, from the top bar. */
-.agent-toggle { height: var(--topbar-h); padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
-.agent-toggle[aria-expanded='true'] { background: var(--ink); color: var(--on-ink); }
-.agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--ink); }
+.agent-toggle { height: 38px; padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
+.agent-toggle[aria-expanded='true'] { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--ink); box-shadow: none; }
 .agent[data-narrow] {
   display: none;
   position: fixed;
-  top: calc(var(--topbar-h) + var(--space-2) * 2);
+  top: calc(var(--topbar-h) + 1px + var(--space-2));
   right: var(--space-2);
   bottom: var(--space-2);
   width: min(var(--panel-agent), calc(100vw - var(--space-2) * 2));
+  margin: 0;
   z-index: 6;
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-lg);
 }
 .agent[data-narrow][data-open='true'] { display: flex; }

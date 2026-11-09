@@ -6,7 +6,7 @@ const OPTIONS: Array<{ view: View; label: string }> = [
   { view: 'lienzo', label: 'Lienzo' },
 ];
 
-/** A radio group: one tab stop, arrow keys move and select, the selected option is an inverted pill. */
+/** A radio group: one tab stop, arrow keys move and select, the selected option is a raised white segment. */
 export function ViewSelector({ view, onChange }: { view: View; onChange: (view: View) => void }) {
   const buttons = useRef<Array<HTMLButtonElement | null>>([]);
   const onKeyDown = (event: KeyboardEvent) => {
@@ -20,7 +20,7 @@ export function ViewSelector({ view, onChange }: { view: View; onChange: (view: 
     buttons.current[next]?.focus();
   };
   return (
-    <div className="selector glass" role="radiogroup" aria-label="Vista" onKeyDown={onKeyDown}>
+    <div className="selector" role="radiogroup" aria-label="Vista" onKeyDown={onKeyDown}>
       {OPTIONS.map(({ view: value, label }, index) => (
         <button
           key={value}

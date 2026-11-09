@@ -1,4 +1,5 @@
-/* Presentar: the drawing and a step indicator, on paper. No other chrome, no glass and no markers: see docs/design/direction.md. */
+/* Presentar: the drawing on paper, with a minimal frame. The mark and «Salir» on top, the step's title and the
+   pager below. Everything but the pager fades with the pointer. See docs/design/direction.md. */
 .present { position: fixed; inset: 0; z-index: 40; overflow: hidden; isolation: isolate; background: var(--paper); user-select: none; -webkit-user-select: none; }
 .present[data-idle='true'] { cursor: none; }
 /* Focus lives here only so that keys arrive. A ring around the whole screen would be chrome. */
@@ -15,9 +16,23 @@
 .present__page img { position: absolute; display: block; max-width: none; pointer-events: none; }
 .present__message { position: absolute; inset: 0; display: grid; place-content: center; color: var(--ink-3); font-size: var(--text-15); }
 
-.indicator { position: absolute; z-index: 3; right: var(--space-5); bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); color: var(--ink-3); font: var(--text-12) var(--font-mono); }
+.present__bar { position: absolute; z-index: 3; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 0 var(--space-5); pointer-events: none; transition: opacity 400ms ease; }
+.present__bar > * { pointer-events: auto; }
+.present__bar--top { top: 0; height: 72px; }
+.present__bar--bottom { bottom: 0; height: 64px; color: var(--ink-3); font-size: var(--text-12); }
+.present[data-idle='true'] .present__bar { opacity: 0; }
+.present[data-idle='true'] .present__bar > * { pointer-events: none; }
+.present__title { min-width: 0; max-width: calc(50% - 120px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: var(--weight-medium); }
+.present__hint { white-space: nowrap; }
+.present__exit { display: inline-flex; align-items: center; gap: var(--space-2); height: 38px; padding: 0 var(--space-2) 0 var(--space-3); border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent-line); color: var(--ink-2); font-weight: var(--weight-semibold); }
+.present__exit:hover { background: var(--accent-soft); color: var(--ink); }
+.present__exit kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink-3); font: var(--weight-medium) var(--text-11) / 1 var(--font-ui); }
+@media (prefers-reduced-motion: reduce) { .present__bar { transition: none; } }
+
+/* The pager: centred at the bottom, on a grey pill, and always there. */
+.indicator { position: absolute; z-index: 4; left: 50%; bottom: 14px; translate: -50% 0; display: flex; align-items: center; gap: var(--space-3); height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); white-space: nowrap; }
 .indicator__ticks { display: flex; gap: 4px; }
-.indicator__ticks i { width: 12px; height: 3px; border-radius: var(--radius-pill); background: var(--line-control); }
-.indicator__ticks i.on { background: var(--ink); }
+.indicator__ticks i { width: 12px; height: 3px; border-radius: var(--radius-pill); background: var(--line-strong); }
+.indicator__ticks i.on { background: var(--accent); }
 /* A narrow window: the numbers alone. */
-@media (max-width: 479px) { .indicator__ticks { display: none; } }
+@media (max-width: 479px) { .indicator__ticks { display: none; } .present__hint { display: none; } }

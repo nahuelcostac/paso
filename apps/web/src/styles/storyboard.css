@@ -1,52 +1,50 @@
-/* The Storyboard: scenes sit directly on the table, separated by space alone. See docs/design/direction.md. */
+/* The Storyboard: each scene under a thin rule, its steps as white cards. See docs/design/direction.md. */
 .btn--bare { color: var(--ink-2); }
 .btn--bare:hover:not(:disabled) { color: var(--ink); }
 .spacer { flex: 1; }
 .board__notice { margin-bottom: var(--space-4); }
 
-.scene { position: relative; }
-.scene + .scene { margin-top: var(--space-5); }
-.scene__head { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: 10px; min-height: 22px; }
-.scene__num { font: var(--text-12) var(--font-mono); color: var(--ink-3); }
-.scene__title { min-width: 0; font-size: var(--text-15); font-weight: var(--weight-bold); line-height: var(--leading-tight); overflow-wrap: anywhere; }
-.scene__meta { flex: none; color: var(--ink-3); font-size: var(--text-12); white-space: nowrap; }
-.scene__rename { flex: 0 1 320px; min-width: 0; }
-.scene__rename input { font-size: var(--text-15); font-weight: var(--weight-bold); }
+.scene { position: relative; padding-top: var(--space-5); border-top: var(--border); }
+.scene + .scene { margin-top: var(--space-6); }
+.scene__head { display: flex; align-items: flex-end; gap: var(--space-3); margin-bottom: var(--space-4); min-height: 44px; }
+.scene__heading { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.scene__title { min-width: 0; font-size: var(--text-20); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); overflow-wrap: anywhere; }
+/* The step count, as the reference's small bordered counter. */
+.scene__meta { flex: none; display: inline-flex; align-items: center; height: 22px; padding: 0 7px; margin-bottom: 1px; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--line); background: var(--surface); color: var(--ink-3); font-size: var(--text-12); white-space: nowrap; }
+.scene__rename { width: min(360px, 100%); min-width: 0; }
+.scene__rename input { font-size: var(--text-20); font-weight: var(--weight-bold); letter-spacing: var(--tracking-title); height: 32px; }
 
 /* Handle and menu: quiet until the scene is hovered or has focus. */
-.scene__tools { margin-left: auto; align-self: center; display: flex; gap: 2px; margin-block: -3px; opacity: 0; transition: opacity var(--motion-fast); }
+.scene__tools { margin-left: auto; align-self: flex-end; display: flex; gap: 2px; opacity: 0; transition: opacity var(--motion-fast); }
 .scene:hover .scene__tools, .scene:focus-within .scene__tools, .scene[data-grabbed] .scene__tools { opacity: 1; }
 @media (hover: none) { .scene__tools { opacity: 1; } }
-.scene__tool { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-pill); color: var(--ink-2); }
-.scene__tool:hover { background: var(--table-well); color: var(--ink); }
-.scene__tool[aria-expanded='true'] { background: var(--table-well); color: var(--ink); }
+.scene__tool { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-md); color: var(--ink-3); }
+.scene__tool:hover { background: var(--surface-sunken); color: var(--ink); }
+.scene__tool[aria-expanded='true'] { background: var(--surface-sunken); color: var(--ink); }
 .scene__grip { cursor: grab; touch-action: none; }
-.scene__grip[aria-pressed='true'] { background: var(--ink); color: var(--on-ink); }
+.scene__grip[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
 .board[data-dragging] { user-select: none; cursor: grabbing; }
 .board[data-dragging] .scene__grip { cursor: grabbing; }
 .scene[data-dragging] { opacity: 0.45; }
 /* Where a dragged scene will land: an ink line in the space between scenes. */
-.scene[data-drop]::before { content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: var(--ink); pointer-events: none; z-index: 1; }
-.scene[data-drop='before']::before { top: calc(var(--space-5) / -2 - 2px); }
-.scene[data-drop='after']::before { bottom: calc(var(--space-5) / -2 - 2px); }
+.scene[data-drop]::before { content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: var(--accent); pointer-events: none; z-index: 1; }
+.scene[data-drop='before']::before { top: calc(var(--space-6) / -2 - 2px); }
+.scene[data-drop='after']::before { bottom: calc(var(--space-6) / -2 - 2px); }
 
-.scene__steps { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--space-3); }
+.scene__steps { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: var(--space-4); }
 
-/* The add-step slot: the hover and focus state of a scene, in the cell after its last step. An empty scene shows it always. */
-.frame-add { display: grid; place-items: center; align-content: center; gap: 6px; aspect-ratio: 16 / 10; width: 100%; color: var(--ink-3); border: 1.5px dashed var(--line-control); border-radius: var(--radius-frame); opacity: 0; transition: opacity var(--motion-fast), background var(--motion-fast); }
-.scene:hover .frame-add, .scene:focus-within .frame-add, .frame-add:focus-visible, .frame-add--empty { opacity: 1; }
-@media (hover: none) { .frame-add { opacity: 1; } }
-.frame-add:hover:not(:disabled) { color: var(--ink); background: var(--table-well); }
-.frame-add:disabled { opacity: 0.55 !important; }
-.frame-add__text { font-size: var(--text-13); }
-/* When steps fill the last row the slot would start a new one, and the scenes below would jump. It hangs in the space under the scene instead. */
-.frame-add--tail { position: absolute; inset: 100% 0 auto; width: auto; height: 20px; aspect-ratio: auto; border: 0; border-radius: 0; background: none; align-content: end; }
-.frame-add--tail::before { content: ''; position: absolute; inset: 2px 0 0; border: 1.5px dashed var(--line-control); border-radius: var(--radius-control); }
-.frame-add--tail:hover:not(:disabled) { background: none; }
-.frame-add--tail:hover:not(:disabled)::before { background: var(--table-well); }
-.frame-add--tail svg { position: relative; align-self: center; margin-top: 2px; }
+/* The add-step card: always in the cell after the last step, dashed like an empty sheet. */
+.frame-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 100%; aspect-ratio: auto; padding: var(--space-4); color: var(--ink-3); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-card); text-align: center; }
+/* An empty scene's card has no neighbour to take its height from. */
+.frame-add--empty { min-height: 0; aspect-ratio: 208 / 175; }
+.frame-add:hover:not(:disabled) { color: var(--ink-2); border-color: var(--accent-line); background: var(--surface); }
+.frame-add__icon { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 6px; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-ink); }
+.frame-add__text { color: var(--ink-2); font-weight: var(--weight-semibold); }
+.frame-add__sub { font-size: var(--text-12); }
 
-.skeleton--scene { height: 16px; width: 180px; }
-.board__empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); max-width: 420px; margin: 10vh auto 0; text-align: center; }
+.skeleton--scene { height: 18px; width: 200px; }
+.board__empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); max-width: 420px; margin: 8vh auto 0; text-align: center; }
 .board__empty p { color: var(--ink-2); line-height: var(--leading-prose); }
-.board__empty-title { font-size: var(--text-22); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: -0.015em; }
+.board__empty-title { font-size: var(--text-20); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); }
+.board__empty .btn--soft { background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-sm); }
+.board__empty .btn--soft:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 84%, var(--surface)); box-shadow: var(--shadow-sm); }

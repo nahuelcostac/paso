@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
+import { Brand } from '../components/Brand';
+import { pad } from '../components/StepFrame';
 import { ApiRequestError } from '../lib/api';
 import type { ServiceEvent } from '../state/projects-store';
 import { useTheme } from '../editor/use-theme';
@@ -184,9 +187,20 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
       <img src={page.url} alt="" draggable={false} style={frameOf(page)} />
     </div>)}
     {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">No se pudo dibujar este paso.</p></div>}
+    {/* A minimal frame: the mark and the way out on top, the step and where you are below. It fades with the pointer. */}
+    <div className="present__bar present__bar--top">
+      <Brand />
+      <button type="button" className="present__exit" tabIndex={-1} onClick={(event) => { event.stopPropagation(); exit(); }}>
+        <X className="i" aria-hidden="true" />Salir<kbd>Esc</kbd>
+      </button>
+    </div>
+    <div className="present__bar present__bar--bottom">
+      <p className="present__title">{step?.document.title}</p>
+      <p className="present__hint" aria-hidden="true">← → para navegar</p>
+    </div>
     {count > 0 && <div className="indicator" role="status" aria-label={`Paso ${index + 1} de ${count}`}>
       {count <= MAX_TICKS && <span className="indicator__ticks" aria-hidden="true">{deck!.steps.map((item, position) => <i key={item.id} className={position === index ? 'on' : undefined} />)}</span>}
-      <span aria-hidden="true">{index + 1}/{count}</span>
+      <span aria-hidden="true">{pad(index + 1)} / {pad(count)}</span>
     </div>}
   </div>;
 }

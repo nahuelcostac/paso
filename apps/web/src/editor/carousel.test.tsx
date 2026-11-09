@@ -28,10 +28,18 @@ describe('step carousel', () => {
     setup();
     expect(frame(2)).toHaveAttribute('aria-current', 'step');
     expect(frame(1)).not.toHaveAttribute('aria-current');
-    expect(screen.getAllByText(/^0[1-4]$/).map((n) => n.textContent)).toEqual(['01', '02', '03', '04']);
+    const strip = document.querySelector<HTMLElement>('.carousel__frames')!;
+    expect(within(strip).getAllByText(/^0[1-4]$/).map((n) => n.textContent)).toEqual(['01', '02', '03', '04']);
     expect([1, 2, 3, 4].map((n) => frame(n).getAttribute('tabindex'))).toEqual(['-1', '0', '-1', '-1']);
     // No room for a title in the strip: it goes in the tooltip.
     expect(frame(3)).toHaveAttribute('title', 'Tercero'); expect(screen.queryByText('Tercero')).not.toBeInTheDocument();
+  });
+  it('says where you are as «02 / 04», for the eye only: the current frame already says it to screen readers', () => {
+    const { redraw } = setup();
+    const pager = document.querySelector('.carousel__pager')!;
+    expect(pager).toHaveTextContent('02 / 04'); expect(pager).toHaveAttribute('aria-hidden', 'true');
+    redraw({ currentId: undefined }); expect(pager).toHaveTextContent('– / 04');
+    redraw({ stepIds: [], currentId: undefined }); expect(document.querySelector('.carousel__pager')).not.toBeInTheDocument();
   });
   it('arrow keys move between steps only while focus is inside the carousel', async () => {
     const { props } = setup(); const user = userEvent.setup();

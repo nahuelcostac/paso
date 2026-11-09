@@ -96,7 +96,7 @@ describe('the Storyboard against the real service', () => {
     expect(sceneTitles()).toEqual(['El problema', 'Partir en dos', 'Vacía']);
     expect(board()).toHaveTextContent('3 escenas · 4 pasos');
     const first = scene('El problema');
-    expect(first).toHaveTextContent('01');
+    expect(first).toHaveTextContent('Escena 1 de 3');
     expect(first).toHaveTextContent('3 pasos');
     expect(scene('Partir en dos')).toHaveTextContent('1 paso');
     expect(scene('Vacía')).toHaveTextContent('Sin pasos');
@@ -181,7 +181,7 @@ describe('the Storyboard against the real service', () => {
     expect(await sceneOrder()).toEqual(['b', 'c']);
     await expect(readFile(join(dataDir, 'p', 'scenes', 'a', 'scene.json'))).rejects.toThrow();
     // Numbers follow the new order.
-    expect(scene('Partir en dos')).toHaveTextContent('01');
+    expect(scene('Partir en dos')).toHaveTextContent('Escena 1 de 2');
   });
 
   it('reorders scenes by keyboard: pick up, move, drop; Escape puts the scene back', async () => {
@@ -202,7 +202,7 @@ describe('the Storyboard against the real service', () => {
     await user.keyboard('{Enter}');
     await waitFor(async () => expect(await sceneOrder()).toEqual(['c', 'a', 'b']), patience);
     expect(sceneTitles()).toEqual(['Vacía', 'El problema', 'Partir en dos']);
-    expect(scene('Vacía')).toHaveTextContent('01');
+    expect(scene('Vacía')).toHaveTextContent('Escena 1 de 3');
 
     grip(1).focus();
     await user.keyboard('{Enter}{ArrowDown}{Escape}');

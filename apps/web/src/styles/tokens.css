@@ -7,38 +7,22 @@
  * This file holds tokens, font faces and the Excalidraw theme. It must not style app elements.
  */
 
-/* Typefaces: vendored so the app works offline. Source and licence (SIL OFL 1.1):
-   @fontsource-variable/atkinson-hyperlegible-next and -mono, version 5.3.0. */
+/* Typeface: vendored so the app works offline. Source and licence (SIL OFL 1.1, fonts/OFL-inter.txt):
+   @fontsource-variable/inter 5.3.0, weight axis, latin and latin-ext. */
 @font-face {
-  font-family: 'Atkinson Hyperlegible Next';
+  font-family: 'Inter Variable';
   font-style: normal;
   font-display: swap;
-  font-weight: 200 800;
-  src: url('./fonts/atkinson-hyperlegible-next-latin-ext-wght-normal.woff2') format('woff2');
+  font-weight: 100 900;
+  src: url('./fonts/inter-latin-ext-wght-normal.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'Atkinson Hyperlegible Next';
+  font-family: 'Inter Variable';
   font-style: normal;
   font-display: swap;
-  font-weight: 200 800;
-  src: url('./fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Atkinson Hyperlegible Mono';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 200 800;
-  src: url('./fonts/atkinson-hyperlegible-mono-latin-ext-wght-normal.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: 'Atkinson Hyperlegible Mono';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 200 800;
-  src: url('./fonts/atkinson-hyperlegible-mono-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 900;
+  src: url('./fonts/inter-latin-wght-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -48,82 +32,94 @@
   /* ------------------------------------------------------------------ colour
      Each pair is light-dark(light, dark). Use the names, never raw values. */
 
-  /* The table: warm beige behind everything. The wash is a very soft tonal shift
-     that gives glass something to refract; on flat colour glass looks like plain fill. */
-  --table: light-dark(#ece5d7, #1b1916);
-  --table-wash:
-    radial-gradient(70% 90% at 12% 8%, light-dark(#f5f0e6, #27231e) 0%, transparent 70%),
-    radial-gradient(60% 80% at 92% 96%, light-dark(#ddd2bd, #12100e) 0%, transparent 72%),
-    var(--table);
+  /* One warm paper family, in layers. The workspace (behind the Storyboard and around the floating panels) is an
+     off-white; the chrome (header, panels, chat, dialogs, menus) is the same paper one tone deeper; step cards and
+     what you type into are plain white. Dark mirrors it: the workspace is the deepest, the chrome a step up. */
+  --page: light-dark(#fbfaf8, #141210);
+  /* The Storyboard's own layer: white cards with thin warm lines. .board swaps these in for --surface, --surface-sunken,
+     --surface-hover, --line and --line-strong. */
+  --work-surface: light-dark(#ffffff, #1d1a16);
+  --work-sunken: light-dark(#f5f3ef, #25221d);
+  --work-hover: light-dark(#eeebe5, #2d2924);
+  --work-line: light-dark(#e9e5de, #2e2a24);
+  --work-line-strong: light-dark(#d9d3c9, #433d35);
+  /* The chrome: header, floating panels, chat, dialogs, menus. Solid, never translucent. */
+  --surface: light-dark(#f4f1eb, #221f1a);
+  /* Lighter than the chrome: what you type into inside a panel (the chat's composer). */
+  --surface-raised: light-dark(#ffffff, #2c2823);
+  /* A sunken fill on the chrome: hover, the user's chat bubble, the pager, a selected row. */
+  --surface-sunken: light-dark(#ebe7df, #2c2823);
+  /* Hover on a sunken fill. */
+  --surface-hover: light-dark(#e3ded4, #36312b);
 
-  /* Paper: drawings only. Dark value is Excalidraw's own. */
+  /* Paper: drawings only, and the Lienzo's step strip, which stays white beside the canvas. Dark value is Excalidraw's own. */
   --paper: light-dark(#ffffff, #121212);
 
-  /* Glass. --glass for panels and bars, --glass-raised where text input or a menu
-     needs more opacity. Always use with --glass-filter, --glass-sheen and --glass-shadow.
-     backdrop-filter does not nest: a blurred element inside a blurred element sees
-     nothing behind its parent, so mount menus and popovers outside the panel. */
-  --glass: light-dark(rgb(255 253 248 / 0.56), rgb(66 61 53 / 0.46));
-  --glass-raised: light-dark(rgb(255 254 251 / 0.84), rgb(58 54 47 / 0.84));
-  --glass-filter: blur(24px) saturate(1.5);
-  --glass-sheen: linear-gradient(180deg, light-dark(rgb(255 255 255 / 0.3), rgb(255 248 235 / 0.05)), transparent 64px);
-  --glass-edge: light-dark(rgb(255 255 255 / 0.8), rgb(255 248 235 / 0.11));
-  --glass-shadow:
-    inset 0 1px 0 var(--glass-edge),
-    inset 0 0 0 1px light-dark(rgb(255 255 255 / 0.3), rgb(255 248 235 / 0.05)),
-    0 1px 2px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.3)),
-    0 10px 30px light-dark(rgb(74 56 28 / 0.1), rgb(0 0 0 / 0.28));
+  /* Lines on the chrome: thin borders between surfaces and around cards. */
+  --line: light-dark(#e4dfd5, #332e28);
+  /* Stronger edge: hovered cards, inputs, dashed slots. */
+  --line-strong: light-dark(#d2cbbe, #48423a);
 
-  /* Behind a modal dialog, and the lift of a popover above the panels. */
-  --scrim: light-dark(rgb(40 30 14 / 0.28), rgb(0 0 0 / 0.5));
-  --shadow-popover: light-dark(rgb(74 56 28 / 0.2), rgb(0 0 0 / 0.5));
+  /* Behind a modal dialog, and the lift of popovers, dialogs and the floating panels. Warm, like the paper. */
+  --scrim: light-dark(rgb(40 30 14 / 0.24), rgb(0 0 0 / 0.55));
+  --shadow-sm: 0 1px 2px light-dark(rgb(60 46 24 / 0.05), rgb(0 0 0 / 0.3));
+  --shadow-md: 0 1px 2px light-dark(rgb(60 46 24 / 0.06), rgb(0 0 0 / 0.3)), 0 4px 12px light-dark(rgb(60 46 24 / 0.06), rgb(0 0 0 / 0.25));
+  --shadow-lg: 0 2px 6px light-dark(rgb(60 46 24 / 0.07), rgb(0 0 0 / 0.3)), 0 16px 40px light-dark(rgb(60 46 24 / 0.14), rgb(0 0 0 / 0.5));
 
-  /* Soft fill for hover, selected rows and the user's chat bubble. */
-  --table-well: light-dark(rgb(74 56 28 / 0.1), rgb(255 245 225 / 0.1));
-
-  /* Lines. Rare: separate with space first. */
-  --line: light-dark(rgb(74 56 28 / 0.16), rgb(255 245 225 / 0.13));
-  --line-control: light-dark(#7a7160, #857d6e); /* 3:1 edges: dashed slots, inputs */
-
-  /* Text. All three pass AA on the table, on glass and on paper. */
+  /* Text: warm inks. --ink-3 passes AA on every layer; --muted is for icons and disabled text only. */
   --ink: light-dark(#1d1a15, #f2ede3);
   --ink-2: light-dark(#4b453a, #d9d3c6);
-  --ink-3: light-dark(#544d41, #c1b8a8);
+  --ink-3: light-dark(#665d4f, #b3aa9a);
+  --muted: light-dark(#8f8676, #8a8172);
   --on-ink: light-dark(#fffdf8, #1d1a15); /* text on an --ink fill */
 
-  /* The two markers. Always a fill behind --on-marker text, never a line or
-     text colour. --mark: where you are, and the one primary action.
-     --agent: what the agent touched. */
-  --mark: #dcf23c;
-  --agent: #ff7ab2;
-  --on-marker: #1d1a15;
-  --agent-ink: light-dark(#960e48, #ff9ec6); /* agent text with no fill behind it */
-  --mark-edge: light-dark(rgb(29 26 21 / 0.55), rgb(220 242 60 / 0)); /* In light, --mark matches the table in luminance */
+  /* The accent is the ink itself: actions (Presentar, send, the first scene), the chosen view, the open step and the
+     current project. No second colour competes with the agent's pink. */
+  --accent: var(--ink);
+  --on-accent: var(--on-ink); /* text on an --accent fill */
+  --accent-strong: light-dark(#3a352d, #ffffff); /* hover and pressed */
+  --accent-ink: var(--ink); /* accent as text or icon on a surface */
+  --accent-soft: light-dark(#e9e5dd, #36312b); /* a selected row or option: a warm grey fill */
+  --accent-line: light-dark(#bdb4a5, #6a6255); /* its edge */
 
-  --danger-ink: light-dark(#9a1a12, #ff9389);
-  --focus: light-dark(#1d1a15, #dcf23c);
+  /* The agent marker: what the agent touched. A pink fill behind --on-agent text, so a board can be scanned for the
+     agent's work at a glance. It is the only colour in the chrome: everything else is paper and ink. */
+  --agent: #ff7ab2;
+  --on-agent: #1d1a15;
+  --agent-ink: light-dark(#a3124f, #ff9ec6); /* agent text with no fill behind it */
+
+  --ok: light-dark(#3a9d6e, #5cc293); /* the «Guardado» dot */
+  --danger-ink: light-dark(#b42318, #ff9a8f);
+  --danger-soft: light-dark(#fbece6, #3d2621);
+  --focus: light-dark(#7a7060, #b3aa9a); /* a warm grey that reaches 3:1 on every layer */
 
   /* ---------------------------------------------------------------- typography
-     Minimum size is 12px. Mono is for step and scene numbers, not for prose. */
-  --font-ui: 'Atkinson Hyperlegible Next', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+     Inter everywhere, numbers in tabular figures. 12px is the minimum, except the spaced uppercase eyebrow (11px). */
+  --font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; /* code in agent messages only */
 
-  --text-12: 12px; /* meta, frame numbers */
-  --text-13: 13px; /* default UI, agent conversation, tool activity */
-  --text-15: 15px; /* scene titles */
-  --text-22: 22px; /* project title on the storyboard */
+  --text-11: 11px; /* eyebrow, uppercase and spaced */
+  --text-12: 12px; /* meta, step numbers */
+  --text-13: 13px; /* default UI, agent conversation */
+  --text-15: 15px; /* card titles, dialog titles */
+  --text-20: 20px; /* scene titles */
+  --text-28: 28px; /* project title on the storyboard */
 
   --leading-tight: 1.2;
   --leading-ui: 1.4;
-  --leading-prose: 1.5; /* agent conversation */
+  --leading-prose: 1.55; /* agent conversation */
 
   --weight-regular: 400;
-  --weight-medium: 550;
+  --weight-medium: 500;
+  --weight-semibold: 600;
   --weight-bold: 700;
+
+  --tracking-eyebrow: 0.16em;
+  --tracking-title: -0.02em;
 
   /* ------------------------------------------------------------------- spacing */
   --space-1: 4px;
-  --space-2: 8px; /* also the gutter around and between panels */
+  --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px; /* also Excalidraw's own canvas inset: align to it */
   --space-5: 24px;
@@ -131,38 +127,31 @@
   --space-7: 48px;
 
   /* -------------------------------------------------------------------- layout */
-  --panel-projects: 232px;
-  --panel-agent: 360px;
-  --topbar-h: 36px;
+  --panel-projects: 240px;
+  --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
+  --topbar-h: 60px;
+  --subbar-h: 48px;
   --carousel-h: 108px;
-  --control-h: 28px;
+  --control-h: 32px;
   --canvas-min-w: 808px; /* Excalidraw clips "Biblioteca" somewhere under 780px and turns mobile below 730px */
 
-  /* --------------------------------------------------------------------- shape
-     Radii are concentric: an inner radius is the outer one minus the gap, so
-     a 16px card sits 8px inside a 24px panel. */
-  --radius-panel: 24px; /* panels, carousel, canvas */
-  --radius-card: 16px; /* composer, chat bubble, list rows, popovers */
-  --radius-frame: 12px; /* thumbnails */
-  --radius-frame-small: 10px; /* carousel thumbnails, project icon tile */
-  --radius-control: 8px; /* ghost controls inside a card */
-  --radius-pill: 999px; /* buttons, selector, chips */
+  /* --------------------------------------------------------------------- shape */
+  --radius-sm: 6px; /* small controls, badges, thumbnails in the carousel */
+  --radius-md: 8px; /* buttons, inputs, menu items, project tiles */
+  --radius-card: 10px; /* step cards, scene and composer cards, Excalidraw islands */
+  --radius-lg: 14px; /* dialogs, popovers, the chat's bubbles and composer */
+  --radius-panel: 20px; /* the floating projects and chat panels */
+  --radius-pill: 999px; /* chips, the view selector */
 
   --border: 1px solid var(--line);
 
-  /* Paper resting on the table. */
-  --shadow-paper:
-    0 0 0 1px light-dark(rgb(74 56 28 / 0.12), rgb(255 245 225 / 0.14)),
-    0 1px 2px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.3)),
-    0 6px 16px light-dark(rgb(74 56 28 / 0.08), rgb(0 0 0 / 0.24));
-
   /* --------------------------------------------------------------------- focus
-     Apply as box-shadow on :focus-visible so it follows the radius and is not
-     clipped. The inner ring separates it from fills. */
-  --focus-ring: 0 0 0 2px var(--table), 0 0 0 4px var(--focus);
+     A warm grey ring that reaches 3:1 on every layer. Apply as box-shadow on :focus-visible so it
+     follows the radius and is not clipped. The inner ring separates it from the element. */
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus);
 
   /* -------------------------------------------------------------------- motion */
-  --motion-fast: 120ms cubic-bezier(0.2, 0, 0, 1);
+  --motion-fast: 150ms cubic-bezier(0.2, 0, 0, 1);
 
   /* Thumbnails in the light theme are the drawing as is. */
   --thumb-filter: none;
@@ -187,70 +176,58 @@
     --motion-fast: 0ms linear;
   }
 }
-/* People who ask for less transparency get the same layout on solid surfaces. */
-@media (prefers-reduced-transparency: reduce) {
-  :root {
-    --glass: light-dark(#f4efe5, #2f2b25);
-    --glass-raised: light-dark(#fbf8f2, #38342d);
-    --glass-filter: none;
-    --glass-sheen: none;
-  }
-}
 
 /*
- * Excalidraw theme: replaces its violet, puts its UI in Paso's typeface and gives
- * its floating controls the same glass and radii as the rest of the app.
- * The doubled class wins regardless of stylesheet order. Variable names come from
- * @excalidraw/excalidraw 0.18.1: re-check them when upgrading.
+ * Excalidraw theme: its primary colour becomes Paso's ink, its UI takes Inter, and its floating controls become white
+ * cards with a thin warm line, like the Storyboard's step cards. The doubled class wins regardless of
+ * stylesheet order. Variable names come from @excalidraw/excalidraw 0.18.1: re-check them when upgrading.
  */
 .excalidraw.excalidraw,
 .excalidraw.excalidraw.theme--dark {
+  /* The board's controls are white like the canvas they sit on, not the paper of the chrome: the same swap as .board. */
+  --surface: var(--work-surface); --surface-sunken: var(--work-sunken); --surface-hover: var(--work-hover);
+  --line: var(--work-line); --line-strong: var(--work-line-strong);
   --ui-font: var(--font-ui);
 
-  --border-radius-md: 10px;
-  --border-radius-lg: 14px;
+  --border-radius-md: var(--radius-md);
+  --border-radius-lg: var(--radius-card);
 
-  /* More opaque than --glass: drawings of any colour pass underneath. */
-  --island-bg-color: light-dark(rgb(255 253 248 / 0.74), rgb(52 48 42 / 0.76));
-  --shadow-island: var(--glass-shadow);
+  --island-bg-color: var(--surface);
+  --shadow-island: 0 0 0 1px var(--line), var(--shadow-md);
 
-  --color-surface-lowest: light-dark(#f7f3ea, #1f1d19);
-  --color-surface-low: light-dark(#f1ebdf, #2c2924);
-  --color-surface-mid: light-dark(#f5f0e6, #24211d);
-  --color-surface-high: light-dark(#e6decd, #3a362f);
+  --color-surface-lowest: var(--surface);
+  --color-surface-low: var(--surface-sunken);
+  --color-surface-mid: var(--surface-sunken);
+  --color-surface-high: var(--surface-hover);
   --color-border-outline-variant: var(--line);
-  --color-slider-track: var(--line-control);
+  --color-slider-track: var(--line-strong);
 
-  --color-primary: var(--ink);
-  --color-primary-darker: var(--ink);
-  --color-primary-darkest: var(--ink);
-  --color-primary-hover: var(--ink-2);
-  --color-primary-light: var(--table-well);
-  --color-primary-light-darker: var(--table-well);
-  --color-brand-hover: var(--ink-2);
-  --color-brand-active: var(--table-well);
+  --color-primary: var(--accent);
+  --color-primary-darker: var(--accent-strong);
+  --color-primary-darkest: var(--accent-strong);
+  --color-primary-hover: var(--accent-strong);
+  --color-primary-light: var(--accent-soft);
+  --color-primary-light-darker: var(--accent-line);
+  --color-brand-hover: var(--accent-strong);
+  --color-brand-active: var(--accent-soft);
 
-  /* One variable drives the active tool and every selected option in the
-     properties panel, so it must stay neutral. */
-  --color-surface-primary-container: light-dark(#e6decd, #4a453c);
-  --color-on-primary-container: var(--ink);
+  /* One variable drives the active tool and every selected option in the properties panel: a soft warm grey with ink,
+     so a panel full of selected options stays calm. */
+  --color-surface-primary-container: var(--accent-soft);
+  --color-on-primary-container: var(--accent-ink);
 }
 
-/* Selection box and handles. Excalidraw hands this value straight to the canvas, which
-   rejects light-dark() and silently draws black, so each theme needs a literal colour.
-   The dark canvas is drawn through Excalidraw's filter: that value comes out as --ink-2. */
+/* Selection box and handles: --focus's warm grey, so selecting reads like focusing. Excalidraw hands this value straight
+   to the canvas, which rejects light-dark() and silently draws black, so each theme needs a literal colour. The dark
+   canvas is drawn through Excalidraw's filter: #5f574b comes out as about #a7a096, close to dark --focus. */
 .excalidraw.excalidraw {
-  --color-selection: #4b453a;
+  --color-selection: #7a7060;
 }
 .excalidraw.excalidraw.theme--dark {
-  --color-selection: #251e0f;
+  --color-selection: #5f574b;
 }
 
-.excalidraw.excalidraw .Island {
-  backdrop-filter: var(--glass-filter);
-}
-
-/* Its corner buttons are flat by default: give them the same glass as the islands. */
+/* Its corner buttons are flat by default: give them the same card as the islands. */
 .excalidraw.excalidraw .zoom-actions,
 .excalidraw.excalidraw .undo-redo-buttons,
 .excalidraw.excalidraw .sidebar-trigger:not(:hover),
@@ -258,7 +235,6 @@
 .excalidraw.excalidraw .help-icon:not(:hover) {
   background-color: var(--island-bg-color);
   border-color: transparent;
-  backdrop-filter: var(--glass-filter);
   box-shadow: var(--shadow-island);
 }
 .excalidraw.excalidraw .zoom-actions button,
@@ -268,7 +244,7 @@
 }
 .excalidraw.excalidraw .zoom-actions button:hover,
 .excalidraw.excalidraw .undo-redo-buttons button:not(:disabled):hover {
-  background-color: var(--table-well) !important;
+  background-color: var(--surface-sunken) !important;
 }
 
 /* Its two hardcoded violet-grey hovers in dark mode. */
@@ -277,10 +253,4 @@
 }
 .excalidraw.excalidraw.excalidraw.theme--dark .App-menu__left {
   --button-hover-bg: var(--color-surface-high);
-}
-
-/* The active tool alone gets the same inverted block as the view selector. */
-.excalidraw.excalidraw .App-toolbar {
-  --color-surface-primary-container: var(--ink);
-  --color-on-primary-container: var(--on-ink);
 }
