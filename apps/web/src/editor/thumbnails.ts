@@ -4,6 +4,7 @@ import { loadFiles } from './assets';
 import { canvasFiles, excalidraw } from './excalidraw-runtime';
 import { restoreSceneContent } from './scene-content';
 import { sceneBounds, type Bounds } from './thumbnail-bounds';
+import { serializeSvgExport } from './svg-export-queue';
 
 export type Thumbnail = { stepId: string; title?: string; revision: string; bounds: Bounds; svg: string };
 export type Theme = 'light' | 'dark';
@@ -26,7 +27,8 @@ export class ThumbnailCache {
       const bounds = sceneBounds(stepBounds);
       const [left, top, right, bottom] = bounds;
       const anchor = convertToExcalidrawElements([{ type: 'rectangle', x: left, y: top, width: right - left, height: bottom - top, opacity: 0, strokeWidth: 0, strokeColor: 'transparent', backgroundColor: 'transparent' }]);
-      return Promise.all(steps.map(async ({ document, revision }, index) => {
+      const thumbnails: Thumbnail[] = [];
+      for (const [index, { document, revision }] of steps.entries()) {
         // A step is exported again only when its own revision, the scene's camera or the theme changed.
         // Saving one step of a long scene therefore costs one export, not one per step.
         const stepKey = JSON.stringify([api.config.baseUrl, projectId, sceneId, theme, document.id, revision, bounds]);
@@ -34,8 +36,8 @@ export class ThumbnailCache {
         if (!svg) {
           svg = (async () => {
             const files = await loadFiles(api, projectId, document);
-            const exported = await exportToSvg({ elements: [...anchor, ...restored[index]], files: canvasFiles(files), exportPadding: 0,
-              appState: { ...document.appState, exportWithDarkMode: theme === 'dark', exportBackground: true, exportEmbedScene: false } });
+            const exported = await serializeSvgExport<SVGSVGElement>(() => exportToSvg({ elements: [...anchor, ...restored[index]], files: canvasFiles(files), exportPadding: 0,
+              appState: { ...document.appState, exportWithDarkMode: theme === 'dark', exportBackground: true, exportEmbedScene: false } }));
             if (hasArrowGlyphs(document.elements.filter((element) => element.type === 'text' && !element.isDeleted && element.fontFamily === 5).map((element) => String(element.text ?? '')))) await embedArrowFont(exported);
             return exported.outerHTML;
           })();
@@ -43,8 +45,9 @@ export class ThumbnailCache {
           if (this.exports.size > this.limit * 16) this.exports.delete(this.exports.keys().next().value!);
           svg.catch(() => this.exports.delete(stepKey));
         }
-        return { stepId: document.id, ...(document.title ? { title: document.title } : {}), revision, bounds, svg: await svg };
-      }));
+        thumbnails.push({ stepId: document.id, ...(document.title ? { title: document.title } : {}), revision, bounds, svg: await svg });
+      }
+      return thumbnails;
     })();
     this.cache.set(key, render);
     if (this.cache.size > this.limit) this.cache.delete(this.cache.keys().next().value!);

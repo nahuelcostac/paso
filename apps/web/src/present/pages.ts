@@ -5,6 +5,7 @@ import type { ApiClient } from '../lib/api';
 import { loadFiles } from '../editor/assets';
 import { canvasFiles, excalidraw } from '../editor/excalidraw-runtime';
 import { restoreSceneContent } from '../editor/scene-content';
+import { serializeSvgExport } from '../editor/svg-export-queue';
 import { unionBounds, type Bounds } from '../editor/thumbnail-bounds';
 import type { Theme } from '../editor/thumbnails';
 import { presentationAnchor } from './framing';
@@ -35,10 +36,10 @@ export async function renderPage(api: ApiClient, projectId: string, deck: Deck, 
   const files = await loadFiles(api, projectId, step.document);
   const [left, top, right, bottom] = deck.anchor;
   const anchor = convertToExcalidrawElements([{ type: 'rectangle', x: left, y: top, width: right - left, height: bottom - top, opacity: 0, strokeWidth: 0, strokeColor: 'transparent', backgroundColor: 'transparent' }]);
-  const svg = await exportToSvg({
+  const svg = await serializeSvgExport<SVGSVGElement>(() => exportToSvg({
     elements: [...anchor, ...step.elements], files: canvasFiles(files), exportPadding: 0,
     appState: { ...step.document.appState, exportWithDarkMode: theme === 'dark', exportBackground: false, exportEmbedScene: false },
-  });
+  }));
   if (hasArrowGlyphs(step.document.elements.filter((element) => element.type === 'text' && !element.isDeleted && element.fontFamily === 5).map((element) => String(element.text ?? '')))) await embedArrowFont(svg);
   const url = URL.createObjectURL(new Blob([svg.outerHTML], { type: 'image/svg+xml' }));
   const image = new Image();
