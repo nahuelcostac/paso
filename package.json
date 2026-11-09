@@ -1,6 +1,7 @@
 {
   "name": "paso",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": "22.14.0"
