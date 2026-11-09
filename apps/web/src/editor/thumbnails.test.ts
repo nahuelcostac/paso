@@ -35,4 +35,32 @@ describe('thumbnail revision cache', () => {
     await cache.scene(api, 'p', 's', 'light'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(7);
     cache.clear(); await cache.scene(api, 'p', 's', 'light'); expect(mocks.exportToSvg).toHaveBeenCalledTimes(9);
   });
+  it('serializes exports across scenes and cache instances and continues after a failure', async () => {
+    let active = 0;
+    let peak = 0;
+    const finish: Array<(fail?: boolean) => void> = [];
+    mocks.exportToSvg.mockImplementation(() => new Promise((resolve, reject) => {
+      peak = Math.max(peak, ++active);
+      finish.push((fail = false) => {
+        active--;
+        if (fail) reject(new Error('export failed'));
+        else resolve({ outerHTML: '<svg />' });
+      });
+    }));
+    const steps = [{ document: createStep({ id: 'a' }), revision: '1' }, { document: createStep({ id: 'b' }), revision: '1' }];
+    const api = { config: { baseUrl: 'local' }, listSteps: vi.fn(async () => steps) } as unknown as ApiClient;
+    const first = new ThumbnailCache().scene(api, 'p', 'first', 'light');
+    const second = new ThumbnailCache().scene(api, 'p', 'second', 'light');
+    const firstResult = first.catch(() => undefined);
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+    finish[0](true);
+    await vi.waitFor(() => expect(finish).toHaveLength(2));
+    finish[1]();
+    await vi.waitFor(() => expect(finish).toHaveLength(3));
+    finish[2]();
+    expect(await firstResult).toBeUndefined();
+    expect(await second).toHaveLength(2);
+    expect(peak).toBe(1);
+    mocks.exportToSvg.mockReset().mockResolvedValue({ outerHTML: '<svg />' });
+  });
 });
