@@ -387,7 +387,7 @@ describe('undoing a run', () => {
     await user.click(await within(panel).findByRole('button', { name: 'Deshacer ejecución' }, patience));
 
     const dialog = await screen.findByRole('alertdialog', { name: '¿Deshacer esta ejecución?' }, patience);
-    expect(dialog).toHaveTextContent('Un paso vuelve a como estaba antes.');
+    expect(dialog).toHaveTextContent('Un paso recupera su contenido, título y notas anteriores.');
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus(), patience);
     // Nothing changes until it is confirmed.

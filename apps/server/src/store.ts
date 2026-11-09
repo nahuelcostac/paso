@@ -22,7 +22,7 @@ const projectPatchInput = z.object({ name: z.string().min(1).optional(), icon: i
   .refine((data) => data.name !== undefined || data.icon !== undefined, { message: 'Send a name, an icon, or both.' });
 const orderInput = z.object({ ids: z.array(idSchema) }).strict();
 const stepInput = stepSchema.omit({ schemaVersion: true }).partial().strict();
-const duplicateInput = z.object({ id: idSchema.optional() }).strict();
+const duplicateInput = z.object({ id: idSchema.optional(), title: z.string().max(500).optional() }).strict();
 const projectPath = (id: string) => `${id}/project.json`;
 const scenePath = (p: string, s: string) => `${p}/scenes/${s}/scene.json`;
 const stepPath = (p: string, s: string, t: string) => `${p}/scenes/${s}/steps/${t}.json`;
@@ -280,6 +280,7 @@ export class Store {
           const data = duplicateInput.parse(input);
           if (data.id === stepId) throw new ApiError(409, 'ALREADY_EXISTS', 'A duplicated step needs a new ID.');
           step = duplicateStep(target.document as Step, data.id);
+          if (data.title !== undefined) step.title = data.title;
         } else {
           const data = stepInput.parse(input);
           step = createStep(data);

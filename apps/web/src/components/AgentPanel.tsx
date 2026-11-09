@@ -53,6 +53,8 @@ const TOOL_WORDS: Record<string, [running: string, done: string]> = {
   create_scene: ['Creando una escena', 'Creó una escena'],
   create_step: ['Creando el paso', 'Creó el paso'],
   duplicate_step: ['Duplicando un paso', 'Duplicó un paso en'],
+  update_step: ['Cambiando el título o las notas del paso', 'Cambió el título o las notas del paso'],
+  delete_step: ['Borrando el paso', 'Borró el paso'],
   add_elements: ['Cambiando el paso', 'Cambió el paso'],
   update_elements: ['Cambiando el paso', 'Cambió el paso'],
   delete_elements: ['Cambiando el paso', 'Cambió el paso'],
@@ -72,7 +74,7 @@ function ToolIcon({ item }: { item: ToolItem }) {
   if (item.status === 'running') return <LoaderCircle className="i i--spin" aria-hidden="true" />;
   if (item.status === 'error') return <TriangleAlert className="i" aria-hidden="true" />;
   if (item.tool === 'create_scene' || item.tool === 'create_step' || item.tool === 'duplicate_step') return <FilePlus className="i" aria-hidden="true" />;
-  if (item.tool.endsWith('_elements')) return <Pencil className="i" aria-hidden="true" />;
+  if (item.tool.endsWith('_elements') || item.tool === 'update_step' || item.tool === 'delete_step') return <Pencil className="i" aria-hidden="true" />;
   return <Eye className="i" aria-hidden="true" />;
 }
 
@@ -111,10 +113,10 @@ export function warningText(warning: UndoWarning, scenes: Scene[]) {
 function planLines(plan: UndoPlan) {
   const { stepsToRestore, stepsToDelete, stepsToRecreate, scenesToDelete, orderChanges } = plan.changes;
   const lines: string[] = [];
-  if (stepsToRestore.length) lines.push(stepsToRestore.length === 1 ? 'Un paso vuelve a como estaba antes.' : `${stepsToRestore.length} pasos vuelven a como estaban antes.`);
+  if (stepsToRestore.length) lines.push(stepsToRestore.length === 1 ? 'Un paso recupera su contenido, título y notas anteriores.' : `${stepsToRestore.length} pasos recuperan su contenido, título y notas anteriores.`);
   if (stepsToDelete.length) lines.push(stepsToDelete.length === 1 ? 'Se borra un paso que creó el agente.' : `Se borran ${stepsToDelete.length} pasos que creó el agente.`);
   if (scenesToDelete.length) lines.push(scenesToDelete.length === 1 ? 'Se borra una escena que creó el agente.' : `Se borran ${scenesToDelete.length} escenas que creó el agente.`);
-  if (stepsToRecreate.length) lines.push(stepsToRecreate.length === 1 ? 'Vuelve un paso que se borró después.' : `Vuelven ${stepsToRecreate.length} pasos que se borraron después.`);
+  if (stepsToRecreate.length) lines.push(stepsToRecreate.length === 1 ? 'Vuelve un paso borrado, con su contenido y en su posición anterior.' : `Vuelven ${stepsToRecreate.length} pasos borrados, con su contenido y en su posición anterior.`);
   if (!lines.length && orderChanges.length) lines.push('Se recupera el orden de antes.');
   return lines;
 }

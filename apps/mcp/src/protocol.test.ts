@@ -81,10 +81,51 @@ afterAll(async () => {
 describe('compiled stdio MCP with a compiled local service', () => {
   it('offers only scoped board tools and reads projects', async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual(['list_projects', 'read_project', 'read_scene', 'read_step', 'create_scene', 'create_step', 'duplicate_step', 'add_elements', 'update_elements', 'delete_elements', 'get_step_image'].sort());
+    expect(tools.map((tool) => tool.name).sort()).toEqual(['list_projects', 'read_project', 'read_scene', 'read_step', 'create_scene', 'create_step', 'duplicate_step', 'update_step', 'delete_step', 'add_elements', 'update_elements', 'delete_elements', 'get_step_image'].sort());
     expect(tools.every((tool) => tool.description && tool.inputSchema.additionalProperties === false)).toBe(true);
     const projects = await value<{ projects: { id: string }[] }>('list_projects');
     expect(projects.projects.some((project) => project.id === 'protocol')).toBe(true);
+  });
+  it('attributes metadata, duplication and deletion to the run and restores content and position', async () => {
+    const projectId = 'step-tools';
+    const p = `/api/projects/${projectId}`;
+    const s = `${p}/scenes/s`;
+    const target = (stepId: string) => ({ projectId, sceneId: 's', stepId });
+    await api('/api/projects', 'POST', { id: projectId, name: 'Steps' });
+    await api(`${p}/scenes`, 'POST', { id: 's', name: 'Scene' });
+    const a = await api<Envelope<Step>>(`${s}/steps`, 'POST', { id: 'a', title: 'Original', speakerNotes: 'Before' });
+    const emptyB = await api<Envelope<Step>>(`${s}/steps`, 'POST', { id: 'b', title: 'Delete me', speakerNotes: 'Keep me' });
+    await value('add_elements', { ...target('b'), revision: emptyB.revision, elements: [{ type: 'rectangle', id: 'kept', x: 10, y: 20 }] });
+    const b = await api<Envelope<Step>>(`${s}/steps/b`);
+    await api(`${s}/steps`, 'POST', { id: 'c', title: 'Third' });
+    await api(`${p}/runs`, 'POST', { id: 'run' });
+    const renamed = await value<Envelope<Step>>('update_step', { ...target('a'), revision: a.revision, title: 'New', speakerNotes: 'After' });
+    expect(renamed.document).toMatchObject({ title: 'New', speakerNotes: 'After' });
+    expect(JSON.stringify(await call('update_step', { ...target('a'), revision: a.revision, title: 'Stale' }))).toContain('REVISION_CONFLICT');
+    expect(JSON.stringify(await call('delete_step', { ...target('a'), revision: a.revision }))).toContain('REVISION_CONFLICT');
+    const copy = await value<Envelope<Step>>('duplicate_step', { ...target('a'), revision: renamed.revision, id: 'copy', title: 'Copy title' });
+    expect(copy.document).toMatchObject({ title: 'Copy title', speakerNotes: 'After' });
+    await value('delete_step', { ...target('b'), revision: b.revision });
+    await api(`${p}/runs/run/finish`, 'POST');
+    const { plan } = await api<{ plan: { requiresForce: boolean; confirmationToken: string; changes: { stepsToRestore: { id: string }[]; stepsToRecreate: { id: string }[]; stepsToDelete: { id: string }[] } } }>(`${p}/runs/run/undo`);
+    expect(plan.requiresForce).toBe(false);
+    expect(plan.changes.stepsToRestore.map((step) => step.id)).toEqual(['a']);
+    expect(plan.changes.stepsToRecreate.map((step) => step.id)).toEqual(['b']);
+    expect(plan.changes.stepsToDelete.map((step) => step.id)).toEqual(['copy']);
+    await api(`${p}/runs/run/undo`, 'POST', { confirm: plan.confirmationToken });
+    expect(await api(`${s}/steps/a`)).toEqual(a);
+    expect(await api(`${s}/steps/b`)).toEqual(b);
+    expect((await api<Envelope<Scene>>(s)).document.stepIds).toEqual(['a', 'b', 'c']);
+  });
+  it('allows deleting the last step, as the existing service and empty-scene format allow', async () => {
+    const projectId = 'empty-scene';
+    const p = `/api/projects/${projectId}`;
+    const s = `${p}/scenes/s`;
+    await api('/api/projects', 'POST', { id: projectId, name: 'Empty scene' });
+    await api(`${p}/scenes`, 'POST', { id: 's', name: 'Scene' });
+    const step = await api<Envelope<Step>>(`${s}/steps`, 'POST', { id: 'only' });
+    await value('delete_step', { projectId, sceneId: 's', stepId: 'only', revision: step.revision });
+    expect((await api<Envelope<Scene>>(s)).document.stepIds).toEqual([]);
   });
   it.each(['human-only-A', 'agent-twice-B'])('undo attributes compiled MCP writes correctly, %s', async (scenario) => {
     const projectId = `attribution-${scenario}`;

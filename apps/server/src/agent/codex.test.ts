@@ -59,7 +59,7 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
     expect(await readdir(request.workDir)).toEqual([]);
     expect(thread.params.environments).toEqual([]);
     expect(thread.params.approvalPolicy).toBe('never');
-    expect(thread.params.dynamicTools).toHaveLength(11);
+    expect(thread.params.dynamicTools).toHaveLength(13);
     expect(turn.params.input[0].text).toBe('prompt; $(touch /tmp/unsafe)');
     expect(call.args.join(' ')).not.toContain('touch');
     expect(codexCatalog('model').models[0]).toMatchObject({ shell_type: 'disabled', apply_patch_tool_type: null, tool_mode: 'direct', multi_agent_version: null, node_repl_disabled: true, experimental_supported_tools: [] });
