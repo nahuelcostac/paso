@@ -118,7 +118,8 @@ describe('simple Excalidraw elements', () => {
   it('measures characters from distinct Excalifont subsets and rejects missing characters', () => {
     expect(measureText('Hola Ā Ж α', 24).width).toBeGreaterThan(0);
     expect(measureText('áéíóúüñ ÁÉÍÓÚÜÑ ¿¡ «» –—…• 0123456789 %€+=×', 24).height).toBe(30);
-    for (const char of '→←↑↓') expect(() => measureText(char, 24)).toThrow('UNSUPPORTED_TEXT');
+    for (const char of '→←↑↓') expect(measureText(char, 24).width).toBeCloseTo(measureText(char, 24, 9).width);
+    expect(measureText('Hola → mundo', 24).width).toBeCloseTo(measureText('Hola ', 24).width + measureText('→', 24, 9).width + measureText(' mundo', 24).width);
     expect(measureText('Uno\nDos', 24).height).toBe(60);
   });
   it('rejects unsupported changes without mutating input', () => {

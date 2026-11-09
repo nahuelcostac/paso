@@ -39,7 +39,7 @@ export function measureText(text: string, fontSize: number, family = 5) {
     for (const character of line || ' ') {
       const code = character.codePointAt(0)!;
       const subset = family === 5 ? subsets.find(({ ranges }) => ranges.some(([start, end]) => code >= start && code <= end)) : undefined;
-      const font = family === 9 ? loadFont('Liberation/LiberationSans-Regular.woff2') : subset ? loadFont(`Excalifont/Excalifont-Regular-${subset.hash}.woff2`) : undefined;
+      const font = family === 9 || (family === 5 && code >= 0x2190 && code <= 0x2193) ? loadFont('Liberation/LiberationSans-Regular.woff2') : subset ? loadFont(`Excalifont/Excalifont-Regular-${subset.hash}.woff2`) : undefined;
       if (/\p{Cc}|\p{Cf}/u.test(character) || !font?.hasGlyphForCodePoint(code)) {
         throw new Error(`UNSUPPORTED_TEXT. The bundled ${family === 5 ? 'Excalifont' : 'Liberation Sans'} font cannot measure this character (U+${code.toString(16).toUpperCase()}). Use supported text, or add it in the Paso app. No system-font fallback is used.`);
       }

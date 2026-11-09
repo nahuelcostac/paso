@@ -136,7 +136,7 @@ Font size is 12 to 96. A batch contains at most 200 elements or patches.
   is an integer from 0 to 100. New elements use solid fills and roughness 1. Text and labels use Excalifont.
 - Text has a 4,000-character limit. Use explicit `\n` line breaks. There is no
   automatic wrapping. Text is normalized to NFC, LF line endings and eight
-  spaces per tab. Unsupported glyphs and control characters are rejected,
+  spaces per tab. The four arrows `→ ← ↑ ↓` use bundled Liberation Sans glyphs. Unsupported glyphs and control characters are rejected,
   rather than measured with an unknown fallback font.
 
 For example, pass this array to `add_elements` with the step target and its
@@ -193,7 +193,7 @@ real font metrics or a reliable exporter.
 The MCP adapter therefore constructs the supported full elements in Node.
 `fontkit` reads the **bundled Excalifont WOFF2 subsets** that Excalidraw uses
 for font family 5. Unicode ranges select the same subset as the browser.
-Existing Liberation Sans text keeps its font when edited. It measures glyph advance widths, not character counts.
+The four arrow glyphs use the bundled Liberation Sans font in the canvas and exports. Existing Liberation Sans text keeps its font when edited. It measures glyph advance widths, not character counts.
 Shapes receive extra label padding, with the ellipse and diamond inner-area
 rules accounted for. Bindings are reciprocal. Fractional drawing indexes,
 seeds and metadata are internal to the adapter.

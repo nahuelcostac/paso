@@ -1,3 +1,4 @@
+import { embedArrowFont, hasArrowGlyphs } from './arrow-font';
 import type { ApiClient } from '../lib/api';
 import { loadFiles } from './assets';
 import { canvasFiles, excalidraw } from './excalidraw-runtime';
@@ -35,6 +36,7 @@ export class ThumbnailCache {
             const files = await loadFiles(api, projectId, document);
             const exported = await exportToSvg({ elements: [...anchor, ...restored[index]], files: canvasFiles(files), exportPadding: 0,
               appState: { ...document.appState, exportWithDarkMode: theme === 'dark', exportBackground: true, exportEmbedScene: false } });
+            if (hasArrowGlyphs(document.elements.filter((element) => element.type === 'text' && !element.isDeleted && element.fontFamily === 5).map((element) => String(element.text ?? '')))) await embedArrowFont(exported);
             return exported.outerHTML;
           })();
           this.exports.set(stepKey, svg);
