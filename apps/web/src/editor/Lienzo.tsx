@@ -7,6 +7,7 @@ import { StepCarousel } from './StepCarousel';
 import { useThumbnails } from './use-thumbnails';
 import { useTheme } from './use-theme';
 import './excalidraw-runtime';
+import type { CanvasCamera } from './canvas-camera';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
 const messages = { failed: 'No se pudo guardar. Tu trabajo sigue en este navegador.', conflict: 'El paso cambió fuera de Paso. Tu trabajo local se conserva.' };
@@ -44,6 +45,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   const { svgs, titles } = useThumbnails(api, projectId, scene?.id, theme, `${structureRevision}/${stepIds.join()}`);
   // Written during render on purpose: the effect below runs after the canvas mounted, and the canvas asks when it loads.
   const routeRef = useRef(route); routeRef.current = route;
+  const camera = useRef<CanvasCamera | undefined>(undefined);
 
   // An address that names a scene or step that is not there lands on the first one.
   useEffect(() => {
@@ -86,7 +88,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
     </div>}
     <div className="canvas canvas--editor">
       {session ? <Suspense fallback={<div className="editor-message">Cargando editor…</div>}>
-        <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} keepFocus={keyboardInCarousel} />
+        <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} keepFocus={keyboardInCarousel} camera={camera} />
       </Suspense> : <div className="canvas__placeholder"><h1>{projectName}</h1><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena con el selector de arriba para empezar a dibujar.'}</p></div>}
     </div>
     {scene && <StepCarousel
