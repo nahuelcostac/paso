@@ -178,12 +178,15 @@
 }
 
 /*
- * Excalidraw theme: its primary colour becomes Paso's ink, its UI takes Inter, and its floating controls become the
- * same paper cards with a thin border as the rest of the app. The doubled class wins regardless of
+ * Excalidraw theme: its primary colour becomes Paso's ink, its UI takes Inter, and its floating controls become white
+ * cards with a thin warm line, like the Storyboard's step cards. The doubled class wins regardless of
  * stylesheet order. Variable names come from @excalidraw/excalidraw 0.18.1: re-check them when upgrading.
  */
 .excalidraw.excalidraw,
 .excalidraw.excalidraw.theme--dark {
+  /* The board's controls are white like the canvas they sit on, not the paper of the chrome: the same swap as .board. */
+  --surface: var(--work-surface); --surface-sunken: var(--work-sunken); --surface-hover: var(--work-hover);
+  --line: var(--work-line); --line-strong: var(--work-line-strong);
   --ui-font: var(--font-ui);
 
   --border-radius-md: var(--radius-md);
