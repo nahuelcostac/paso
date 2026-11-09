@@ -133,7 +133,7 @@ Font size is 12 to 96. A batch contains at most 200 elements or patches.
 - Optional style fields are `strokeColor`, `strokeWidth` and `opacity`.
   Shapes and text also accept `backgroundColor`. Colors use `#rrggbb`, with
   `transparent` also allowed for backgrounds. Stroke width is 1 to 8. Opacity
-  is an integer from 0 to 100. New elements use solid fills and roughness 0.
+  is an integer from 0 to 100. New elements use solid fills and roughness 1. Text and labels use Excalifont.
 - Text has a 4,000-character limit. Use explicit `\n` line breaks. There is no
   automatic wrapping. Text is normalized to NFC, LF line endings and eight
   spaces per tab. Unsupported glyphs and control characters are rejected,
@@ -191,8 +191,9 @@ text-measurement paths use a DOM canvas. Adding a DOM stub would not provide
 real font metrics or a reliable exporter.
 
 The MCP adapter therefore constructs the supported full elements in Node.
-`fontkit` reads the **same bundled Liberation Sans WOFF2** that Excalidraw uses
-for font family 9. It measures glyph advance widths, not character counts.
+`fontkit` reads the **bundled Excalifont WOFF2 subsets** that Excalidraw uses
+for font family 5. Unicode ranges select the same subset as the browser.
+Existing Liberation Sans text keeps its font when edited. It measures glyph advance widths, not character counts.
 Shapes receive extra label padding, with the ellipse and diamond inner-area
 rules accounted for. Bindings are reciprocal. Fractional drawing indexes,
 seeds and metadata are internal to the adapter.

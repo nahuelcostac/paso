@@ -95,9 +95,31 @@ describe('simple Excalidraw elements', () => {
     const changed = updateElements(step, [{ id: 'caption', text: 'Después\nNueva línea', fontSize: 32 }, { id: 'right', label: null }]);
     const caption = changed.elements.find((element) => element.id === 'caption')!;
     expect(caption.text).toBe('Después\nNueva línea');
-    expect(caption.height).toBe(32 * 1.15 * 2);
+    expect(caption.height).toBe(32 * 1.25 * 2);
     expect(changed.elements.find((element) => element.containerId === 'right')!.isDeleted).toBe(true);
     expect(updateElements(changed, [{ id: 'right', label: 'Restaurada' }]).elements.some((element) => element.containerId === 'right' && !element.isDeleted)).toBe(true);
+  });
+  it('uses hand-drawn defaults and preserves the font of existing text', () => {
+    const step = addElements(drawing(), [{ type: 'text', id: 'caption', x: 0, y: 0, text: 'Hola' }]);
+    expect(step.elements.every((element) => element.roughness === 1)).toBe(true);
+    expect(step.elements.filter((element) => element.type === 'text').every((element) => element.fontFamily === 5 && element.lineHeight === 1.25)).toBe(true);
+    const caption = step.elements.find((element) => element.id === 'caption')!;
+    caption.fontFamily = 9; caption.lineHeight = 1.15;
+    const label = step.elements.find((element) => element.containerId === 'left')!;
+    label.fontFamily = 9; label.lineHeight = 1.15;
+    const changed = updateElements(step, [{ id: 'caption', text: 'Nuevo' }, { id: 'left', label: 'Otro' }]);
+    for (const id of [caption.id, label.id]) {
+      const element = changed.elements.find((candidate) => candidate.id === id)!;
+      expect(element.fontFamily).toBe(9);
+      expect(element.lineHeight).toBe(1.15);
+      expect(element.width).toBeCloseTo(measureText(String(element.text), 24, 9).width);
+    }
+  });
+  it('measures characters from distinct Excalifont subsets and rejects missing characters', () => {
+    expect(measureText('Hola Ā Ж α', 24).width).toBeGreaterThan(0);
+    expect(measureText('áéíóúüñ ÁÉÍÓÚÜÑ ¿¡ «» –—…• 0123456789 %€+=×', 24).height).toBe(30);
+    for (const char of '→←↑↓') expect(() => measureText(char, 24)).toThrow('UNSUPPORTED_TEXT');
+    expect(measureText('Uno\nDos', 24).height).toBe(60);
   });
   it('rejects unsupported changes without mutating input', () => {
     const step = drawing();
