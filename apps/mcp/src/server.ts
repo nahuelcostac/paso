@@ -7,7 +7,7 @@ import { elementInput, elementPatch, revisionSchema, targetShape, type Target } 
 import { renderStep } from './image.js';
 
 const textResult = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
-const conventions = 'Canvas units are pixels. x increases right, y down. x/y is the top-left, not the center. Width/height are positive minimum sizes. Labels use the bundled Liberation Sans font and grow containers to fit without wrapping; use \\n for line breaks. IDs are stable and unique within a step. Straight arrows bind shape IDs and follow moved shapes. No raw Excalidraw properties are accepted.';
+const conventions = 'Canvas units are pixels. x increases right, y down. x/y is the top-left, not the center. Width/height are positive minimum sizes. Labels use the bundled Excalifont font and grow containers to fit without wrapping; use \\n for line breaks. IDs are stable and unique within a step. Straight arrows bind shape IDs and follow moved shapes. New shapes and arrows use artist roughness. No raw Excalidraw properties are accepted.';
 const stale = 'Pass the exact unquoted revision returned by read_step. On REVISION_CONFLICT read again and reconsider edits. Writes are atomic per step and never automatically retried.';
 
 export function createBoardMcp(config: Configuration) {

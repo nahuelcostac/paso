@@ -5,6 +5,10 @@ import type { Step } from '@paso/shared';
 (window as unknown as { EXCALIDRAW_ASSET_PATH: string }).EXCALIDRAW_ASSET_PATH = new URL('./', window.location.href).href;
 const { restoreElements, exportToCanvas } = await import('@excalidraw/excalidraw');
 async function renderStep(step: Step, files: BinaryFiles) {
+  if (step.elements.some((element) => element.type === 'text' && !element.isDeleted && element.fontFamily === 5 && /[←↑→↓]/u.test(String(element.text ?? '')))) {
+    const face = new FontFace('Excalifont', `url(${new URL('./fonts/Liberation/LiberationSans-Regular.woff2', window.location.href).href})`, { unicodeRange: 'U+2190-2193' });
+    await face.load(); (document.fonts as FontFaceSet & { add(face: FontFace): void }).add(face);
+  }
   const elements = step.elements as unknown as ExcalidrawElement[];
   const initial = restoreElements(elements, null, { refreshDimensions: false }).filter((element) => !element.isDeleted);
   await exportToCanvas({ elements: initial, files, getDimensions: () => ({ width: 1, height: 1, scale: 0.001 }) });

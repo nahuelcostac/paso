@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { generateKeyBetween } from 'fractional-indexing';
 import type { ExcalidrawElement as Element, Step } from '@paso/shared';
-import { measureText } from './font.js';
+import { lineHeightForFont, measureText } from './font.js';
 import type { ElementInput, ElementPatch } from './input.js';
 
 type Binding = { elementId: string; focus: number; gap: number };
@@ -27,7 +27,7 @@ function base(id: string, type: string): Element {
   return {
     id, type, x: 0, y: 0, width: 0, height: 0, angle: 0,
     strokeColor: '#1b1b1f', backgroundColor: 'transparent', fillStyle: 'solid',
-    strokeWidth: 2, strokeStyle: 'solid', roughness: 0, opacity: 100,
+    strokeWidth: 2, strokeStyle: 'solid', roughness: 1, opacity: 100,
     groupIds: [], frameId: null, index: null, roundness: null, seed: randomInt(1, 2 ** 31),
     version: 1, versionNonce: randomInt(1, 2 ** 31), isDeleted: false,
     boundElements: null, updated: Date.now(), link: null, locked: false,
@@ -35,9 +35,9 @@ function base(id: string, type: string): Element {
 }
 function textElement(id: string, text: string, fontSize: number, containerId: string | null): Element {
   return {
-    ...base(id, 'text'), ...measureText(text, fontSize), fontSize, fontFamily: 9,
+    ...base(id, 'text'), ...measureText(text, fontSize), fontSize, fontFamily: 5,
     textAlign: containerId ? 'center' : 'left', verticalAlign: containerId ? 'middle' : 'top',
-    containerId, originalText: measureText(text, fontSize).text, autoResize: true, lineHeight: 1.15,
+    containerId, originalText: measureText(text, fontSize).text, autoResize: true, lineHeight: 1.25,
   };
 }
 function editable(element: Element) {
@@ -68,8 +68,9 @@ function setLabel(elements: Element[], shape: Element, text: string | null, font
   }
   if (label) {
     const size = fontSize ?? number(label, 'fontSize');
-    const measured = measureText(text, size);
-    Object.assign(label, measured, { fontSize: size, fontFamily: 9, lineHeight: 1.15, originalText: measured.text, autoResize: true });
+    const family = number(label, 'fontFamily');
+    const measured = measureText(text, size, family);
+    Object.assign(label, measured, { fontSize: size, lineHeight: lineHeightForFont(family), originalText: measured.text, autoResize: true });
   }
   else {
     label = textElement(randomUUID(), text, fontSize ?? 24, shape.id);
@@ -168,8 +169,9 @@ export function updateElements(step: Step, patches: ElementPatch[]): Step {
       layoutLabel(elements, element);
       if (['x', 'y', 'width', 'height', 'label', 'fontSize'].some((key) => Object.hasOwn(patch, key))) movedShapes.add(element.id);
     } else if (element.type === 'text' && (patch.text !== undefined || patch.fontSize !== undefined)) {
-      const measured = measureText(patch.text ?? String(element.originalText ?? element.text), patch.fontSize ?? number(element, 'fontSize'));
-      Object.assign(element, measured, { originalText: measured.text, fontSize: patch.fontSize ?? element.fontSize, fontFamily: 9, lineHeight: 1.15, autoResize: true });
+      const family = number(element, 'fontFamily');
+      const measured = measureText(patch.text ?? String(element.originalText ?? element.text), patch.fontSize ?? number(element, 'fontSize'), family);
+      Object.assign(element, measured, { originalText: measured.text, fontSize: patch.fontSize ?? element.fontSize, lineHeight: lineHeightForFont(family), autoResize: true });
     }
   }
   for (const arrow of elements.filter((element) => element.type === 'arrow' && !element.isDeleted)) {

@@ -1,3 +1,4 @@
+import { embedArrowFont, hasArrowGlyphs } from '../editor/arrow-font';
 import type { Step } from '@paso/shared';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { ApiClient } from '../lib/api';
@@ -38,6 +39,7 @@ export async function renderPage(api: ApiClient, projectId: string, deck: Deck, 
     elements: [...anchor, ...step.elements], files: canvasFiles(files), exportPadding: 0,
     appState: { ...step.document.appState, exportWithDarkMode: theme === 'dark', exportBackground: false, exportEmbedScene: false },
   });
+  if (hasArrowGlyphs(step.document.elements.filter((element) => element.type === 'text' && !element.isDeleted && element.fontFamily === 5).map((element) => String(element.text ?? '')))) await embedArrowFont(svg);
   const url = URL.createObjectURL(new Blob([svg.outerHTML], { type: 'image/svg+xml' }));
   const image = new Image();
   image.src = url;
