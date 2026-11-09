@@ -107,7 +107,7 @@ export type RunSummary = {
 };
 
 export function configFromPage(): ClientConfig {
-  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? '';
+  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? (window as Window & { pasoDesktop?: { token: string } }).pasoDesktop?.token ?? '';
   return { baseUrl: window.location.origin, token };
 }
 
