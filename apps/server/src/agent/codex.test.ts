@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { startServer } from '../server.js';
 import { codexAdapter } from './codex.js';
+import { codexTranscriptPaths } from './forget.js';
 import { codexCatalog, codexConfiguration } from './codex-policy.js';
 import type { AgentEvent, AgentRunRequest } from './types.js';
 
@@ -116,5 +117,26 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
   });
   it('times out an idle harness', async () => {
     expect((await collect('hang', { limits: { idleTimeoutMs: 500, maxRunMs: 5000 } })).at(-1)).toMatchObject({ type: 'failed', code: 'timeout' });
+  });
+
+  it('asks for the chosen reasoning effort on the turn only, and offers it in the catalog', async () => {
+    await collect('ok');
+    await collect('ok', { effort: 'high' });
+    const turns = (await records()).filter((r) => r.method === 'turn/start');
+    // Codex would carry a level over to later turns, so a turn without a choice states the default.
+    expect(turns[0].params.effort).toBe('low');
+    expect(turns[1].params.effort).toBe('high');
+    const levels = codexCatalog('m').models[0].supported_reasoning_levels.map((level: { effort: string }) => level.effort);
+    expect(levels).toEqual(['low', 'medium', 'high', 'xhigh']);
+  });
+  it('forgets only the rollout of the deleted thread, in Paso\'s own Codex home', async () => {
+    const day = join(root, 'codex-home', 'sessions', '2026', '11', '11');
+    await mkdir(day, { recursive: true });
+    await writeFile(join(day, 'rollout-2026-11-11T10-00-00-0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000.jsonl'), '{}');
+    await writeFile(join(day, 'rollout-2026-11-11T11-00-00-0199aaaa-bbbb-7ccc-8ddd-111122223333.jsonl'), '{}');
+    expect(await codexTranscriptPaths('0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000', request.workDir)).toHaveLength(1);
+    expect(await codexTranscriptPaths('../../etc/passwd', request.workDir)).toEqual([]);
+    await codexAdapter.forget!('0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000', request.workDir);
+    expect(await readdir(day)).toEqual(['rollout-2026-11-11T11-00-00-0199aaaa-bbbb-7ccc-8ddd-111122223333.jsonl']);
   });
 });

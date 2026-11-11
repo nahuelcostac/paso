@@ -34,6 +34,22 @@ export const HARNESS_MODELS: Record<HarnessId, ModelOption[]> = {
   agy: [{ id: '', label: 'Predeterminado' }],
 };
 
+/**
+ * How hard the model thinks, per harness: the levels the service accepts (`effortLevels` on the server). An empty ID
+ * leaves it to the harness. A harness without levels shows no choice.
+ */
+export const HARNESS_EFFORTS: Record<HarnessId, ModelOption[]> = {
+  claude: [
+    { id: '', label: 'Automático' }, { id: 'low', label: 'Bajo' }, { id: 'medium', label: 'Medio' },
+    { id: 'high', label: 'Alto' }, { id: 'xhigh', label: 'Muy alto' }, { id: 'max', label: 'Máximo' },
+  ],
+  codex: [
+    { id: '', label: 'Automático' }, { id: 'low', label: 'Bajo' }, { id: 'medium', label: 'Medio' },
+    { id: 'high', label: 'Alto' }, { id: 'xhigh', label: 'Muy alto' },
+  ],
+  agy: [],
+};
+
 export type HarnessInfo = DetectedHarness & { added: boolean; supported: boolean };
 
 export type ToolItem = {
@@ -56,7 +72,7 @@ export type AgentTurn = {
   projectId: string;
   sceneId?: string;
   harness: HarnessId;
-  /** Only known in the window that sent it: the service never stores or replays prompts. */
+  /** The person's message. The service replays it with the rest of the conversation. */
   userText?: string;
   entries: TurnEntry[];
   status: 'running' | 'completed' | 'cancelled' | 'failed';
@@ -70,6 +86,8 @@ export type AgentState = {
   /** The harness and model for the next conversation. */
   harness: HarnessId;
   model: string;
+  /** The reasoning effort for the next message. It does not start a new conversation. */
+  effort: string;
   sessions: Record<string, AgentSessionInfo>;
   /** The open conversation (a session ID) per project and scene. */
   conversation: Record<string, string | undefined>;
@@ -125,6 +143,7 @@ export class AgentStore {
     harnesses: { status: 'idle', list: [] },
     harness: 'claude',
     model: '',
+    effort: '',
     sessions: {},
     conversation: {},
     turns: [],
@@ -212,7 +231,43 @@ export class AgentStore {
     const harness = choice.harness ?? shown.harness;
     const model = choice.harness && choice.harness !== shown.harness ? '' : choice.model ?? shown.model;
     const changed = harness !== shown.harness || model !== shown.model;
-    this.set({ harness, model, conversation: session && changed ? { ...this.state.conversation, [key]: undefined } : this.state.conversation });
+    // A level the new harness does not have goes back to automatic.
+    const effort = HARNESS_EFFORTS[harness].some((option) => option.id === this.state.effort) ? this.state.effort : '';
+    this.set({ harness, model, effort, conversation: session && changed ? { ...this.state.conversation, [key]: undefined } : this.state.conversation });
+  }
+
+  /** The reasoning effort applies from the next message on, in the same conversation. */
+  chooseEffort(effort: string) { this.set({ effort }); }
+
+  /** The conversations of a scene, newest first: the history the panel lists. Ones that never got a message are left out. */
+  conversations(projectId: string, sceneId: string | null) {
+    return Object.values(this.state.sessions)
+      .filter((session) => session.projectId === projectId && (session.sceneId ?? null) === sceneId && session.turns > 0)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  /** Opens an earlier conversation of a scene: its messages are read from the service, and the next message continues it. */
+  async openConversation(projectId: string, sceneId: string | null, sessionId: string) {
+    const session = this.state.sessions[sessionId];
+    if (!session) return;
+    this.set({
+      conversation: { ...this.state.conversation, [conversationKey(projectId, sceneId)]: sessionId },
+      notice: { ...this.state.notice, [projectId]: undefined },
+    });
+    await this.replay(sessionId);
+  }
+
+  /**
+   * Deletes a conversation for good: the service drops its history and the harness's own copy. What the agent changed
+   * on the board stays, with its restore points.
+   */
+  async deleteConversation(sessionId: string) {
+    await this.api.deleteAgentSession(sessionId);
+    const sessions = { ...this.state.sessions };
+    delete sessions[sessionId];
+    const conversation = Object.fromEntries(Object.entries(this.state.conversation).map(([key, id]) => [key, id === sessionId ? undefined : id]));
+    this.ignored.add(sessionId);
+    this.set({ sessions, conversation, turns: this.state.turns.filter((turn) => turn.sessionId !== sessionId) });
   }
 
   newConversation(projectId: string, sceneId: string | null) {
@@ -311,12 +366,12 @@ export class AgentStore {
       let runId: string;
       try {
         if (!sessionId) sessionId = await this.createSession(projectId, sceneId, key);
-        runId = (await this.api.sendAgentMessage(sessionId, trimmed)).runId;
+        runId = await this.deliver(projectId, sessionId, trimmed);
       } catch (error) {
         // The service forgets sessions that never reached the harness when it restarts: start a new one.
         if (!(error instanceof ApiRequestError && error.code === 'SESSION_NOT_FOUND')) throw error;
         sessionId = await this.createSession(projectId, sceneId, key);
-        runId = (await this.api.sendAgentMessage(sessionId, trimmed)).runId;
+        runId = await this.deliver(projectId, sessionId, trimmed);
       }
       this.upsertTurn(runId, sessionId, (turn) => ({ ...turn, userText: trimmed }));
       return true;
@@ -324,6 +379,29 @@ export class AgentStore {
       this.setNotice(projectId, sendErrorMessage(error));
       return false;
     }
+  }
+
+  /**
+   * Sends one message. The service says a run is over before it has closed its restore point, so for a moment after
+   * the last answer it may still be busy: when nothing is running here any more, that is waited out, briefly.
+   */
+  private async deliver(projectId: string, sessionId: string, text: string) {
+    for (let attempt = 0; ; attempt++) {
+      try { return (await this.api.sendAgentMessage(sessionId, text, this.effortFor(sessionId))).runId; }
+      catch (error) {
+        const busy = error instanceof ApiRequestError && (error.code === 'SESSION_BUSY' || error.code === 'PROJECT_BUSY');
+        const runningHere = this.state.turns.some((turn) => turn.projectId === projectId && turn.status === 'running');
+        if (!busy || runningHere || attempt >= 12) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
+  }
+
+  /** The chosen effort, when the conversation's harness has it. */
+  private effortFor(sessionId: string) {
+    const harness = this.state.sessions[sessionId]?.harness ?? this.state.harness;
+    const effort = this.state.effort;
+    return effort && HARNESS_EFFORTS[harness].some((option) => option.id === effort) ? effort : undefined;
   }
 
   private async createSession(projectId: string, sceneId: string | null, key: string) {
@@ -419,7 +497,13 @@ export class AgentStore {
     if (!turn) return;
     if (event.type === 'started' || event.type === 'finished' || event.type === 'failed') {
       const session = this.state.sessions[sessionId];
-      if (session) this.set({ sessions: { ...this.state.sessions, [sessionId]: { ...session, state: event.type === 'started' ? 'running' : 'idle' } } });
+      if (session) this.set({ sessions: { ...this.state.sessions, [sessionId]: { ...session, state: event.type === 'started' ? 'running' : 'idle', updatedAt: at } } });
+    }
+    // The history lists a conversation by its first message, and counts its messages.
+    if (event.type === 'message') {
+      const session = this.state.sessions[sessionId];
+      const runs = new Set(this.state.turns.filter((candidate) => candidate.sessionId === sessionId).map((candidate) => candidate.runId));
+      if (session) this.set({ sessions: { ...this.state.sessions, [sessionId]: { ...session, title: session.title ?? event.text.trim().replace(/\s+/g, ' ').slice(0, 120), turns: Math.max(session.turns, runs.size) } } });
     }
     if (event.type === 'finished' || event.type === 'failed') this.reloadRunsUntilClosed(turn.projectId, runId);
   }
@@ -491,6 +575,8 @@ function reduce(turn: AgentTurn, event: AgentEvent, at: string): AgentTurn {
       return { ...turn, startedAt: Date.parse(at) || turn.startedAt };
     case 'session':
       return turn;
+    case 'message':
+      return { ...turn, userText: event.text };
     case 'text_delta':
       if (last?.kind === 'text' && last.streaming) entries[entries.length - 1] = { ...last, text: last.text + event.text };
       else entries.push({ kind: 'text', id: `text-${entries.length}`, text: event.text, streaming: true });

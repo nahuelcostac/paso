@@ -340,3 +340,23 @@ button.chip:hover {
   box-shadow: 0 0 0 1px var(--line), var(--shadow-lg);
 }
 .agent[data-narrow][data-open='true'] { display: flex; }
+
+/* Model and reasoning share one menu: a small heading over each group. */
+.menu__group { margin: 0; padding: 6px 10px 2px; color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+.composer__effort { color: var(--ink-3); }
+
+/* The scene's earlier conversations: a list of first messages, with who answered and when, and a bin for each. */
+.history { width: min(340px, calc(100vw - 16px)); padding: var(--space-1); }
+.history__head { margin: 0; padding: 8px 10px 6px; color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); }
+.history__list { margin: 0; padding: 0; list-style: none; max-height: min(420px, 60vh); overflow-y: auto; }
+.history__item { display: flex; align-items: center; gap: 2px; border-radius: var(--radius-sm); }
+.history__item:hover, .history__item:focus-within { background: var(--surface-sunken); }
+.history__item[data-current] { background: var(--accent-soft); }
+.menu.history .history__open { display: flex; flex: 1; flex-direction: column; align-items: stretch; gap: 2px; width: auto; height: auto; min-width: 0; padding: 7px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.history__open:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.history__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-13); font-weight: var(--weight-medium); }
+.history__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-3); font-size: var(--text-12); }
+.menu.history .history__delete { flex: none; justify-content: center; width: 30px; height: 30px; padding: 0; margin-right: 2px; opacity: 0; }
+.menu.history .history__item:hover .history__open, .menu.history .history__open:focus-visible { background: transparent; }
+.menu.history .history__item:hover .history__delete, .menu.history .history__item:focus-within .history__delete { opacity: 1; }
+@media (hover: none) { .menu.history .history__delete { opacity: 1; } }

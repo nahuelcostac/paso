@@ -187,14 +187,22 @@ describe('agent and model picker', () => {
     // Models: the account's own, without Fable.
     await user.click(within(panel).getByRole('button', { name: 'Modelo: Predeterminado' }));
     const models = await screen.findByRole('menu', { name: 'Elegir modelo' });
-    expect(within(models).getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual(['Predeterminado', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5']);
+    const reasoning = within(models).getByRole('group', { name: 'Razonamiento' });
+    const effortItems = within(reasoning).getAllByRole('menuitemradio');
+    expect(within(models).getAllByRole('menuitemradio').filter((item) => !effortItems.includes(item)).map((item) => item.textContent)).toEqual(['Predeterminado', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5']);
+    // Reasoning shares the menu: Claude Code's own levels, automatic by default.
+    expect(effortItems.map((item) => item.textContent)).toEqual(['Automático', 'Bajo', 'Medio', 'Alto', 'Muy alto', 'Máximo']);
+    expect(within(reasoning).getByRole('menuitemradio', { name: 'Automático' })).toHaveAttribute('aria-checked', 'true');
     expect(models).not.toHaveTextContent(/Fable/i);
     await user.click(within(models).getByRole('menuitemradio', { name: 'Haiku 5.5' }));
+    await user.click(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5' }));
+    await user.click(within(within(await screen.findByRole('menu', { name: 'Elegir modelo' })).getByRole('group', { name: 'Razonamiento' })).getByRole('menuitemradio', { name: 'Alto' }));
+    expect(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5, razonamiento alto' })).toHaveTextContent('Haiku 5.5 · Alto');
 
     await user.clear(within(panel).getByRole('textbox', { name: 'Mensaje para el agente' }));
     await send(panel, user, 'Hola');
     expect(await within(panel).findByText('Paso 1 actualizado.', {}, patience)).toBeInTheDocument();
-    expect(requests[0].model).toBe('claude-haiku-5-5');
+    expect(requests[0]).toMatchObject({ model: 'claude-haiku-5-5', effort: 'high' });
   });
 
   it('adds Codex and sends a turn through the common panel', async () => {
@@ -494,8 +502,8 @@ describe('after a reload', () => {
     expect(await within(panel).findByRole('button', { name: 'Ir al paso 1 de la escena 1' }, patience)).toBeInTheDocument();
     // The step it created is found again from the restore point, since creation events are not replayed.
     await waitFor(() => expect(within(panel).getAllByRole('button', { name: 'Ir al paso 2 de la escena 1' })).toHaveLength(2), patience);
-    // The prompt is not stored by the service, so it is not shown again.
-    expect(within(panel).queryByText('Actualiza el paso 1')).not.toBeInTheDocument();
+    // The service keeps the conversation's history, the person's message included.
+    expect(await within(panel).findByText('Actualiza el paso 1', {}, patience)).toBeInTheDocument();
     expect(await within(panel).findByRole('button', { name: 'Deshacer ejecución' }, patience)).toBeInTheDocument();
 
     // A new conversation still reaches the last run's undo.
@@ -532,6 +540,58 @@ describe('continuing a conversation', () => {
     await waitFor(() => expect(requests).toHaveLength(3), patience);
     expect(requests[2].model).toBeUndefined();
     expect(requests[2].resumeToken).toBeUndefined();
+  });
+});
+
+describe('the history of conversations', () => {
+  it('lists the scene\'s conversations, reopens one to continue it, and deletes one after asking', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    // Each conversation gets its own resume token, so continuing the right one can be told apart.
+    adapterImpl = async function* (request) {
+      yield { type: 'session', resumeToken: request.resumeToken ?? `tok-${requests.length}` };
+      yield { type: 'text', text: `Respuesta a «${request.text}».` };
+      yield { type: 'finished', reason: 'completed' };
+    };
+    const user = userEvent.setup();
+    const panel = await openPanel();
+    await send(panel, user, 'Primero');
+    await within(panel).findByText('Respuesta a «Primero».', {}, patience);
+    await user.click(within(panel).getByRole('button', { name: 'Nueva conversación' }));
+    await send(panel, user, 'Segundo');
+    await within(panel).findByText('Respuesta a «Segundo».', {}, patience);
+
+    // Newest first, each by its first message; the open one is marked.
+    await user.click(within(panel).getByRole('button', { name: 'Historial de conversaciones' }));
+    let history = await screen.findByRole('dialog', { name: 'Historial de conversaciones' });
+    const titles = () => within(history).getAllByRole('button', { name: /^(Primero|Segundo)/ }).map((item) => item.querySelector('.history__title')?.textContent);
+    await waitFor(() => expect(titles()).toEqual(['Segundo', 'Primero']));
+    expect(within(history).getAllByRole('button', { name: /^Segundo/ })[0]).toHaveAttribute('aria-current', 'true');
+    expect(history).toHaveTextContent(/Claude Code · 1 mensaje · hoy, \d\d:\d\d/);
+
+    // Reopening the first shows its messages, and the next message continues it.
+    await user.click(within(history).getAllByRole('button', { name: /^Primero/ })[0]);
+    expect(await within(panel).findByText('Respuesta a «Primero».', {}, patience)).toBeInTheDocument();
+    expect(within(panel).getByText('Primero')).toBeInTheDocument();
+    expect(within(panel).queryByText('Respuesta a «Segundo».')).not.toBeInTheDocument();
+    await send(panel, user, 'Tercero');
+    await within(panel).findByText('Respuesta a «Tercero».', {}, patience);
+    expect(requests.at(-1)).toMatchObject({ text: 'Tercero', resumeToken: 'tok-1' });
+
+    // Deleting asks first; then the conversation and its history are gone from the service too.
+    await user.click(within(panel).getByRole('button', { name: 'Historial de conversaciones' }));
+    history = await screen.findByRole('dialog', { name: 'Historial de conversaciones' });
+    await waitFor(() => expect(titles()).toEqual(['Primero', 'Segundo']));
+    expect(history).toHaveTextContent('2 mensajes');
+    await user.click(within(history).getByRole('button', { name: 'Borrar la conversación «Segundo»' }));
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Borrar esta conversación?' });
+    expect(confirm).toHaveTextContent('la copia que guarda Claude Code');
+    await user.click(within(confirm).getByRole('button', { name: 'Borrar conversación' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    const left = await call<{ sessions: Array<{ title?: string }> }>('GET', '/agent/sessions?projectId=p');
+    expect(left.sessions.map((session) => session.title)).toEqual(['Primero']);
+    await user.click(within(panel).getByRole('button', { name: 'Historial de conversaciones' }));
+    history = await screen.findByRole('dialog', { name: 'Historial de conversaciones' });
+    expect(titles()).toEqual(['Primero']);
   });
 });
 

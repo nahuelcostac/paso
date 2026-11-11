@@ -39,6 +39,8 @@ export type DetectedHarness = {
 export type ToolTarget = { projectId?: string; sceneId?: string; stepId?: string };
 export type AgentEvent =
   | { type: 'started' }
+  /** The person's message, added by the service right after `started`. */
+  | { type: 'message'; text: string }
   | { type: 'session'; resumeToken: string; model?: string }
   | { type: 'text_delta'; text: string }
   | { type: 'text'; text: string }
@@ -57,6 +59,10 @@ export type AgentSessionInfo = {
   resumable: boolean;
   createdAt: string;
   updatedAt: string;
+  /** The start of the first message. */
+  title?: string;
+  /** How many messages the conversation has. */
+  turns: number;
 };
 
 export type AgentSessionEvent = {
@@ -258,8 +264,8 @@ export class ApiClient {
   deleteAgentSession(id: string) {
     return this.request<void>(`/agent/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
-  sendAgentMessage(id: string, text: string) {
-    return this.request<{ runId: string }>(`/agent/sessions/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text } });
+  sendAgentMessage(id: string, text: string, effort?: string) {
+    return this.request<{ runId: string }>(`/agent/sessions/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text, ...(effort ? { effort } : {}) } });
   }
   cancelAgentSession(id: string) {
     return this.request<{ cancelled: boolean }>(`/agent/sessions/${encodeURIComponent(id)}/cancel`, { method: 'POST' });

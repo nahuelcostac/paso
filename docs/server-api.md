@@ -261,16 +261,27 @@ All routes need the session token. Errors and messages are in Spanish.
 | --- | --- | --- |
 | POST | `/agent/sessions` | `{ harness, projectId, sceneId?, model? }`, returns 201 with the session. The project and scene must exist. |
 | GET | `/agent/sessions` | `{ sessions }`, newest first. `?projectId=` filters. |
-| GET, DELETE | `/agent/sessions/:id` | Read, or cancel and forget (204). |
-| POST | `/agent/sessions/:id/messages` | `{ text }` (1 to 32,000 characters). Returns 202 `{ runId }`; the answer arrives as events. |
+| GET, DELETE | `/agent/sessions/:id` | Read, or delete (204): it stops a running turn, and the conversation's history goes, in Paso and in the harness's own copy (see History). |
+| POST | `/agent/sessions/:id/messages` | `{ text, effort? }` (text of 1 to 32,000 characters). Returns 202 `{ runId }`; the answer arrives as events. `effort` is the reasoning level for this message only (see below); 400 `INVALID_EFFORT` if the harness does not have it. |
 | POST | `/agent/sessions/:id/cancel` | `{ cancelled }`. Stops the run and its whole process tree. Idempotent. |
 | POST | `/agent/sessions/:id/resume` | Reopens a stored session, for example after a restart. 409 if it never reached the harness. Sending resumes it too. |
-| GET | `/agent/sessions/:id/events?after=N` | `{ events, next }`. The last 500 events of the session, without `text_delta` (each `text` repeats them), for reconnecting clients. |
+| GET | `/agent/sessions/:id/events?after=N` | `{ events, next }`. The conversation's history: up to the last 5,000 events, without `text_delta` (each `text` repeats them), kept across restarts. |
 
 A session is `{ id, harness, projectId, sceneId?, model?, state, resumable,
-createdAt, updatedAt }` with `state` of `idle` or `running`. `model` is passed
-to the harness only if the client set it; otherwise the harness uses its own
-default. A message while the session is running returns 409 `SESSION_BUSY`.
+createdAt, updatedAt, title?, turns }` with `state` of `idle` or `running`.
+`title` is the start of the first message (120 characters, spaces collapsed)
+and `turns` the number of messages, for the history. `model` is passed to the
+harness only if the client set it; otherwise the harness uses its own default.
+A message while the session is running returns 409 `SESSION_BUSY`.
+
+**Reasoning effort.** Each message may set `effort`, the harness's own level:
+Claude Code takes `low`, `medium`, `high`, `xhigh` or `max` (passed as
+`--effort`); Codex takes `low`, `medium`, `high` or `xhigh` (the turn's
+`effort`, all listed in Paso's model catalog). Without it Claude Code uses its
+default; Codex would keep a turn's level for the turns after it, so every
+Codex turn states one, and without a choice that is the catalog's default,
+`low`. It is not part of the session: the next message may choose another.
+Antigravity has no levels yet.
 
 A **run** is one message and the agent's whole answer to it. It is the unit
 that restore points attach to (see below).
@@ -293,6 +304,7 @@ output are never forwarded.
 | `event.type` | Fields |
 | --- | --- |
 | `started` | The run was accepted (added by Paso). |
+| `message` | `text`, the person's message (added by Paso right after `started`). |
 | `session` | `resumeToken` (opaque, kept by Paso for resume), `model?`. |
 | `text_delta` | `text`, an increment of the assistant's answer. |
 | `text` | `text`, a complete assistant text block. Repeats the deltas before it. |
@@ -357,17 +369,37 @@ harness and the MCP process, readable by the same user only. Harness
 detection (`/harnesses/detect`) uses the same reduced environment, so
 "signed in" means what a session will see.
 
+### History
+
+Paso keeps each conversation so it can be read again and continued, even after
+a restart. The index (`agent-sessions.json`, mode 0600) holds IDs, project,
+scene, model, resume token, `title` and `turns`. The history of each
+conversation, its events with the person's messages and the agent's text,
+tool names, targets and outcomes, is one file in `agent-transcripts/` next to
+the index (mode 0600 in a 0700 folder, written through a flushed temporary file
+and a rename), never inside a project folder. Tool arguments and results,
+harness output and the service token are never in it. Only conversations that
+reached the harness are kept; the oldest idle ones go when there are more than
+200, with their history.
+
+Deleting a conversation removes it from the index, deletes its history file
+and deletes the harness's own copy of it: Claude Code's transcript
+(`<config>/projects/<working directory>/<token>.jsonl` and the folder of the
+same name, where `<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`) and Codex's
+rollout in Paso's own Codex home (`codex-home/sessions/**/…-<token>.jsonl`).
+Only files named after that resume token, in that folder, are touched. What
+the agent changed on the board stays, with its restore points.
+
 What still reaches a session, by design or because the CLI cannot turn it off:
 the built-in plugins and sub-agent types Claude Code lists at start (they
 cannot act without tools); administrator-managed policy settings, which the CLI
 always applies; and the user's Claude Code **transcripts**. Resume needs them,
 so Claude Code saves each session (prompts, answers and board data the agent
 read) under `~/.claude/projects/<working directory>` as it does for any run.
-Paso does not read them and does not copy messages anywhere: its own index
-(`agent-sessions.json`, mode 0600) holds only IDs, project, scene, model and the
-resume token.
+Paso never reads them; it deletes one when its conversation is deleted (see
+History).
 
-Paso does not log prompts, answers, tokens or harness output.
+Paso does not log prompts, answers, tokens or harness output. Its own copy of a conversation is the history described above.
 
 ### Codex policy and protocol
 
@@ -428,7 +460,7 @@ The controls act together.
 
 The catalog and CLI-owned transcripts live under `codex-home`, outside the
 project directory. The CLI persists prompts, answers and board data there for
-resume. Paso's session index still contains only IDs and resume tokens.
+resume. Paso keeps its own history of each conversation (see History) and deletes the rollout when the conversation is deleted.
 Administrator-managed CLI requirements can still apply. Paso checks the
 reported effective policy and fails closed if it conflicts with this policy.
 

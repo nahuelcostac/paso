@@ -29,8 +29,8 @@ export async function handleAgentRoute(manager: SessionManager, parts: string[],
   if (parts.length === 5) {
     const action = parts[4];
     if (action === 'messages' && method === 'POST') {
-      const input = await json() as { text?: unknown } | null;
-      return { status: 202, data: await manager.send(id, input?.text) };
+      const input = await json() as { text?: unknown; effort?: unknown } | null;
+      return { status: 202, data: await manager.send(id, input?.text, input?.effort) };
     }
     if (action === 'cancel' && method === 'POST') return { status: 200, data: await manager.cancel(id) };
     if (action === 'resume' && method === 'POST') return { status: 200, data: await manager.resume(id) };

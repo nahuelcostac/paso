@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, open, readFile, readdir, realpath, rename, unlink } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, realpath, rename, rm, unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { idSchema } from '@paso/shared';
@@ -7,11 +7,15 @@ import { z } from 'zod';
 import { ApiError, isMissing } from '../errors.js';
 import { claudeAdapter, failureMessage } from './claude.js';
 import { codexAdapter } from './codex.js';
-import { harnessIds, type AgentEvent, type AgentRunHooks, type AgentRunRequest, type FailureCode, type HarnessAdapter, type HarnessId } from './types.js';
+import { effortLevels, harnessIds, type AgentEvent, type AgentRunHooks, type AgentRunRequest, type FailureCode, type HarnessAdapter, type HarnessId } from './types.js';
 
 export type SessionInfo = {
   id: string; harness: HarnessId; projectId: string; sceneId?: string; model?: string;
   state: 'idle' | 'running'; resumable: boolean; createdAt: string; updatedAt: string;
+  /** The start of the first message, for the history. Absent until a message was sent. */
+  title?: string;
+  /** How many messages the conversation has. */
+  turns: number;
 };
 /** What listeners and the event log receive: an adapter event with its place in the session. */
 export type SessionEvent = { sessionId: string; runId: string; seq: number; at: string; event: AgentEvent };
@@ -26,8 +30,10 @@ export type SessionManagerOptions = {
   /** Neutral, empty directory the harness runs in. */
   workDir: string;
   dataDir: string;
-  /** Index of sessions (IDs and resume tokens only, never messages). Must be outside the data directory. */
+  /** Index of sessions: IDs, resume tokens, title and size. Must be outside the data directory. */
   sessionsPath: string;
+  /** One file per conversation with its messages and events, for the history. Defaults to `agent-transcripts` next to the index. */
+  transcriptsDir?: string;
   hooks?: AgentRunHooks;
   maxRunsPerProject?: number;
   maxRuns?: number;
@@ -40,16 +46,21 @@ export type SessionManagerOptions = {
 const recordSchema = z.object({
   id: z.string().uuid(), harness: z.enum(harnessIds), projectId: idSchema, sceneId: idSchema.optional(),
   model: z.string().optional(), resumeToken: z.string().optional(), createdAt: z.string(), updatedAt: z.string(),
+  title: z.string().max(200).optional(), turns: z.number().int().nonnegative().optional(),
 });
 type Record_ = z.infer<typeof recordSchema>;
 type Session = Record_ & {
   state: 'idle' | 'running'; seq: number; log: SessionEvent[];
+  /** Whether `log` holds the stored history yet. It is read when the conversation is first opened or continued. */
+  historyLoaded: boolean;
   run?: { id: string; controller: AbortController; finished: Promise<void> };
 };
 
 const modelPattern = /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,99}$/;
 const tokenPattern = /^[A-Za-z0-9._:-]{1,200}$/;
 const maxMessageChars = 32_000;
+const titleChars = 120;
+const transcriptEntrySchema = z.object({ sessionId: z.string(), runId: z.string(), seq: z.number().int().positive(), at: z.string(), event: z.object({ type: z.string() }).passthrough() });
 const emptyDirNames = new Set(['.DS_Store']);
 
 /** Resolves to the directory if it is a safe place to run an agent. Throws otherwise. */
@@ -84,7 +95,39 @@ export class SessionManager {
       id: session.id, harness: session.harness, projectId: session.projectId,
       ...(session.sceneId ? { sceneId: session.sceneId } : {}), ...(session.model ? { model: session.model } : {}),
       state: session.state, resumable: Boolean(session.resumeToken), createdAt: session.createdAt, updatedAt: session.updatedAt,
+      ...(session.title ? { title: session.title } : {}), turns: session.turns ?? 0,
     };
+  }
+  private get transcriptsDir() { return this.options.transcriptsDir ?? join(dirname(this.options.sessionsPath), 'agent-transcripts'); }
+  private transcriptPath(id: string) { return join(this.transcriptsDir, `${id}.json`); }
+  /** Reads a conversation's stored history once, before anything is shown or added. A missing or damaged file is an empty history. */
+  private async history(session: Session) {
+    if (session.historyLoaded) return;
+    session.historyLoaded = true;
+    try {
+      const value: unknown = JSON.parse(await readFile(this.transcriptPath(session.id), 'utf8'));
+      const stored = (Array.isArray(value) ? value : []).flatMap((item) => {
+        const parsed = transcriptEntrySchema.safeParse(item);
+        return parsed.success && parsed.data.sessionId === session.id ? [parsed.data as unknown as SessionEvent] : [];
+      });
+      const known = new Set(session.log.map((entry) => entry.seq));
+      session.log = [...stored.filter((entry) => !known.has(entry.seq)), ...session.log].sort((a, b) => a.seq - b.seq);
+      session.seq = Math.max(session.seq, ...session.log.map((entry) => entry.seq), 0);
+    } catch { /* No history yet. */ }
+  }
+  /** Stores a conversation's history. Only conversations that reached the harness, which are the ones that can be continued. */
+  private saveHistory(session: Session) {
+    if (!session.resumeToken) return this.writes;
+    const file = this.transcriptPath(session.id);
+    const data = JSON.stringify(session.log) + '\n';
+    const write = () => writePrivate(file, data);
+    this.writes = this.writes.then(write, write).catch(() => {});
+    return this.writes;
+  }
+  private dropHistory(id: string) {
+    const remove = () => rm(this.transcriptPath(id), { force: true });
+    this.writes = this.writes.then(remove, remove).catch(() => {});
+    return this.writes;
   }
   private async load() {
     this.loaded ??= (async () => {
@@ -92,7 +135,7 @@ export class SessionManager {
         const value: unknown = JSON.parse(await readFile(this.options.sessionsPath, 'utf8'));
         for (const item of Array.isArray(value) ? value : []) {
           const parsed = recordSchema.safeParse(item);
-          if (parsed.success) this.sessions.set(parsed.data.id, { ...parsed.data, state: 'idle', seq: 0, log: [] });
+          if (parsed.success) this.sessions.set(parsed.data.id, { ...parsed.data, state: 'idle', seq: 0, log: [], historyLoaded: false });
         }
       } catch (error) {
         // A missing or damaged index only loses the ability to resume; it must not stop the service.
@@ -104,18 +147,10 @@ export class SessionManager {
   private persist() {
     const records = [...this.sessions.values()].filter((s) => s.resumeToken).map((s): Record_ => ({
       id: s.id, harness: s.harness, projectId: s.projectId, sceneId: s.sceneId, model: s.model,
-      resumeToken: s.resumeToken, createdAt: s.createdAt, updatedAt: s.updatedAt,
+      resumeToken: s.resumeToken, createdAt: s.createdAt, updatedAt: s.updatedAt, title: s.title, turns: s.turns,
     }));
     const file = this.options.sessionsPath;
-    const write = async () => {
-      await mkdir(dirname(file), { recursive: true });
-      const temp = join(dirname(file), `.${basename(file)}.${randomBytes(12).toString('hex')}.tmp`);
-      try {
-        const handle = await open(temp, 'wx', 0o600);
-        try { await handle.writeFile(JSON.stringify(records) + '\n'); await handle.sync(); } finally { await handle.close(); }
-        await rename(temp, file);
-      } finally { await unlink(temp).catch(() => {}); }
-    };
+    const write = () => writePrivate(file, JSON.stringify(records) + '\n');
     this.writes = this.writes.then(write, write).catch(() => {});
     return this.writes;
   }
@@ -139,7 +174,7 @@ export class SessionManager {
     const now = new Date().toISOString();
     const session: Session = {
       id: randomUUID(), harness, projectId, sceneId, model: input.model as string | undefined,
-      createdAt: now, updatedAt: now, state: 'idle', seq: 0, log: [],
+      createdAt: now, updatedAt: now, state: 'idle', seq: 0, log: [], historyLoaded: true,
     };
     this.sessions.set(session.id, session);
     this.trim();
@@ -150,7 +185,7 @@ export class SessionManager {
     const limit = this.options.maxSessions ?? 200;
     if (this.sessions.size <= limit) return;
     const idle = [...this.sessions.values()].filter((s) => s.state === 'idle').sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-    for (const s of idle.slice(0, this.sessions.size - limit)) this.sessions.delete(s.id);
+    for (const s of idle.slice(0, this.sessions.size - limit)) { this.sessions.delete(s.id); void this.dropHistory(s.id); }
     void this.persist();
   }
 
@@ -160,7 +195,12 @@ export class SessionManager {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
   async read(id: string) { await this.load(); return this.info(this.get(id)); }
-  async events(id: string, after = 0) { await this.load(); const s = this.get(id); return { events: s.log.filter((e) => e.seq > after), next: s.seq }; }
+  async events(id: string, after = 0) {
+    await this.load();
+    const s = this.get(id);
+    await this.history(s);
+    return { events: s.log.filter((e) => e.seq > after), next: s.seq };
+  }
 
   /** Reopens a stored session, for example after the service restarted. Sending resumes it too. */
   async resume(id: string): Promise<SessionInfo> {
@@ -173,23 +213,37 @@ export class SessionManager {
     return this.info(session);
   }
 
+  /**
+   * Deletes a conversation: it stops if running, leaves the index, and its history goes, here and in the harness's own
+   * copy, so nothing of it stays on this computer.
+   */
   async remove(id: string) {
     await this.load();
     const session = this.get(id);
     await this.stop(session);
     this.sessions.delete(id);
     await this.persist();
+    await this.dropHistory(id);
+    const forget = this.adapters[session.harness]?.forget;
+    if (forget && session.resumeToken) {
+      try { await forget(session.resumeToken, this.workDir); } catch { /* The conversation is gone from Paso either way. */ }
+    }
   }
 
-  async send(id: string, text: unknown): Promise<{ runId: string }> {
+  async send(id: string, text: unknown, effort?: unknown): Promise<{ runId: string }> {
     await this.load();
     if (typeof text !== 'string' || !text.trim() || text.length > maxMessageChars) {
       throw new ApiError(400, 'INVALID_MESSAGE', `El mensaje debe tener texto y no superar ${maxMessageChars} caracteres.`);
     }
     if (this.closing) throw new ApiError(503, 'SERVICE_CLOSING', 'El servicio se está cerrando.');
     const session = this.get(id);
+    if (effort !== undefined && (typeof effort !== 'string' || !effortLevels[session.harness].includes(effort))) {
+      throw new ApiError(400, 'INVALID_EFFORT', 'Ese modo de razonamiento no está disponible para este asistente.');
+    }
     if (!this.adapters[session.harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', 'Este asistente todavía no se puede usar desde Paso.');
     await this.options.validateTarget(session.projectId, session.sceneId);
+    // A continued conversation adds to its stored history, so its numbering carries on.
+    await this.history(session);
     // From here to marking the session as running there is no await, so limits cannot race.
     if (session.state === 'running') throw new ApiError(409, 'SESSION_BUSY', 'El asistente todavía está trabajando en esta sesión.');
     const running = [...this.sessions.values()].filter((s) => s.state === 'running');
@@ -203,7 +257,7 @@ export class SessionManager {
     const runId = randomUUID();
     session.state = 'running';
     session.run = { id: runId, controller, finished: Promise.resolve() };
-    session.run.finished = this.execute(session, runId, text, controller.signal);
+    session.run.finished = this.execute(session, runId, text, controller.signal, effort as string | undefined);
     return { runId };
   }
 
@@ -224,7 +278,7 @@ export class SessionManager {
     // Deltas are repeated by the `text` event that follows them, so the replay log skips them.
     if (event.type !== 'text_delta') {
       session.log.push(entry);
-      const limit = this.options.eventLogSize ?? 500;
+      const limit = this.options.eventLogSize ?? 5000;
       if (session.log.length > limit) session.log.splice(0, session.log.length - limit);
     }
     for (const listener of this.listeners) {
@@ -233,7 +287,7 @@ export class SessionManager {
   }
 
   /** The single place where a run starts and ends. Run hooks attach here. */
-  private async execute(session: Session, runId: string, text: string, signal: AbortSignal) {
+  private async execute(session: Session, runId: string, text: string, signal: AbortSignal, effort?: string) {
     const context = { sessionId: session.id, runId, harness: session.harness, projectId: session.projectId, sceneId: session.sceneId };
     let terminal: AgentEvent | undefined;
     const emit = (event: AgentEvent) => {
@@ -247,6 +301,9 @@ export class SessionManager {
     };
     const fail = (code: FailureCode) => emit({ type: 'failed', code, message: failureMessage(code) });
     emit({ type: 'started' });
+    emit({ type: 'message', text });
+    session.title ??= text.trim().replace(/\s+/g, ' ').slice(0, titleChars);
+    session.turns = (session.turns ?? 0) + 1;
     try {
       let blocked = false;
       try { await this.options.hooks?.beforeRun?.(context); } catch { blocked = true; }
@@ -263,6 +320,7 @@ export class SessionManager {
             executable: detected.path, workDir: this.workDir, text,
             ...(session.resumeToken && tokenPattern.test(session.resumeToken) ? { resumeToken: session.resumeToken } : {}),
             ...(session.model ? { model: session.model } : {}),
+            ...(effort ? { effort } : {}),
             context: { projectId: session.projectId, ...(session.sceneId ? { sceneId: session.sceneId } : {}) },
             board: this.options.board(),
             limits: { idleTimeoutMs: this.options.idleTimeoutMs ?? 120_000, maxRunMs: this.options.maxRunMs ?? 20 * 60_000 },
@@ -282,8 +340,11 @@ export class SessionManager {
     // The session stays "running" until the hook is done, so a restore point is closed before the next run opens.
     try { await this.options.hooks?.afterRun?.(context, outcome); } catch { /* The run is over; nothing to undo. */ }
     session.updatedAt = new Date().toISOString();
-    // Idle means the index is durable too: a restart right after a run can still resume it.
-    await this.persist();
+    // Idle means the index is durable: a restart right after a run can still resume it. The history is queued behind
+    // it and does not hold the session, so the next message can start as soon as the run has ended.
+    const index = this.persist();
+    void this.saveHistory(session);
+    await index;
     session.state = 'idle';
     session.run = undefined;
   }
@@ -309,4 +370,15 @@ export class SessionManager {
     await Promise.all(runs.map((run) => run.finished));
     await this.writes;
   }
+}
+
+/** Writes a file only this user can read, through a flushed temporary file and a rename, so a crash never leaves half of it. */
+async function writePrivate(file: string, data: string) {
+  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+  const temp = join(dirname(file), `.${basename(file)}.${randomBytes(12).toString('hex')}.tmp`);
+  try {
+    const handle = await open(temp, 'wx', 0o600);
+    try { await handle.writeFile(data); await handle.sync(); } finally { await handle.close(); }
+    await rename(temp, file);
+  } finally { await unlink(temp).catch(() => {}); }
 }
