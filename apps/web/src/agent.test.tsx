@@ -165,39 +165,44 @@ describe('agent and model picker', () => {
     expect(within(panel).queryByText(/con tu propia sesión y tu cuota/)).not.toBeInTheDocument();
     expect(JSON.parse(await readFile(harnessRegistryPath, 'utf8'))).toEqual(['claude']);
 
-    // The picker is a menu on the body. Codex is available; agy is not installed.
-    await user.click(within(panel).getByRole('button', { name: 'Agente: Claude Code' }));
-    const menu = await screen.findByRole('menu', { name: 'Elegir agente' });
-    expect(panel.contains(menu)).toBe(false);
-    const claude = within(menu).getByRole('menuitemradio', { name: /Claude Code/ });
-    expect(claude).toHaveFocus();
-    expect(claude).toHaveTextContent('2.1.40 · Con tu sesión');
-    const codex = within(menu).getByRole('menuitemradio', { name: /Codex/ });
-    expect(codex).not.toHaveAttribute('aria-disabled', 'true');
-    expect(codex).toHaveTextContent('0.80.0');
-    expect(within(menu).getByRole('menuitemradio', { name: /Antigravity/ })).toHaveTextContent('No instalado');
-    await user.keyboard('{ArrowDown}');
-    expect(codex).toHaveFocus();
-    await user.click(codex);
-    expect(within(panel).getByRole('button', { name: 'Agente: Codex' })).toBeInTheDocument();
+    // One picker for agent, model and reasoning, on the body: agents in a rail, the models of the one in view, the levels.
+    const trigger = () => within(panel).getByRole('button', { name: /^Agente y modelo: / });
+    expect(trigger()).toHaveAccessibleName('Agente y modelo: Claude Code, Predeterminado');
+    await user.click(trigger());
+    let picker = await screen.findByRole('dialog', { name: 'Elegir agente y modelo' });
+    expect(panel.contains(picker)).toBe(false);
+    const agents = within(picker).getByRole('radiogroup', { name: 'Agente' });
+    expect(within(agents).getAllByRole('radio').map((item) => item.getAttribute('aria-label'))).toEqual(['Claude Code', 'Codex', 'Antigravity']);
+    expect(within(agents).getByRole('radio', { name: 'Claude Code' })).toHaveAttribute('aria-checked', 'true');
+    // Models: the account's own, without Fable. The chosen one has the focus.
+    const models = within(picker).getByRole('radiogroup', { name: 'Modelo' });
+    expect(within(models).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Predeterminado', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5']);
+    expect(within(models).getByRole('radio', { name: 'Predeterminado' })).toHaveFocus();
+    expect(picker).not.toHaveTextContent(/Fable/i);
+    // Reasoning: Claude Code's own levels, automatic by default.
+    const reasoning = within(picker).getByRole('radiogroup', { name: 'Razonamiento' });
+    expect(within(reasoning).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Automático', 'Bajo', 'Medio', 'Alto', 'Muy alto', 'Máximo']);
+    expect(within(reasoning).getByRole('radio', { name: 'Automático' })).toHaveAttribute('aria-checked', 'true');
+    // Antigravity is not installed: its column says so instead of listing models.
+    await user.click(within(agents).getByRole('radio', { name: 'Antigravity' }));
+    expect(picker).toHaveTextContent('No se encuentra Antigravity en este equipo.');
+    expect(within(picker).getByRole('button', { name: 'Detectar de nuevo' })).toBeInTheDocument();
+    // Codex is available: picking one of its models makes it the agent, and the panel asks to add it.
+    await user.click(within(agents).getByRole('radio', { name: 'Codex' }));
+    expect(picker).toHaveTextContent('0.80.0');
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Predeterminado' }));
+    expect(trigger()).toHaveAccessibleName('Agente y modelo: Codex, Predeterminado');
     expect(within(panel).getByRole('button', { name: 'Añadir Codex' })).toBeInTheDocument();
-    await user.click(within(panel).getByRole('button', { name: 'Agente: Codex' }));
-    await user.click(within(await screen.findByRole('menu', { name: 'Elegir agente' })).getByRole('menuitemradio', { name: /Claude Code/ }));
-
-    // Models: the account's own, without Fable.
-    await user.click(within(panel).getByRole('button', { name: 'Modelo: Predeterminado' }));
-    const models = await screen.findByRole('menu', { name: 'Elegir modelo' });
-    const reasoning = within(models).getByRole('group', { name: 'Razonamiento' });
-    const effortItems = within(reasoning).getAllByRole('menuitemradio');
-    expect(within(models).getAllByRole('menuitemradio').filter((item) => !effortItems.includes(item)).map((item) => item.textContent)).toEqual(['Predeterminado', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5']);
-    // Reasoning shares the menu: Claude Code's own levels, automatic by default.
-    expect(effortItems.map((item) => item.textContent)).toEqual(['Automático', 'Bajo', 'Medio', 'Alto', 'Muy alto', 'Máximo']);
-    expect(within(reasoning).getByRole('menuitemradio', { name: 'Automático' })).toHaveAttribute('aria-checked', 'true');
-    expect(models).not.toHaveTextContent(/Fable/i);
-    await user.click(within(models).getByRole('menuitemradio', { name: 'Haiku 5.5' }));
-    await user.click(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5' }));
-    await user.click(within(within(await screen.findByRole('menu', { name: 'Elegir modelo' })).getByRole('group', { name: 'Razonamiento' })).getByRole('menuitemradio', { name: 'Alto' }));
-    expect(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5, razonamiento alto' })).toHaveTextContent('Haiku 5.5 · Alto');
+    // Back to Claude Code, with Haiku: the popup stays open on the levels, and a level closes it.
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Agente' })).getByRole('radio', { name: 'Claude Code' }));
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Haiku 5.5' }));
+    picker = screen.getByRole('dialog', { name: 'Elegir agente y modelo' });
+    await waitFor(() => expect(within(within(picker).getByRole('radiogroup', { name: 'Razonamiento' })).getByRole('radio', { name: 'Automático' })).toHaveFocus());
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Razonamiento' })).getByRole('radio', { name: 'Alto' }));
+    expect(screen.queryByRole('dialog', { name: 'Elegir agente y modelo' })).not.toBeInTheDocument();
+    expect(trigger()).toHaveAccessibleName('Agente y modelo: Claude Code, Haiku 5.5, razonamiento alto');
+    expect(trigger()).toHaveFocus();
+    expect(trigger().querySelector('.effort-bars')).not.toBeNull();   // the level as bars, as in T3 Code
 
     await user.clear(within(panel).getByRole('textbox', { name: 'Mensaje para el agente' }));
     await send(panel, user, 'Hola');
@@ -209,9 +214,12 @@ describe('agent and model picker', () => {
     await installHarness('codex', 'codex-cli 0.166.0');
     const user = userEvent.setup();
     const panel = await openPanel();
-    await user.click(within(panel).getByRole('button', { name: 'Agente: Claude Code' }));
-    const menu = await screen.findByRole('menu', { name: 'Elegir agente' });
-    await user.click(await within(menu).findByRole('menuitemradio', { name: /Codex/ }, patience));
+    await user.click(within(panel).getByRole('button', { name: /^Agente y modelo: / }));
+    const picker = await screen.findByRole('dialog', { name: 'Elegir agente y modelo' });
+    await waitFor(() => expect(within(picker).getByRole('radio', { name: 'Codex' })).toBeInTheDocument(), patience);
+    await user.click(within(picker).getByRole('radio', { name: 'Codex' }));
+    await user.click(await within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).findByRole('radio', { name: 'Predeterminado' }, patience));
+    await user.keyboard('{Escape}');
     await user.click(await within(panel).findByRole('button', { name: 'Añadir Codex' }, patience));
     await send(panel, user, 'Dibuja con Codex');
     expect(await within(panel).findByText('Paso 1 actualizado.', {}, patience)).toBeInTheDocument();
@@ -519,22 +527,24 @@ describe('continuing a conversation', () => {
     await call('POST', '/harnesses', { id: 'claude' });
     const user = userEvent.setup();
     let panel = await openPanel();
-    await user.click(within(panel).getByRole('button', { name: 'Modelo: Predeterminado' }));
-    await user.click(within(await screen.findByRole('menu', { name: 'Elegir modelo' })).getByRole('menuitemradio', { name: 'Haiku 5.5' }));
+    await user.click(within(panel).getByRole('button', { name: /^Agente y modelo: / }));
+    await user.click(within(within(await screen.findByRole('dialog', { name: 'Elegir agente y modelo' })).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Haiku 5.5' }));
+    await user.keyboard('{Escape}');
     await send(panel, user, 'Primero');
     await within(panel).findByText(/· 1 cambio/, {}, patience);
 
     cleanup();
     panel = await openPanel();
     await within(panel).findByText('Paso 1 actualizado.', {}, patience);
-    expect(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Agente y modelo: Claude Code, Haiku 5.5' })).toBeInTheDocument();
     await send(panel, user, 'Segundo');
     await waitFor(() => expect(requests).toHaveLength(2), patience);
     expect(requests[1]).toMatchObject({ model: 'claude-haiku-5-5', resumeToken: 'tok' });
     await waitFor(() => expect(within(panel).queryByText(/Trabajando ·/)).not.toBeInTheDocument(), patience);
 
-    await user.click(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5' }));
-    await user.click(within(await screen.findByRole('menu', { name: 'Elegir modelo' })).getByRole('menuitemradio', { name: 'Predeterminado' }));
+    await user.click(within(panel).getByRole('button', { name: 'Agente y modelo: Claude Code, Haiku 5.5' }));
+    await user.click(within(within(await screen.findByRole('dialog', { name: 'Elegir agente y modelo' })).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Predeterminado' }));
+    await user.keyboard('{Escape}');
     expect(within(panel).queryByText('Paso 1 actualizado.')).not.toBeInTheDocument();
     await send(panel, user, 'Tercero');
     await waitFor(() => expect(requests).toHaveLength(3), patience);

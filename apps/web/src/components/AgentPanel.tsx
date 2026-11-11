@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, ChevronDown, Eye, FilePlus, History, LoaderCircle, PanelRight, Pencil, RefreshCw, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
+import { ArrowUp, Eye, FilePlus, History, LoaderCircle, PanelRight, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { Scene } from '@paso/shared';
 import { ApiRequestError, UnavailableError, type AgentSessionInfo, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
 import { formatSteps } from '../lib/format';
 import {
   HARNESS_EFFORTS, HARNESS_MODELS, HARNESS_NAMES, conversationKey, countRunChanges, undoErrorMessage, undoableRun, useAgent,
-  type AgentStore, type AgentTurn, type HarnessInfo, type ToolItem,
+  type AgentStore, type AgentTurn, type ToolItem,
 } from '../state/agent-store';
+import { AgentPicker } from './AgentPicker';
+import { ProviderIcon } from './ProviderIcon';
 import { Dialog } from './Dialog';
-import { Popover, useMenuKeys } from './Popover';
+import { Popover } from './Popover';
 import { pad } from './StepFrame';
 import '../styles/agent.css';
 
@@ -168,20 +170,11 @@ function UndoDialog({ state, scenes, onCancel, onConfirm }: {
   );
 }
 
-function harnessSubtitle(info: HarnessInfo | undefined) {
-  if (!info) return 'Comprobando…';
-  if (!info.found) return 'No instalado';
-  const version = info.version ? `${info.version.replace(/\s*\(.*\)$/, '')} · ` : '';
-  if (!info.supported) return `${version}Todavía no disponible en Paso`;
-  if (info.session === 'signed_out') return `${version}Sin sesión iniciada`;
-  return info.added ? `${version}Con tu sesión` : `${version}Añadir a Paso`;
-}
-
 /** The agent panel: a conversation with the person's own harness about this project, and what the agent does in it. */
 export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady, resizer }: Props) {
   const state = useAgent(store);
   const [input, setInput] = useState('');
-  const [menu, setMenu] = useState<{ kind: 'harness' | 'model' | 'history'; anchor: HTMLButtonElement } | null>(null);
+  const [menu, setMenu] = useState<{ kind: 'history'; anchor: HTMLButtonElement } | null>(null);
   const [deleting, setDeleting] = useState<{ session: AgentSessionInfo; busy: boolean; error?: string } | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [adding, setAdding] = useState(false);
@@ -426,21 +419,13 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
           value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={onComposerKey}
         />
         <div className="composer__foot">
-          <button
-            type="button" className="composer__control" aria-haspopup="menu" aria-expanded={menu?.kind === 'harness'}
-            aria-label={`Agente: ${HARNESS_NAMES[harness]}`}
-            onClick={(event) => setMenu(menu?.kind === 'harness' ? null : { kind: 'harness', anchor: event.currentTarget })}
-          >
-            {HARNESS_NAMES[harness]}<ChevronDown className="i" aria-hidden="true" />
-          </button>
-          <button
-            type="button" className="composer__control" aria-haspopup="menu" aria-expanded={menu?.kind === 'model'}
-            aria-label={`Modelo: ${model.label}${effort?.id ? `, razonamiento ${effort.label.toLowerCase()}` : ''}`}
-            title="Modelo y razonamiento"
-            onClick={(event) => setMenu(menu?.kind === 'model' ? null : { kind: 'model', anchor: event.currentTarget })}
-          >
-            {model.label}{effort?.id ? <span className="composer__effort"> · {effort.label}</span> : null}<ChevronDown className="i" aria-hidden="true" />
-          </button>
+          <AgentPicker
+            harnesses={state.harnesses.list} loading={state.harnesses.status === 'loading'}
+            harness={harness} model={model.id} effort={effort?.id ?? ''}
+            onPick={(choice) => store.choose(projectId, targetSceneId, choice)}
+            onPickEffort={(id) => store.chooseEffort(id)}
+            onRefresh={() => void store.loadHarnesses(true)}
+          />
           <span className="spacer" />
           {running ? (
             <button type="button" className="composer__send" aria-label="Detener" title="Detener" onClick={() => void store.stop(projectId)}>
@@ -454,24 +439,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
         </div>
       </div>
 
-      {menu?.kind === 'harness' && (
-        <HarnessMenu
-          anchor={menu.anchor} list={state.harnesses.list} loading={state.harnesses.status === 'loading'} current={harness} onClose={() => setMenu(null)}
-          onRefresh={() => void store.loadHarnesses(true)}
-          onPick={(picked) => {
-            setMenu(null); menu.anchor.focus();
-            // Adding is separate: the panel says what it means before the person agrees to it.
-            store.choose(projectId, targetSceneId, { harness: picked.id });
-          }}
-        />
-      )}
-      {menu?.kind === 'model' && (
-        <ModelMenu
-          anchor={menu.anchor} models={models} current={model.id} efforts={efforts} currentEffort={effort?.id ?? ''} onClose={() => setMenu(null)}
-          onPick={(id) => { setMenu(null); menu.anchor.focus(); store.choose(projectId, targetSceneId, { model: id }); }}
-          onPickEffort={(id) => { setMenu(null); menu.anchor.focus(); store.chooseEffort(id); }}
-        />
-      )}
       {menu?.kind === 'history' && (
         <HistoryPopover
           anchor={menu.anchor} conversations={history} current={sessionId} onClose={() => setMenu(null)}
@@ -503,75 +470,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
       )}
       {undo?.plan && <UndoDialog state={{ ...undo, plan: undo.plan }} scenes={scenes} onCancel={() => setUndo(null)} onConfirm={(force) => void confirmUndo(force)} />}
     </aside>
-  );
-}
-
-function HarnessMenu({ anchor, list: harnesses, loading, current, onClose, onPick, onRefresh }: {
-  anchor: HTMLElement; list: HarnessInfo[]; loading: boolean; current: HarnessId; onClose: () => void;
-  onPick: (harness: HarnessInfo) => void; onRefresh: () => void;
-}) {
-  const list = useRef<HTMLDivElement>(null);
-  const keys = useMenuKeys(list);
-  return (
-    <Popover anchor={anchor} onClose={onClose} role="menu" label="Elegir agente" className="menu menu--agent" onKeyDown={keys}>
-      <div ref={list}>
-        {harnesses.map((harness) => {
-          const available = harness.supported && harness.found;
-          return (
-            <button
-              key={harness.id} type="button" role="menuitemradio" aria-checked={harness.id === current} aria-disabled={!available || undefined}
-              className="menu__item--two-lines" onClick={() => { if (available) onPick(harness); }}
-            >
-              <span className="menu__text">
-                <span className="menu__label">{HARNESS_NAMES[harness.id]}</span>
-                <span className="menu__sub">{harnessSubtitle(harness)}</span>
-              </span>
-              {harness.id === current && <Check className="i" aria-hidden="true" />}
-            </button>
-          );
-        })}
-        {harnesses.length === 0 && <p className="menu__empty">{loading ? 'Buscando asistentes…' : 'No se pudo comprobar qué asistentes hay.'}</p>}
-        <hr />
-        <button type="button" role="menuitem" disabled={loading} onClick={onRefresh}>
-          <RefreshCw className={`i${loading ? ' i--spin' : ''}`} aria-hidden="true" /><span className="menu__label">Detectar de nuevo</span>
-        </button>
-      </div>
-    </Popover>
-  );
-}
-
-function ModelMenu({ anchor, models, current, efforts, currentEffort, onClose, onPick, onPickEffort }: {
-  anchor: HTMLElement; models: { id: string; label: string }[]; current: string;
-  efforts: { id: string; label: string }[]; currentEffort: string;
-  onClose: () => void; onPick: (id: string) => void; onPickEffort: (id: string) => void;
-}) {
-  const list = useRef<HTMLDivElement>(null);
-  const keys = useMenuKeys(list);
-  return (
-    <Popover anchor={anchor} onClose={onClose} role="menu" label="Elegir modelo" className="menu menu--scenes" onKeyDown={keys}>
-      <div ref={list}>
-        {efforts.length > 0 && <p className="menu__group" aria-hidden="true">Modelo</p>}
-        {models.map((option) => (
-          <button key={option.id || 'default'} type="button" role="menuitemradio" aria-checked={option.id === current} onClick={() => onPick(option.id)}>
-            <span className="menu__label">{option.label}</span>
-            {option.id === current && <Check className="i" aria-hidden="true" />}
-          </button>
-        ))}
-        {/* How hard the model thinks: it applies from the next message, in this same conversation. */}
-        {efforts.length > 0 && <>
-          <hr />
-          <p className="menu__group" aria-hidden="true">Razonamiento</p>
-          <div role="group" aria-label="Razonamiento">
-            {efforts.map((option) => (
-              <button key={option.id || 'auto'} type="button" role="menuitemradio" aria-checked={option.id === currentEffort} onClick={() => onPickEffort(option.id)}>
-                <span className="menu__label">{option.label}</span>
-                {option.id === currentEffort && <Check className="i" aria-hidden="true" />}
-              </button>
-            ))}
-          </div>
-        </>}
-      </div>
-    </Popover>
   );
 }
 
@@ -610,6 +508,7 @@ function HistoryPopover({ anchor, conversations, current, onClose, onOpen, onDel
                 <button ref={index === 0 ? first : undefined} type="button" className="history__open" aria-current={conversation.id === current ? 'true' : undefined} onClick={() => onOpen(conversation.id)}>
                   <span className="history__title">{title}</span>
                   <span className="history__meta">
+                    <ProviderIcon id={conversation.harness} size={12} />
                     {running ? 'Trabajando… · ' : ''}{HARNESS_NAMES[conversation.harness]}{modelLabel && modelLabel !== 'Predeterminado' ? ` · ${modelLabel}` : ''} · {plural(conversation.turns, 'mensaje', 'mensajes')} · {whenLabel(conversation.updatedAt)}
                   </span>
                 </button>

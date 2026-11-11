@@ -229,7 +229,7 @@ export class AgentStore {
     const session = open ? this.state.sessions[open] : undefined;
     const shown = { harness: session?.harness ?? this.state.harness, model: session ? session.model ?? '' : this.state.model };
     const harness = choice.harness ?? shown.harness;
-    const model = choice.harness && choice.harness !== shown.harness ? '' : choice.model ?? shown.model;
+    const model = choice.model ?? (harness !== shown.harness ? '' : shown.model);
     const changed = harness !== shown.harness || model !== shown.model;
     // A level the new harness does not have goes back to automatic.
     const effort = HARNESS_EFFORTS[harness].some((option) => option.id === this.state.effort) ? this.state.effort : '';
