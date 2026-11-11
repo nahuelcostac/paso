@@ -54,6 +54,51 @@ The production build contains no token. A desktop host must supply the meta
 tag or adapt the client to its trusted initialization channel. Starting the
 web package alone does not supply a session. Restart root `pnpm dev` to rotate it.
 
+## Workspaces
+
+A workspace is a folder on this computer that holds project folders. The data
+directory (`PASO_DATA_DIR`) is the default workspace, «Mis diagramas». It is
+always listed and cannot be removed. The person can add other folders.
+
+The service has one open workspace at a time. Every project route, the event
+stream, the agents and the MCP tools work in that folder, so a client never
+names a workspace in a project route. Opening another workspace closes the
+current folder's watcher, opens the new one, and sends
+`{ type: "workspaces", activeId }` on the event stream. A client then reads
+its projects again. The service refuses to switch with 409 `AGENT_RUNNING`
+while an agent works.
+
+The list lives in `workspaces.json` next to the data directory (option
+`workspacesPath`, variable `PASO_WORKSPACES_PATH`), never inside a workspace.
+Removing a workspace takes it off the list and deletes nothing. The open
+workspace is restored on the next start when its folder still exists and the
+list was written for the same data directory; otherwise the service starts in
+the default one. A workspace whose folder is gone is listed with
+`available: false`, and opening it fails with 422 `WORKSPACE_UNAVAILABLE`.
+It is never created again silently.
+
+A folder can be added when it exists and is not the home folder, a disk's root,
+another workspace, inside one or containing one, or one of Paso's own folders
+(the app data folder, the restore points and the agents' folder). Restore
+points of added workspaces are kept in `workspaces/<id>/runs` next to the
+default restore points, so Paso writes nothing into the person's folders
+except their projects.
+
+| Method | Route | Input or result |
+| --- | --- | --- |
+| GET | `/workspaces` | `{ activeId, workspaces: [{ id, name, path, default, available }] }` |
+| POST | `/workspaces` | `{ path, name? }`, adds an existing folder, returns 201 with the workspace. It does not open it |
+| PUT | `/workspaces/active` | `{ id }`, opens that workspace, returns the list |
+| DELETE | `/workspaces/:w` | Takes it off the list; the default workspace opens if it was open |
+| POST | `/workspaces/:w/reveal` | Shows the folder in the system's file manager |
+| GET | `/folders?path=` | The folder explorer: `{ path, parent, home, crumbs, folders: [{ name, path }], projects }` |
+| POST | `/folders` | `{ parent, name }`, creates a folder, returns 201 with `{ path }` |
+
+The folder explorer lists folder names only: no files, nothing they contain,
+no hidden folders, and no links. `projects` counts the subfolders that hold a
+`project.json`. Without `path` it starts in the home folder. `crumbs` is the
+way down to the folder, from the home folder when it is inside it.
+
 ## Routes
 
 All routes start with `/api`. Document responses use

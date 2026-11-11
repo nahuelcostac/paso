@@ -4,7 +4,7 @@ import { ActionError, type ServiceEvent } from './projects-store';
 
 export type SceneEntry = { id: string; name: string; revision: string; stepIds: string[] };
 /** What the Storyboard shows about a step: its title, and its revision so thumbnails know when to redraw. */
-export type StepEntry = { id: string; title?: string; revision: string };
+export type StepEntry = { id: string; title?: string; revision: string; /** It has a presentation camera. */ framed?: true };
 
 export type StoryboardState = {
   /** loading: nothing known yet. ready: scenes are listed. error: they could not be read. */
@@ -134,7 +134,7 @@ export class StoryboardStore {
       const listed = await this.api.listSteps(this.projectId, sceneId);
       if (this.stepVersions.get(sceneId) !== version || this.disposed) return;
       const steps = { ...this.state.steps };
-      for (const { document, revision } of listed) steps[document.id] = { id: document.id, revision, ...(document.title ? { title: document.title } : {}) };
+      for (const { document, revision } of listed) steps[document.id] = { id: document.id, revision, ...(document.title ? { title: document.title } : {}), ...(document.camera ? { framed: true as const } : {}) };
       this.set({ steps, stepsLoaded: { ...this.state.stepsLoaded, [sceneId]: true } });
     } catch {
       // The scene may have been deleted meanwhile, or the service is away. Asking again after the next event is enough.
@@ -159,9 +159,18 @@ export class StoryboardStore {
     if (error instanceof ApiRequestError) {
       if (error.status === 409 || error.status === 428 || error.status === 400) throw new ActionError('La escena cambió fuera de Paso. Ya está actualizada: inténtalo de nuevo.');
       if (error.status === 404) throw new ActionError('La escena ya no existe.');
-      if (error.status === 422) throw new ActionError('Los archivos del proyecto no son válidos.');
+      if (error.status === 422) throw new ActionError('Los archivos del diagrama no son válidos.');
     }
     throw new ActionError('Inténtalo de nuevo.');
+  }
+
+  /** A title saved from here shows at once; the service's event confirms it. */
+  showTitle(stepId: string, title: string) {
+    const step = this.state.steps[stepId];
+    if (!step) return;
+    const named: StepEntry = { ...step };
+    if (title.trim()) named.title = title.trim(); else delete named.title;
+    this.set({ steps: { ...this.state.steps, [stepId]: named } });
   }
 
   /** Appends a scene and returns its ID. The caller can then offer its name for editing. */

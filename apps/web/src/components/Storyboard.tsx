@@ -8,6 +8,7 @@ import { ActionError, type ServiceEvent } from '../state/projects-store';
 import { StoryboardStore, useStoryboard, type SceneEntry } from '../state/storyboard-store';
 import { Dialog } from './Dialog';
 import { SceneSection } from './SceneSection';
+import { ViewToggle } from './ViewToggle';
 import '../styles/storyboard.css';
 
 type Props = {
@@ -22,6 +23,12 @@ type Props = {
   navigate: (route: Route, options?: { replace?: boolean }) => void;
   /** The agent's marks: `changed` for its work, `working` for the step it is changing now. */
   stepAgentStates?: Record<string, 'working' | 'changed'>;
+  /** The app's own failures that have no other place here, such as a step that could not be saved. */
+  notices?: React.ReactNode;
+  /** Presentar, over the top right corner: the same corner as on the board. */
+  corner?: React.ReactNode;
+  /** Saves a step's title, through the steps the Lienzo may have open. */
+  renameStep?: (target: { projectId: string; sceneId: string; stepId: string }, title: string) => Promise<void>;
 };
 
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Inténtalo de nuevo.';
@@ -33,8 +40,11 @@ function insertAt(order: string[], from: number, to: number) {
   return next;
 }
 
-/** The whole project at a glance: its scenes, in the ledger layout, with thumbnails of their steps. */
-export function Storyboard({ api, projectId, projectName, listedSize, events, thumbnails, route, navigate, stepAgentStates }: Props) {
+/**
+ * The Estudio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
+ * It opens from the Lienzo | Estudio switch in the corner; a step, the same switch or Escape goes back to the board.
+ */
+export function Storyboard({ api, projectId, projectName, listedSize, events, thumbnails, route, navigate, stepAgentStates, notices, corner, renameStep }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);
   useEffect(() => { store.start(); return () => store.dispose(); }, [store]);
   const state = useStoryboard(store);
@@ -206,19 +216,36 @@ export function Storyboard({ api, projectId, projectName, listedSize, events, th
     return undefined;
   };
 
+  const back = () => navigate({ ...route, view: 'lienzo' });
+  // The Estudio shows one scene: the one selected in the sidebar, which is also the one the chat works on. Without one
+  // in the address, the first scene is selected, so later reorders do not change what is on show.
+  const selectedScene = scenes.find((entry) => entry.id === route.sceneId) ?? scenes[0];
+  useEffect(() => {
+    if (state.phase !== 'ready' || !selectedScene || selectedScene.id === route.sceneId) return;
+    navigate({ ...route, sceneId: selectedScene.id, stepId: selectedScene.stepIds[0] }, { replace: true });
+  }, [state.phase, selectedScene, route, navigate]);
+  // Opened from the board, whose switch is gone now: focus lands on the title, so Escape and Tab work from here.
+  useEffect(() => { if (document.activeElement === document.body) title.current?.focus({ preventScroll: true }); }, []);
   return (
-    <main className="board" aria-label="Storyboard" aria-busy={state.phase === 'loading'} data-dragging={drag?.moved || undefined} ref={setBoard}>
+    <main
+      className="board" aria-label="Estudio" aria-busy={state.phase === 'loading'} data-dragging={drag?.moved || undefined} ref={setBoard}
+      onKeyDown={(event) => {
+        // Escape closes the overview, unless it is ending something here first: a rename, a drag, a held scene.
+        if (event.key !== 'Escape' || event.defaultPrevented || renamingId || grabbed || drag || deleting) return;
+        if ((event.target as HTMLElement).closest('input, textarea, [role="menu"], [role="dialog"], [role="alertdialog"]')) return;
+        back();
+      }}
+    >
+      <div className="canvas__corner board__corner">
+        {corner}
+        <ViewToggle route={route} navigate={navigate} />
+      </div>
+      {notices && <div className="board__top">{notices}</div>}
       <div className="board__head">
         <div className="board__heading">
           <h1 className="board__title" tabIndex={-1} ref={title}>{projectName}</h1>
           <p className="board__meta">{listedSize}</p>
         </div>
-        <span className="spacer" />
-        {scenes.length > 0 && (
-          <button type="button" className="btn btn--outline" disabled={creating} onClick={() => void createScene()}>
-            <Plus className="i" aria-hidden="true" />Nueva escena
-          </button>
-        )}
       </div>
 
       {notice && (
@@ -240,7 +267,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, events, th
         <div className="board__empty" role="status">
           <div className="main-message__icon"><TriangleAlert className="i" aria-hidden="true" /></div>
           <h2 className="board__empty-title">No se pudieron cargar las escenas</h2>
-          <p>Paso no pudo leer este proyecto. Comprueba que el servicio local sigue en marcha.</p>
+          <p>Paso no pudo leer este diagrama. Comprueba que el servicio local sigue en marcha.</p>
           <button type="button" className="btn btn--soft" onClick={() => store.retry()}>Reintentar</button>
         </div>
       )}
@@ -248,15 +275,16 @@ export function Storyboard({ api, projectId, projectName, listedSize, events, th
       {state.phase === 'ready' && scenes.length === 0 && (
         <div className="board__empty">
           <div className="main-message__icon"><Layers className="i" aria-hidden="true" /></div>
-          <h2 className="board__empty-title">Este proyecto aún no tiene escenas</h2>
+          <h2 className="board__empty-title">Este diagrama aún no tiene escenas</h2>
           <p>Una escena agrupa los pasos de una parte de la explicación. Crea la primera y empieza a añadir pasos.</p>
           <button type="button" className="btn btn--soft btn--large" disabled={creating} onClick={() => void createScene()}><Plus className="i" aria-hidden="true" />Crear la primera escena</button>
         </div>
       )}
 
-      {scenes.map((scene, index) => (
+      {selectedScene && [selectedScene].map((scene) => ({ scene, index: scenes.indexOf(scene) })).map(({ scene, index }) => (
         <SceneSection
           key={scene.id}
+          manage={false}
           scene={scene}
           index={index}
           total={scenes.length}
@@ -273,6 +301,11 @@ export function Storyboard({ api, projectId, projectName, listedSize, events, th
           dragging={drag?.id === scene.id && drag.moved}
           dropMarker={dropMarker(index)}
           onOpenStep={(stepId) => navigate({ projectId, view: 'lienzo', sceneId: scene.id, stepId })}
+          onRenameStep={renameStep ? async (stepId, title) => {
+            await renameStep({ projectId, sceneId: scene.id, stepId }, title);
+            store.showTitle(stepId, title);
+            setNotice(null);
+          } : undefined}
           onAddStep={async () => { await run(() => store.createStep(scene.id), 'añadir el paso'); }}
           onRename={async (name) => {
             try { await store.renameScene(scene.id, name); setRenamingId(null); setNotice(null); }

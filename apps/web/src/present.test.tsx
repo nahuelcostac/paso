@@ -64,7 +64,7 @@ afterEach(async () => { cleanup(); await service.close(); await rm(dataDir, { re
 
 /** Steps with the given elements. The address opens the step at `start`. */
 async function open(contents: Array<Array<ReturnType<typeof box>>>, start = 0) {
-  const { document: project } = await api.createProject({ name: 'Proyecto' });
+  const { document: project } = await api.createProject({ name: 'Diagrama' });
   const sceneId = (await api.createScene(project.id, 'Escena')).document.id;
   const steps: string[] = [];
   for (const elements of contents) steps.push((await api.createStep(project.id, sceneId, { elements })).document.id);
@@ -86,14 +86,22 @@ async function start(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('the Presentar button', () => {
-  it('is in the top bar of the Lienzo, and not on the Storyboard', async () => {
+  it('is over the top right corner of the canvas, and of the Estudio too, and presents from there', async () => {
     const user = userEvent.setup();
     await open([[box('a')]]);
     const button = await presentar();
-    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Presentar' })).toBe(button);
-    await user.click(screen.getByRole('radio', { name: 'Storyboard' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Presentar' })).not.toBeInTheDocument());
-    expect(document.querySelector('[data-slot="presentar"]')).toBeInTheDocument();
+    expect(within(document.querySelector<HTMLElement>('.canvas__corner')!).getByRole('button', { name: 'Presentar' })).toBe(button);
+    await user.click(await screen.findByRole('button', { name: 'Estudio' }));
+    const studio = await screen.findByRole('main', { name: 'Estudio' });
+    const again = within(studio).getByRole('button', { name: 'Presentar' });
+    expect(again.closest('.canvas__corner')).not.toBeNull();
+    await waitFor(() => expect(again).toBeEnabled());
+    await user.click(again);
+    await stage();
+    await user.keyboard('{Escape}');
+    // Leaving lands back in the Estudio.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Presentación' })).not.toBeInTheDocument());
+    expect(screen.getByRole('main', { name: 'Estudio' })).toBeInTheDocument();
   });
   it('is disabled on a scene with no steps, and says why', async () => {
     await open([]);
@@ -108,7 +116,7 @@ describe('the Presentar button', () => {
     const { projectId, sceneId, steps } = await open([[box('a')], [box('b')]]);
     await screen.findByTestId('canvas');
     await user.click(screen.getByRole('button', { name: 'Dibujar' }));
-    expect(document.querySelector('.topbar [data-save-state]')).toHaveTextContent('Cambios pendientes');
+    expect(document.querySelector('.projects__foot[data-save-state]')).toHaveTextContent('Cambios pendientes');
     await user.click(await presentar());
     await stage();
     expect((await api.getStep({ projectId, sceneId, stepId: steps[0] })).document.elements.map((e) => e.id)).toEqual(['a', 'drawn-1']);
@@ -167,7 +175,7 @@ describe('moving through the presentation', () => {
     expect(document.querySelectorAll('.indicator__ticks i')).toHaveLength(4);
     expect(document.querySelectorAll('.indicator__ticks i.on')).toHaveLength(1);
     expect(screen.getByText('02 / 04')).toBeInTheDocument();
-    for (const [key, target] of [['{ArrowRight}', 2], ['{ArrowRight}', 3], ['{ArrowRight}', 3], ['{ArrowLeft}', 2], ['{PageUp}', 1], ['{PageDown}', 2], [' ', 3], ['{Home}', 0], ['{ArrowLeft}', 0], ['{End}', 3]] as const) {
+    for (const [key, target] of [['{ArrowRight}', 2], ['{ArrowRight}', 3], ['{ArrowRight}', 3], ['{ArrowLeft}', 2], ['{PageUp}', 1], ['{PageDown}', 2], [' ', 2], ['{Home}', 0], ['{ArrowLeft}', 0], ['{End}', 3]] as const) {
       await user.keyboard(key);
       await expectShown(steps[target]);
       await expectIndicator(`Paso ${target + 1} de 4`);
@@ -206,6 +214,92 @@ describe('moving through the presentation', () => {
     await expectShown(steps[0]);
     fireEvent.click(dialog, { clientX: window.innerWidth - 10 }); await expectShown(steps[1]);
     fireEvent.click(dialog, { clientX: 10 }); await expectShown(steps[0]);
+  });
+  it('goes to the first and last step, and back and forth, from the pager, without the click also moving it', async () => {
+    const user = userEvent.setup();
+    const { steps } = await open([[box('a')], [box('b')], [box('c')], [box('d')]], 1);
+    await start(user);
+    await expectShown(steps[1]);
+    await user.click(screen.getByRole('button', { name: 'Último paso' })); await expectShown(steps[3]); await expectIndicator('Paso 4 de 4');
+    expect(screen.getByRole('button', { name: 'Último paso' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Paso siguiente' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Paso anterior' })); await expectShown(steps[2]);
+    await user.click(screen.getByRole('button', { name: 'Primer paso' })); await expectShown(steps[0]); await expectIndicator('Paso 1 de 4');
+    expect(screen.getByRole('button', { name: 'Primer paso' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Paso siguiente' })); await expectShown(steps[1]);
+    for (const name of ['Primer paso', 'Paso anterior', 'Paso siguiente', 'Último paso']) expect(screen.getByRole('button', { name })).toHaveAttribute('tabindex', '-1');
+  });
+  it('zooms around the pointer and turns the laser on and off, from the keyboard, keeping the step', async () => {
+    const user = userEvent.setup();
+    const { steps } = await open([[box('a')], [box('b')]]);
+    await start(user);
+    await expectShown(steps[0]);
+    const stage = document.querySelector<HTMLElement>('.present__stage')!;
+    fireEvent.mouseMove(window, { clientX: 200, clientY: 100 });
+    await user.keyboard('+');
+    expect(Number(/scale\(([\d.]+)\)/.exec(stage.style.transform)![1])).toBeCloseTo(1.1);
+    await user.keyboard('+');
+    expect(Number(/scale\(([\d.]+)\)/.exec(stage.style.transform)![1])).toBeCloseTo(1.2);
+    // The zoom stays while the steps change, and 0 gives the framing back.
+    await user.keyboard('{ArrowRight}'); await expectShown(steps[1]);
+    expect(Number(/scale\(([\d.]+)\)/.exec(stage.style.transform)![1])).toBeCloseTo(1.2);
+    await user.keyboard('-');
+    expect(Number(/scale\(([\d.]+)\)/.exec(stage.style.transform)![1])).toBeCloseTo(1.1);
+    await user.keyboard('0');
+    expect(stage.style.transform).toBe('');
+    expect(document.querySelector('.laser')).toBeNull();
+    await user.keyboard('l');
+    expect(document.querySelector('.laser circle')).not.toBeNull();   // the dot starts where the pointer is
+    expect(screen.getByRole('dialog', { name: 'Presentación' })).toHaveAttribute('data-laser', 'true');
+    await user.keyboard('L');
+    expect(document.querySelector('.laser')).toBeNull();
+    await expectShown(steps[1]);
+  });
+  it('keeps wheel zoom and pan between steps, reserves Space for panning and resets with 0', async () => {
+    const user = userEvent.setup();
+    const { steps } = await open([[box('a')], [box('b')]]);
+    const dialog = await start(user);
+    await expectShown(steps[0]);
+    const plate = document.querySelector<HTMLElement>('.present__stage')!;
+    fireEvent.wheel(dialog, { ctrlKey: true, deltaY: 10, clientX: 200, clientY: 100 });
+    fireEvent.wheel(dialog, { deltaX: -50, deltaY: 30 });
+    expect(plate.style.transform).toMatch(/scale\(0\.9\)/);
+    expect(plate).toHaveAttribute('data-motion', 'none');
+    const view = plate.style.transform;
+    await user.keyboard(' ');
+    await expectShown(steps[0]);
+    await user.keyboard('{ArrowRight}');
+    await expectShown(steps[1]);
+    expect(plate.style.transform).toBe(view);
+    await user.keyboard('0');
+    expect(plate.style.transform).toBe('');
+  });
+  it('glides to a step\'s camera and back to the whole scene, and 0 returns to the camera after a manual zoom', async () => {
+    const user = userEvent.setup();
+    const { document: project } = await api.createProject({ name: 'Diagrama' });
+    const sceneId = (await api.createScene(project.id, 'Escena')).document.id;
+    const camera = { x: 0, y: 0, width: 100, height: 100 };
+    const ids: string[] = [];
+    for (const [index, framed] of [false, true, false].entries()) ids.push((await api.createStep(project.id, sceneId, { elements: [box(`b${index}`), box(`c${index}`, 900)], ...(framed ? { camera } : {}) })).document.id);
+    window.location.hash = `#/${project.id}/lienzo/${sceneId}/${ids[0]}`;
+    render(<App config={config} recovery={recovery} />);
+    await start(user);
+    await expectShown(ids[0]);
+    const stagePlate = document.querySelector<HTMLElement>('.present__stage')!;
+    expect(stagePlate.style.transform).toBe('');
+    await user.keyboard('{ArrowRight}'); await expectShown(ids[1]);
+    await waitFor(() => expect(stagePlate.style.transform).toMatch(/scale\(/));
+    expect(stagePlate).toHaveAttribute('data-motion', 'camera');
+    const framedView = stagePlate.style.transform;
+    expect(Number(/scale\(([\d.]+)\)/.exec(framedView)![1])).toBeGreaterThan(1);
+    // A manual zoom on top (out: this small camera is already at the maximum), then 0: back to the step's camera.
+    await user.keyboard('-');
+    expect(stagePlate.style.transform).not.toBe(framedView);
+    await user.keyboard('0');
+    expect(stagePlate.style.transform).toBe(framedView);
+    await user.keyboard('{ArrowRight}'); await expectShown(ids[2]);
+    await waitFor(() => expect(stagePlate.style.transform).toBe(''));
+    expect(stagePlate).toHaveAttribute('data-motion', 'camera');
   });
   it('shows a scene of one step, and an empty step within a scene', async () => {
     const user = userEvent.setup();

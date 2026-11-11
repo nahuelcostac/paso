@@ -61,6 +61,13 @@ describe('Añadir paso and Duplicar paso', () => {
     const id = await actions.add(s.projectId, s.sceneId, undefined);
     expect(await order(s)).toEqual([id]); expect((await content(s, id)).elements).toEqual([]);
   });
+  it('adds from the final step even when that step was never opened', async () => {
+    const s = await scene();
+    await store.select(s.target(0)); open(store.current()!);
+    const id = await actions.add(s.projectId, s.sceneId, s.ids[2]);
+    expect(await order(s)).toEqual([...s.ids, id]);
+    expect(elementIds(await content(s, id))).toEqual(['e2']);
+  });
   it('Duplicar with a save pending: the copy has the latest content, title and notes, right after the original', async () => {
     const s = await scene(); await store.select(s.target(0)); const session = open(store.current()!);
     drawing(session, 'late'); drawing(session, 'later');

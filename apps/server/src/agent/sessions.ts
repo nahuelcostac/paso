@@ -194,7 +194,7 @@ export class SessionManager {
     if (session.state === 'running') throw new ApiError(409, 'SESSION_BUSY', 'El asistente todavía está trabajando en esta sesión.');
     const running = [...this.sessions.values()].filter((s) => s.state === 'running');
     if (running.filter((s) => s.projectId === session.projectId).length >= (this.options.maxRunsPerProject ?? 1)) {
-      throw new ApiError(409, 'PROJECT_BUSY', 'Ya hay un asistente trabajando en este proyecto. Espera a que termine o cancélalo.');
+      throw new ApiError(409, 'PROJECT_BUSY', 'Ya hay un asistente trabajando en este diagrama. Espera a que termine o cancélalo.');
     }
     if (running.length >= (this.options.maxRuns ?? 4)) {
       throw new ApiError(409, 'TOO_MANY_RUNS', 'Hay demasiados asistentes trabajando a la vez. Espera a que termine alguno.');
@@ -297,6 +297,9 @@ export class SessionManager {
       return (await readdir(this.workDir)).every((name) => emptyDirNames.has(name));
     } catch { return false; }
   }
+
+  /** True while any agent is working. The service does not change workspace under a running agent. */
+  busy() { return [...this.sessions.values()].some((session) => session.state === 'running'); }
 
   /** Stops every running harness, with its whole process tree, and waits for them to be gone. */
   async close() {

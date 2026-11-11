@@ -11,7 +11,8 @@ export function parseRoute(hash: string): Route {
   const [projectId, view, sceneId, stepId] = hash.replace(/^#\/?/, '').split('/');
   return {
     projectId: projectId && /^[A-Za-z0-9_-]{1,128}$/.test(projectId) ? projectId : null,
-    view: view === 'lienzo' ? 'lienzo' : 'storyboard',
+    // The board is where a diagram opens. The Estudio ('storyboard') is its overview, opened from the Lienzo | Estudio switch.
+    view: view === 'storyboard' ? 'storyboard' : 'lienzo',
     ...(sceneId && /^[A-Za-z0-9_-]{1,128}$/.test(sceneId) ? { sceneId } : {}),
     ...(stepId && /^[A-Za-z0-9_-]{1,128}$/.test(stepId) ? { stepId } : {}),
   };

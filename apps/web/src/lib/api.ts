@@ -19,6 +19,11 @@ export class ApiRequestError extends Error {
 export type ProjectEnvelope = { document: Project; revision: string };
 export type ProjectListItem = ({ id: string } & ProjectEnvelope) | { id: string; error: { code: string; message: string } };
 
+/** A folder of projects. `default` is the service's own folder, always listed. */
+export type WorkspaceInfo = { id: string; name: string; path: string; default: boolean; available: boolean };
+export type WorkspaceListing = { activeId: string; workspaces: WorkspaceInfo[] };
+export type FolderListing = { path: string; parent: string | null; home: string; folders: Array<{ name: string; path: string }>; projects: number; crumbs: Array<{ name: string; path: string }> };
+
 export const harnessIds = ['claude', 'codex', 'agy'] as const;
 export type HarnessId = (typeof harnessIds)[number];
 export type HarnessSessionStatus = 'signed_in' | 'signed_out' | 'unknown';
@@ -160,6 +165,17 @@ export class ApiClient {
     return this.request<void>(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE', revision });
   }
 
+  listWorkspaces() { return this.request<WorkspaceListing>('/workspaces'); }
+  addWorkspace(path: string) { return this.request<WorkspaceInfo>('/workspaces', { method: 'POST', body: { path } }); }
+  /** Opens a workspace: every project route then works in its folder. */
+  activateWorkspace(id: string) { return this.request<WorkspaceListing>('/workspaces/active', { method: 'PUT', body: { id } }); }
+  /** Takes a workspace off the list. Its folder and files stay. */
+  removeWorkspace(id: string) { return this.request<void>(`/workspaces/${encodeURIComponent(id)}`, { method: 'DELETE' }); }
+  revealWorkspace(id: string) { return this.request<void>(`/workspaces/${encodeURIComponent(id)}/reveal`, { method: 'POST' }); }
+  /** The folder explorer: folder names only. With no path it starts in the person's home folder. */
+  listFolders(path?: string) { return this.request<FolderListing>(`/folders${path ? `?path=${encodeURIComponent(path)}` : ''}`); }
+  createFolder(parent: string, name: string) { return this.request<{ path: string }>('/folders', { method: 'POST', body: { parent, name } }); }
+
   private stepPath(target: Target) {
     return `/projects/${encodeURIComponent(target.projectId)}/scenes/${encodeURIComponent(target.sceneId)}/steps/${encodeURIComponent(target.stepId)}`;
   }
@@ -186,7 +202,7 @@ export class ApiClient {
     return this.request<ProjectEnvelope>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'PUT', body: { ids }, revision });
   }
   /** Appends a step. With no content it is blank; with a body it is a snapshot of that content, element IDs included. */
-  createStep(projectId: string, sceneId: string, body: Partial<Pick<Step, 'title' | 'speakerNotes' | 'elements' | 'appState' | 'files'>> = {}) {
+  createStep(projectId: string, sceneId: string, body: Partial<Pick<Step, 'title' | 'speakerNotes' | 'camera' | 'elements' | 'appState' | 'files'>> = {}) {
     return this.request<{ document: Step; revision: string }>(`${this.scenePath(projectId, sceneId)}/steps`, { method: 'POST', body });
   }
   /** The copy is appended to the scene. `revision` is the revision of the step being copied. */

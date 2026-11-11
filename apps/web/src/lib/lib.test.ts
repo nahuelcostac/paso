@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeContents, explainProjectError, fold, formatSize } from './format';
+import { describeContents, explainProjectError, fold, formatSize, groupByRecency } from './format';
 import { parseRoute, routeHash } from './route';
 import { ICONS } from './icon-catalog';
 import { iconFor, searchIcons } from './icons';
@@ -21,10 +21,11 @@ describe('routes', () => {
     expect(routeHash({ projectId: 'abc-123', view: 'storyboard' })).toBe('#/abc-123/storyboard');
     expect(parseRoute(routeHash({ projectId: 'p_1', view: 'lienzo' }))).toEqual({ projectId: 'p_1', view: 'lienzo' });
   });
-  it('falls back to the Storyboard and to no project for anything else', () => {
-    expect(parseRoute('')).toEqual({ projectId: null, view: 'storyboard' });
-    expect(parseRoute('#/')).toEqual({ projectId: null, view: 'storyboard' });
-    expect(parseRoute('#/p/presentar')).toEqual({ projectId: 'p', view: 'storyboard' });
+  it('falls back to the board and to no project for anything else', () => {
+    expect(parseRoute('')).toEqual({ projectId: null, view: 'lienzo' });
+    expect(parseRoute('#/')).toEqual({ projectId: null, view: 'lienzo' });
+    expect(parseRoute('#/p/presentar')).toEqual({ projectId: 'p', view: 'lienzo' });
+    expect(parseRoute('#/p/storyboard')).toEqual({ projectId: 'p', view: 'storyboard' });
     expect(parseRoute('#/../etc/lienzo').projectId).toBeNull();
     expect(parseRoute('#/a b/lienzo').projectId).toBeNull();
   });
@@ -66,5 +67,23 @@ describe('explainProjectError', () => {
     expect(newer.short).toMatch(/más nueva/);
     expect(newer.long).toMatch(/Actualiza Paso/);
     expect(explainProjectError('[{"code":"invalid_type"}]').short).toMatch(/dañados/);
+  });
+});
+
+describe('groupByRecency', () => {
+  it('groups by today, earlier this month and before, on the local calendar, and leaves out empty groups', () => {
+    const now = new Date(2026, 10, 10, 9, 30);
+    const at = (...parts: [number, number, number, number?]) => new Date(...(parts as [number, number, number, number])).toISOString();
+    const items = [
+      { name: 'esta mañana', at: at(2026, 10, 10, 0) },
+      { name: 'ayer', at: at(2026, 10, 9, 23) },
+      { name: 'día 1', at: at(2026, 10, 1, 0) },
+      { name: 'octubre', at: at(2026, 9, 31, 23) },
+      { name: 'otro reloj', at: at(2026, 10, 12, 0) },
+    ];
+    expect(groupByRecency(items, (item) => item.at, now).map((group) => [group.label, group.items.map((item) => item.name)])).toEqual([
+      ['Hoy', ['esta mañana', 'otro reloj']], ['Este mes', ['ayer', 'día 1']], ['Anteriores', ['octubre']],
+    ]);
+    expect(groupByRecency([items[3]], (item) => item.at, now).map((group) => group.label)).toEqual(['Anteriores']);
   });
 });

@@ -70,8 +70,6 @@ export type AgentState = {
   /** The harness and model for the next conversation. */
   harness: HarnessId;
   model: string;
-  /** The scene the agent receives, per project. `null` is the whole project; missing follows the address. */
-  targetScene: Record<string, string | null>;
   sessions: Record<string, AgentSessionInfo>;
   /** The open conversation (a session ID) per project and scene. */
   conversation: Record<string, string | undefined>;
@@ -107,7 +105,7 @@ export function undoErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) {
     switch (error.code) {
       case 'NEWER_RUN_EXISTS': return 'Hay una ejecución más reciente con cambios. Deshazla primero.';
-      case 'RUN_IN_PROGRESS': return 'El agente está trabajando en este proyecto. Espera a que termine o detenlo.';
+      case 'RUN_IN_PROGRESS': return 'El agente está trabajando en este diagrama. Espera a que termine o detenlo.';
       case 'RUN_ALREADY_UNDONE': return 'Esta ejecución ya se deshizo.';
       case 'NOT_FOUND': return 'Ya no se guarda el punto de restauración de esta ejecución.';
     }
@@ -127,7 +125,6 @@ export class AgentStore {
     harnesses: { status: 'idle', list: [] },
     harness: 'claude',
     model: '',
-    targetScene: {},
     sessions: {},
     conversation: {},
     turns: [],
@@ -216,10 +213,6 @@ export class AgentStore {
     const model = choice.harness && choice.harness !== shown.harness ? '' : choice.model ?? shown.model;
     const changed = harness !== shown.harness || model !== shown.model;
     this.set({ harness, model, conversation: session && changed ? { ...this.state.conversation, [key]: undefined } : this.state.conversation });
-  }
-
-  setTargetScene(projectId: string, sceneId: string | null) {
-    this.set({ targetScene: { ...this.state.targetScene, [projectId]: sceneId } });
   }
 
   newConversation(projectId: string, sceneId: string | null) {

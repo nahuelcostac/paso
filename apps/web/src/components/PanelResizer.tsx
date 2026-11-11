@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
-/** The chat's widths, in pixels. `initial` is --panel-agent in tokens.css, and PROJECTS is --panel-projects. */
+/** The chat's widths, in pixels. `initial` is --panel-agent in tokens.css, PROJECTS is --panel-projects and RAIL --rail-w. */
 export const AGENT_WIDTH = { initial: 360, min: 320, max: 720 } as const;
 const PROJECTS = 240;
-const BOARD_MIN = 440;
+const RAIL = 52;
+/** What the overview keeps beside the chat: the room for its cards. The chat is only in the overview. */
+export const BOARD_MIN = { storyboard: 440 } as const;
 const STEP = 16;
 const KEY = 'paso.agent-width';
 
@@ -14,9 +16,14 @@ function stored(): number {
   } catch { return AGENT_WIDTH.initial; }
 }
 
-/** The widest the chat may be: the Storyboard keeps --board-min beside it, and a drawer leaves a strip of the board in view. */
-function widest(projectsOpen: boolean, drawer: boolean) {
-  const room = drawer ? window.innerWidth - 48 : window.innerWidth - (projectsOpen ? PROJECTS : 0) - BOARD_MIN;
+/** The room the window leaves for a docked chat: what is left once the sidebar, or its rail, and the board have theirs. */
+export function chatRoom(width: number, projectsOpen: boolean, boardMin: number) {
+  return width - (projectsOpen ? PROJECTS : RAIL) - boardMin;
+}
+
+/** The widest the chat may be: the board keeps its minimum beside it, and a drawer leaves a strip of the board in view. */
+function widest(projectsOpen: boolean, drawer: boolean, boardMin: number) {
+  const room = drawer ? window.innerWidth - 48 : chatRoom(window.innerWidth, projectsOpen, boardMin);
   return Math.max(AGENT_WIDTH.min, Math.min(AGENT_WIDTH.max, room));
 }
 
@@ -24,15 +31,15 @@ function widest(projectsOpen: boolean, drawer: boolean) {
  * The chat's width as the person left it. It is remembered in this browser only, and it never takes the board's room:
  * a smaller window shows it narrower without forgetting the chosen width.
  */
-export function useAgentWidth(projectsOpen: boolean, drawer: boolean) {
+export function useAgentWidth(projectsOpen: boolean, drawer: boolean, boardMin: number = BOARD_MIN.storyboard) {
   const [chosen, setChosen] = useState(stored);
-  const [max, setMax] = useState(() => widest(projectsOpen, drawer));
+  const [max, setMax] = useState(() => widest(projectsOpen, drawer, boardMin));
   useEffect(() => {
-    const sync = () => setMax(widest(projectsOpen, drawer));
+    const sync = () => setMax(widest(projectsOpen, drawer, boardMin));
     sync();
     window.addEventListener('resize', sync);
     return () => window.removeEventListener('resize', sync);
-  }, [projectsOpen, drawer]);
+  }, [projectsOpen, drawer, boardMin]);
   const width = Math.min(Math.max(chosen, AGENT_WIDTH.min), max);
   const choose = (next: number) => {
     const value = Math.round(Math.min(Math.max(next, AGENT_WIDTH.min), max));

@@ -90,6 +90,18 @@ describe('versioned documents', () => {
   });
 });
 
+describe('the step camera', () => {
+  it('is optional, kept by a duplicate, and must be a finite box with a positive size', () => {
+    const step = createStep({ id: 'framed', camera: { x: -10, y: 20.5, width: 300, height: 200 } });
+    expect(parseStep(structuredClone(step)).camera).toEqual({ x: -10, y: 20.5, width: 300, height: 200 });
+    expect(duplicateStep(step, 'copy').camera).toEqual(step.camera);
+    expect(createStep({ id: 'plain' })).not.toHaveProperty('camera');
+    for (const camera of [{ x: 0, y: 0, width: 0, height: 10 }, { x: 0, y: 0, width: 10, height: -1 }, { x: Infinity, y: 0, width: 10, height: 10 }, { x: 0, y: 0, width: 10 }, { x: 0, y: 0, width: 10, height: 10, zoom: 2 }]) {
+      expect(() => parseStep({ ...step, camera })).toThrow();
+    }
+  });
+});
+
 describe('domain helpers', () => {
   it('creates valid empty documents with stable supplied values', () => {
     const project = createProject('New project', { id: 'p', now: '2026-11-07T12:00:00.000Z' });

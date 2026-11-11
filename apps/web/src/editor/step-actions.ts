@@ -76,7 +76,8 @@ export class StepActions {
    */
   add(projectId: string, sceneId: string, after?: string) {
     return this.serial(() => this.failure(async () => {
-      const source = after ? await this.settled({ projectId, sceneId, stepId: after }) : undefined;
+      const target = after ? { projectId, sceneId, stepId: after } : undefined;
+      const source = target ? await this.settled(target) ?? (await this.api.getStep(target)).document : undefined;
       const body = source ? { elements: source.elements, appState: source.appState, files: source.files } : {};
       const created = await this.api.createStep(projectId, sceneId, body);
       const at = after ? (await this.api.getScene(projectId, sceneId)).document.stepIds.indexOf(after) + 1 : 'end';

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ComponentPropsWithRef } from 'react';
+import { Scan } from 'lucide-react';
 import '../styles/step-frame.css';
 
 export type StepFrameProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 'title'> & {
@@ -10,6 +11,8 @@ export type StepFrameProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 
   current?: boolean;
   /** Whether the agent is changing this step right now or changed it in an active run. */
   agentState?: 'working' | 'changed';
+  /** It has a presentation camera: Presentar zooms to part of it. The thumbnail still shows the whole scene. */
+  framed?: boolean;
   /** The step drawn by the thumbnail service, as an SVG document. Without it a quiet placeholder shows. */
   svg?: string;
   /**
@@ -39,7 +42,7 @@ function useSvgUrl(svg: string | undefined) {
  * drawing is already drawn for the current theme, so no colour filter is applied to it.
  * Anything else a button takes, such as `onClick` or `ref`, goes to the button.
  */
-export function StepFrame({ number, title, current = false, agentState, svg, size = 'storyboard', className = '', ...button }: StepFrameProps) {
+export function StepFrame({ number, title, current = false, agentState, framed = false, svg, size = 'storyboard', className = '', ...button }: StepFrameProps) {
   const url = useSvgUrl(svg);
   const workingClass = agentState === 'working' ? 'frame--agent-working' : '';
   return (
@@ -47,12 +50,13 @@ export function StepFrame({ number, title, current = false, agentState, svg, siz
       type="button"
       className={`frame frame--${size} ${workingClass} ${className}`.replace(/\s+/g, ' ').trim()}
       aria-current={current ? 'step' : undefined}
-      aria-label={`Paso ${number}${title ? `: ${title}` : ''}`}
+      aria-label={`Paso ${number}${title ? `: ${title}` : ''}${framed ? ', con encuadre' : ''}`}
       title={title}
       {...button}
     >
       <span className="frame__paper" data-state={url ? 'ready' : 'loading'}>
         {url ? <img src={url} alt="" draggable={false} /> : <span className="frame__placeholder" aria-hidden="true" />}
+        {framed && size === 'storyboard' && <span className="frame__framed" title="Con encuadre: Presentar se acerca a una parte del dibujo" aria-hidden="true"><Scan className="i" /></span>}
       </span>
       <span className="frame__label">
         <span className="frame__num">{pad(number)}</span>

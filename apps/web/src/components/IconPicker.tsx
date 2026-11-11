@@ -12,8 +12,8 @@ export function IconPicker({ anchor, current, onPick, onClose }: Props) {
   const status = useId();
   const selected = current ?? DEFAULT_ICON;
   return (
-    <Popover anchor={anchor} onClose={onClose} role="dialog" label="Icono del proyecto" className="picker">
-      <div className="picker__title">Icono del proyecto</div>
+    <Popover anchor={anchor} onClose={onClose} role="dialog" label="Icono del diagrama" className="picker">
+      <div className="picker__title">Icono del diagrama</div>
       <label className="picker__search">
         <Search className="i" aria-hidden="true" />
         <input

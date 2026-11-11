@@ -26,7 +26,7 @@ hyphens. Creation helpers generate UUIDs unless an ID is supplied.
 | --- | --- | --- |
 | `project.json` | `schemaVersion`, `id`, `name`, `createdAt`, `updatedAt`, `sceneIds` | `icon` |
 | `scene.json` | `schemaVersion`, `id`, `name`, `stepIds` | None |
-| Step JSON | `schemaVersion`, `id`, `elements`, `appState`, `files` | `title`, `speakerNotes` |
+| Step JSON | `schemaVersion`, `id`, `elements`, `appState`, `files` | `title`, `speakerNotes`, `camera` |
 
 `icon` is the name of a [Lucide](https://lucide.dev) icon in kebab case, such as
 `folder` or `chart-scatter`. It is for the project list and needs no format change:
@@ -34,6 +34,13 @@ files without it stay valid at version 1, and the app shows `folder` for them. T
 schema checks only the shape (lowercase letters, digits and single hyphens, at most
 64 characters), not the list of icons, so a newer Lucide release needs no change here.
 An app that does not know a name shows `folder`. Scenes and steps have no icon.
+
+`camera` is the part of the drawing Presentar zooms to on that step:
+`{ "x", "y", "width", "height" }` in canvas units, with x/y at the top-left and a
+positive width and height. A step without it shows the whole scene, framed from the
+union of all its steps. Only the presentation reads it: the editor, thumbnails and
+exports ignore it. It was added without a version change, since files without it
+stay valid, and `duplicateStep` copies it like any other field.
 
 Project timestamps are ISO 8601 strings with a time zone, for example
 `2026-11-07T12:00:00.000Z`. The writer must update `updatedAt` when project

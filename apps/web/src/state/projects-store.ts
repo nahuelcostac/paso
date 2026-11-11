@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Project } from '@paso/shared';
-import { ApiClient, ApiRequestError, UnavailableError, type AgentEvent, type ProjectListItem } from '../lib/api';
+import { ApiClient, ApiRequestError, UnavailableError, type AgentEvent, type ProjectListItem, type WorkspaceListing } from '../lib/api';
 
 export type ProjectRow =
   | { kind: 'ok'; id: string; project: Project; revision: string; scenes: number; steps: number }
@@ -14,19 +14,23 @@ export type StoreState = {
   /** Why the service cannot be reached, when it cannot. */
   reason: 'network' | 'session' | 'server' | null;
   rows: ProjectRow[];
+  /** The workspaces and the open one. Null until the first read. */
+  workspaces: WorkspaceListing | null;
 };
 
 /** A failed action. `message` is the reason, a sentence that follows "No se pudo …". */
 export class ActionError extends Error {}
 
+// Most recently changed first, as the sidebar groups them by when they last changed.
 const sortRows = (rows: ProjectRow[]) => [...rows].sort((a, b) => {
   if (a.kind !== b.kind) return a.kind === 'ok' ? -1 : 1;
-  if (a.kind === 'ok' && b.kind === 'ok' && a.project.createdAt !== b.project.createdAt) return a.project.createdAt < b.project.createdAt ? 1 : -1;
+  if (a.kind === 'ok' && b.kind === 'ok' && a.project.updatedAt !== b.project.updatedAt) return a.project.updatedAt < b.project.updatedAt ? 1 : -1;
   return a.id < b.id ? -1 : 1;
 });
 
 export type ServiceEvent = {
   type: string;
+  activeId?: string;
   kind?: string;
   projectId?: string;
   sceneId?: string;
@@ -47,7 +51,7 @@ export type ServiceEvent = {
 export class ProjectsStore {
   private eventListeners = new Set<(event: ServiceEvent) => void>();
   subscribeEvents = (listener: (event: ServiceEvent) => void) => { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener); }; };
-  private state: StoreState = { phase: 'loading', connected: false, reason: null, rows: [] };
+  private state: StoreState = { phase: 'loading', connected: false, reason: null, rows: [], workspaces: null };
   private listeners = new Set<() => void>();
   private socket?: WebSocket;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
@@ -56,6 +60,7 @@ export class ProjectsStore {
   private dirty = new Set<string>();
   private versions = new Map<string, number>();
   private disposed = false;
+  private loading?: number;
 
   constructor(private readonly api: ApiClient) {}
 
@@ -118,6 +123,12 @@ export class ProjectsStore {
   private handle(event: ServiceEvent) {
     this.eventListeners.forEach((listener) => listener(event));
     if (event.type === 'ready') { void this.loadAll(); return; }
+    if (event.type === 'workspaces') {
+      // Another window, or this one, opened another workspace: its projects replace the list.
+      if (event.activeId !== this.state.workspaces?.activeId) void this.loadAll();
+      else void this.loadWorkspaces();
+      return;
+    }
     if (!event.projectId || event.kind === 'asset') return;
     // A step's own edits change nothing the list shows. Creating or removing one is a scene or project event.
     if (event.kind === 'step' && event.type === 'updated') return;
@@ -139,17 +150,25 @@ export class ProjectsStore {
     return { kind: 'ok', id: item.id, project: item.document, revision: item.revision, scenes: scenes.length, steps };
   }
 
+  private async loadWorkspaces() {
+    try { this.set({ workspaces: await this.api.listWorkspaces() }); } catch { /* The next event or reconnect reads it again. */ }
+  }
+
   private async loadAll() {
+    const load = (this.loading ?? 0) + 1;
+    this.loading = load;
     try {
-      const items = await this.api.listProjects();
+      const [items, workspaces] = await Promise.all([this.api.listProjects(), this.api.listWorkspaces()]);
       const rows = await Promise.all(items.map((item) => this.toRow(item).catch((error) => {
         // A project that broke between the two requests is shown as a row with its error.
         if (error instanceof ApiRequestError) return { kind: 'error', id: item.id, message: error.message } as ProjectRow;
         throw error;
       })));
+      // A newer read, after a workspace switch, wins over this one.
+      if (this.loading !== load || this.disposed) return;
       this.attempts = 0;
       this.versions.clear();
-      this.set({ phase: 'ready', connected: true, reason: null, rows: sortRows(rows) });
+      this.set({ phase: 'ready', connected: true, reason: null, rows: sortRows(rows), workspaces });
     } catch {
       // Reading failed after the stream opened: treat it like a lost connection.
       this.release();
@@ -184,15 +203,15 @@ export class ProjectsStore {
     if (error instanceof ApiRequestError) {
       if (error.status === 409 || error.status === 428) {
         if (id) await this.refresh(id);
-        throw new ActionError('El proyecto cambió fuera de Paso. Ya está actualizado: inténtalo de nuevo.');
+        throw new ActionError('El diagrama cambió fuera de Paso. Ya está actualizado: inténtalo de nuevo.');
       }
       if (error.status === 404) {
         if (id) await this.refresh(id);
-        throw new ActionError('El proyecto ya no existe.');
+        throw new ActionError('El diagrama ya no existe.');
       }
       if (error.status === 422) {
         if (id) await this.refresh(id);
-        throw new ActionError('Los archivos del proyecto no son válidos.');
+        throw new ActionError('Los archivos del diagrama no son válidos.');
       }
     }
     throw new ActionError('Inténtalo de nuevo.');
@@ -203,7 +222,7 @@ export class ProjectsStore {
 
   private okRow(id: string) {
     const row = this.state.rows.find((candidate) => candidate.id === id);
-    if (row?.kind !== 'ok') throw new ActionError('Este proyecto no se puede editar.');
+    if (row?.kind !== 'ok') throw new ActionError('Este diagrama no se puede editar.');
     return row;
   }
 
@@ -223,6 +242,23 @@ export class ProjectsStore {
       this.setRows((rows) => rows.map((existing) => existing.id === id && existing.kind === 'ok' ? { ...existing, project: document, revision } : existing));
     } catch (error) { return this.fail(error, id); }
   }
+  /** Opens another workspace and shows its projects. */
+  async switchWorkspace(id: string) {
+    await this.api.activateWorkspace(id);
+    // The list and its projects change together, so nothing shows one workspace's name over another's projects.
+    await this.loadAll();
+  }
+  /** Adds a folder as a workspace and opens it. */
+  async addWorkspace(path: string) {
+    const added = await this.api.addWorkspace(path);
+    await this.switchWorkspace(added.id);
+  }
+  /** Takes a workspace off the list; the service opens the default one if it was open. Nothing is deleted. */
+  async removeWorkspace(id: string) {
+    await this.api.removeWorkspace(id);
+    await this.loadAll();
+  }
+  revealWorkspace(id: string) { return this.api.revealWorkspace(id); }
   /** Opens the project's folder in the system's file manager. */
   reveal(id: string) { return this.api.revealProject(id); }
   async remove(id: string) {
@@ -233,6 +269,13 @@ export class ProjectsStore {
       this.setRows((rows) => rows.filter((existing) => existing.id !== id));
     } catch (error) { return this.fail(error, id); }
   }
+}
+
+/** Words for a failed workspace action, after "No se pudo …". */
+export function workspaceErrorText(error: unknown) {
+  if (error instanceof UnavailableError) return 'No hay conexión con el servicio local.';
+  if (error instanceof ApiRequestError && error.status !== 500) return error.message;
+  return 'Inténtalo de nuevo.';
 }
 
 export function useProjects(store: ProjectsStore) {

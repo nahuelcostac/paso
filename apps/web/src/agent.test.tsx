@@ -41,7 +41,6 @@ let binDir: string;
 let harnessRegistryPath: string;
 let service: Service;
 let config: ClientConfig;
-let narrowWindow = false;
 let requests: AgentRunRequest[];
 let adapterImpl: (request: AgentRunRequest, signal: AbortSignal) => AsyncIterable<AgentEvent>;
 
@@ -118,7 +117,7 @@ async function send(panel: HTMLElement, user: ReturnType<typeof userEvent.setup>
 
 beforeEach(async () => {
   drawn.calls.length = 0;
-  narrowWindow = false;
+  window.innerWidth = 1024;
   requests = [];
   rootDir = await mkdtemp(join(tmpdir(), 'paso-agent-web-'));
   binDir = join(rootDir, 'bin');
@@ -129,7 +128,7 @@ beforeEach(async () => {
 
   window.history.replaceState(null, '', '#/p/storyboard');
   window.matchMedia = ((query: string) => ({
-    matches: narrowWindow && query.includes('1099px'), media: query, addEventListener() {}, removeEventListener() {},
+    matches: false, media: query, addEventListener() {}, removeEventListener() {},
   })) as unknown as typeof window.matchMedia;
 
   adapterImpl = editsStepOne();
@@ -246,14 +245,15 @@ describe('a turn as it happens', () => {
     };
     const user = userEvent.setup();
     const panel = await openPanel();
-    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
 
-    // The target: the panel's head says what the agent receives before anything is sent. The log starts empty.
+    // The target is the scene selected in the sidebar; the panel's head names it, and there is nothing to pick there.
+    // The log starts empty.
     expect(within(panel).getByRole('log', { name: 'Conversación con el agente' })).toBeEmptyDOMElement();
-    await user.click(within(panel).getByRole('button', { name: /El agente recibe: Todo el proyecto/ }));
-    const targets = await screen.findByRole('menu', { name: 'Qué recibe el agente' });
-    await user.click(await within(targets).findByRole('menuitemradio', { name: /Partir en dos/ }, patience));
-    expect(within(panel).getByRole('button', { name: 'El agente recibe: Escena 2 · Partir en dos. Cambiar' })).toBeInTheDocument();
+    await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('01El problema'), patience);
+    await user.click(within(screen.getByRole('list', { name: 'Escenas de Búsqueda binaria' })).getByRole('button', { name: 'Escena 2: Partir en dos' }));
+    await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('02Partir en dos'), patience);
+    expect(screen.getByRole('main', { name: 'Estudio' })).toBeInTheDocument();   // selecting keeps the Estudio
+    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);   // which shows that scene
 
     await send(panel, user, 'Amplía la escena 2');
     expect(await within(panel).findByText('Amplía la escena 2')).toBeInTheDocument();
@@ -327,14 +327,16 @@ describe('a turn as it happens', () => {
     // With the panel in view, the top bar says nothing.
     expect(screen.queryByRole('status', { name: 'Agente trabajando' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('radio', { name: 'Lienzo' }));
+    // Folded, the panel leaves it to its rail.
+    await user.click(within(panel).getByRole('button', { name: 'Ocultar el agente' }));
+    expect(screen.queryByRole('complementary', { name: 'Agente' })).not.toBeInTheDocument();
     const status = await screen.findByRole('status', { name: 'Agente trabajando' }, patience);
     expect(status).toHaveTextContent('Claude Code está cambiando el paso');
     expect(within(status).getByRole('button', { name: 'Ir al paso 1 de la escena 1' })).toHaveTextContent('1');
     await user.click(within(status).getByRole('button', { name: 'Detener' }));
     await waitFor(() => expect(screen.queryByRole('status', { name: 'Agente trabajando' })).not.toBeInTheDocument(), patience);
 
-    await user.click(screen.getByRole('radio', { name: 'Storyboard' }));
+    await user.click(screen.getByRole('button', { name: 'Mostrar el agente' }));
     const after = await screen.findByRole('complementary', { name: 'Agente' }, patience);
     expect(await within(after).findByText(/^Detenida · /, {}, patience)).toBeInTheDocument();
     expect(within(after).getByRole('button', { name: 'Enviar' })).toBeInTheDocument();
@@ -360,7 +362,7 @@ describe('undoing a run', () => {
     const user = userEvent.setup();
     const panel = await openPanel();
     const scene1 = await screen.findByRole('region', { name: 'Escena 1: El problema' }, patience);
-    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
+    await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('01El problema'), patience);
     await send(panel, user, 'Actualiza el paso 1');
     await user.click(await within(panel).findByRole('button', { name: 'Deshacer ejecución' }, patience));
 
@@ -372,8 +374,11 @@ describe('undoing a run', () => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(within(panel).getByText(/· Deshecha/)).toBeInTheDocument();
       expect(within(scene1).getByRole('button', { name: 'Paso 1: Inicio' })).toBeInTheDocument();
-      expect(within(scene2).getByRole('button', { name: 'Paso 1: Trabajo de la persona' })).toBeInTheDocument();
     }, patience);
+    // The other scene keeps the person's edit.
+    await user.click(within(screen.getByRole('list', { name: 'Escenas de Búsqueda binaria' })).getByRole('button', { name: 'Escena 2: Partir en dos' }));
+    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
+    await within(scene2).findByRole('button', { name: 'Paso 1: Trabajo de la persona' }, patience);
     expect(humanStep).toBeDefined();
     expect(await call<StepEnvelope>('GET', humanPath)).toEqual(humanStep);
   });
@@ -424,7 +429,7 @@ describe('undoing a run', () => {
     // Another change after the preview: the plan is read again and asked again.
     await personEdits('/projects/p/scenes/s1/steps/step1', (document) => ({ ...document, speakerNotes: 'otra' }));
     await user.click(confirm);
-    expect(await within(dialog).findByText(/El proyecto cambió mientras mirabas el resumen/, {}, patience)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/El diagrama cambió mientras mirabas el resumen/, {}, patience)).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox')).not.toBeChecked();
     expect(within(scene1).getByRole('button', { name: 'Paso 1: Editado por persona' })).toBeInTheDocument();
 
@@ -531,8 +536,8 @@ describe('continuing a conversation', () => {
 });
 
 describe('narrow windows', () => {
-  it('opens the panel as a drawer from the top bar, and shows the agent status there while it is closed', async () => {
-    narrowWindow = true;
+  it('opens the panel as a drawer from its rail, and shows the agent status there while it is closed', async () => {
+    window.innerWidth = 900;
     await call('POST', '/harnesses', { id: 'claude' });
     adapterImpl = async function* (_request, signal) {
       yield { type: 'tool_use', id: 'slow', tool: 'update_elements', readOnly: false, target: { projectId: 'p', sceneId: 's1', stepId: 'step1' } };
@@ -541,7 +546,7 @@ describe('narrow windows', () => {
     };
     const user = userEvent.setup();
     render(<App config={config} />);
-    const toggle = await screen.findByRole('button', { name: 'Agente' }, patience);
+    const toggle = await screen.findByRole('button', { name: 'Mostrar el agente' }, patience);
     const panel = screen.getByRole('complementary', { name: 'Agente', hidden: true });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(panel).not.toHaveAttribute('data-open');

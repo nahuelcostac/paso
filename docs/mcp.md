@@ -103,7 +103,7 @@ IDs for projects, scenes and steps are service IDs, not names or paths.
 | `create_scene` | `projectId`, `name`, optional `id`. Appends an empty scene and returns its service envelope. |
 | `create_step` | `projectId`, `sceneId`, optional `id`, `title`, `speakerNotes`. Appends an empty step and returns its envelope. |
 | `duplicate_step` | Step target, `revision`, optional new step `id` and `title`. Appends a full independent copy in the same scene, keeping element IDs, assets and unknown data. |
-| `update_step` | Step target, `revision`, and at least one of `title` or `speakerNotes`. Changes metadata while preserving the rest of the snapshot. |
+| `update_step` | Step target, `revision`, and at least one of `title`, `speakerNotes` or `camera`. Changes metadata while preserving the rest of the snapshot. `camera` is `{x, y, width, height}` in canvas units, the area Presentar zooms to on that step; `null` removes it. `read_step` returns it when set. |
 | `delete_step` | Step target and `revision`. Deletes the step. Empty scenes are allowed, including after deleting their last step. |
 | `add_elements` | Step target, `revision`, `elements`. Adds one batch and returns the saved revision and layout. |
 | `update_elements` | Step target, `revision`, `elements` containing patches by `id`. Returns the saved revision and layout. |

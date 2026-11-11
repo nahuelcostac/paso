@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, ChevronDown, Eye, FilePlus, LoaderCircle, Pencil, RefreshCw, Square, SquarePen, TriangleAlert, Undo2, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, Eye, FilePlus, LoaderCircle, PanelRight, Pencil, RefreshCw, Square, SquarePen, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { Scene } from '@paso/shared';
 import { ApiRequestError, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
 import { formatSteps } from '../lib/format';
@@ -24,6 +24,10 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onOpenStep: (sceneId: string, stepId: string) => void;
+  /** Selects a scene, so the chat follows it: the scene the agent works on is the one selected in the sidebar. */
+  onOpenScene: (sceneId: string) => void;
+  /** False while the diagram's scenes are still loading: until then it is not known which scene the agent gets. */
+  scenesReady: boolean;
   /** The handle on the panel's left edge that changes its width. */
   resizer?: React.ReactNode;
 };
@@ -45,15 +49,15 @@ function locateStep(scenes: Scene[], stepId: string | undefined) {
 }
 
 const TOOL_WORDS: Record<string, [running: string, done: string]> = {
-  list_projects: ['Leyendo los proyectos', 'Leyó los proyectos'],
-  read_project: ['Leyendo el proyecto', 'Leyó el proyecto'],
+  list_projects: ['Leyendo los diagramas', 'Leyó los diagramas'],
+  read_project: ['Leyendo el diagrama', 'Leyó el diagrama'],
   read_scene: ['Leyendo la escena', 'Leyó la escena'],
   read_step: ['Leyendo el paso', 'Leyó el paso'],
   get_step_image: ['Mirando el paso', 'Miró el paso'],
   create_scene: ['Creando una escena', 'Creó una escena'],
   create_step: ['Creando el paso', 'Creó el paso'],
   duplicate_step: ['Duplicando un paso', 'Duplicó un paso en'],
-  update_step: ['Cambiando el título o las notas del paso', 'Cambió el título o las notas del paso'],
+  update_step: ['Cambiando los detalles del paso', 'Cambió los detalles del paso'],
   delete_step: ['Borrando el paso', 'Borró el paso'],
   add_elements: ['Cambiando el paso', 'Cambió el paso'],
   update_elements: ['Cambiando el paso', 'Cambió el paso'],
@@ -174,10 +178,10 @@ function harnessSubtitle(info: HarnessInfo | undefined) {
 }
 
 /** The agent panel: a conversation with the person's own harness about this project, and what the agent does in it. */
-export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, resizer }: Props) {
+export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady, resizer }: Props) {
   const state = useAgent(store);
   const [input, setInput] = useState('');
-  const [menu, setMenu] = useState<{ kind: 'target' | 'harness' | 'model'; anchor: HTMLButtonElement } | null>(null);
+  const [menu, setMenu] = useState<{ kind: 'harness' | 'model'; anchor: HTMLButtonElement } | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string>();
@@ -189,14 +193,9 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
   // Opening the drawer puts the person in the composer.
   useEffect(() => { if (narrow && open) textarea.current?.focus(); }, [narrow, open]);
 
-  // The scene the agent receives: the person's pick; else the latest open conversation of the project, so the
-  // panel does not jump when the Lienzo puts a scene in the address; else the scene in the address; else all of it.
-  const picked = state.targetScene[projectId];
-  const latest = useMemo(() => Object.values(state.sessions)
-    .filter((candidate) => candidate.projectId === projectId && state.conversation[conversationKey(projectId, candidate.sceneId)] === candidate.id)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0], [state.sessions, state.conversation, projectId]);
-  const preferred = picked !== undefined ? picked : latest ? latest.sceneId ?? null : routeSceneId ?? null;
-  const targetSceneId = preferred !== null && scenes.some((scene) => scene.id === preferred) ? preferred : null;
+  // The scene the agent works on is the one selected in the sidebar: the scene in the address, or else the first one.
+  // A diagram with no scenes yet is given to it whole.
+  const targetSceneId = scenes.some((scene) => scene.id === routeSceneId) ? routeSceneId! : scenes[0]?.id ?? null;
   const targetIndex = scenes.findIndex((scene) => scene.id === targetSceneId);
   const targetScene = targetIndex >= 0 ? scenes[targetIndex] : undefined;
   const sessionId = state.conversation[conversationKey(projectId, targetSceneId)];
@@ -214,7 +213,7 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
   const models = HARNESS_MODELS[harness];
   const model = models.find((option) => option.id === (session ? session.model ?? '' : state.model)) ?? models[0];
   const info = state.harnesses.list.find((candidate) => candidate.id === harness);
-  const usable = Boolean(info?.supported && info.found && info.added && info.session !== 'signed_out');
+  const usable = Boolean(scenesReady && info?.supported && info.found && info.added && info.session !== 'signed_out');
 
   // The latest turn stays in view. A closed drawer cannot scroll, so it scrolls again when it opens.
   useEffect(() => {
@@ -226,8 +225,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
     if (!usable || running || !input.trim()) return;
     const text = input;
     setInput('');
-    // The conversation keeps its scene from now on, whatever the address says.
-    if (picked === undefined) store.setTargetScene(projectId, targetSceneId);
     if (!(await store.send(projectId, targetSceneId, text))) setInput(text);
   };
   const onComposerKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -258,7 +255,7 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
         // The project changed after the preview: show what undoing does now, and ask again.
         try {
           const fresh = await store.previewUndo(projectId, runId);
-          setUndo({ runId, plan: fresh, busy: false, error: 'El proyecto cambió mientras mirabas el resumen. Revísalo de nuevo.' });
+          setUndo({ runId, plan: fresh, busy: false, error: 'El diagrama cambió mientras mirabas el resumen. Revísalo de nuevo.' });
         } catch (again) { setUndo({ runId, plan, busy: false, error: undoErrorMessage(again) }); }
       } else {
         setUndo({ runId, plan, busy: false, error: undoErrorMessage(error) });
@@ -283,7 +280,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
     return parts.join(' · ');
   };
 
-  const targetName = targetScene ? `Escena ${targetIndex + 1} · ${targetScene.name}` : 'Todo el proyecto';
 
   let harnessNotice: { text: string; action?: { label: string; run: () => void } } | undefined;
   if (state.harnesses.status === 'failed') {
@@ -306,23 +302,18 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
     >
       {resizer}
       <div className="agent__head">
-        <button
-          type="button" className="agent__target" aria-haspopup="menu" aria-expanded={menu?.kind === 'target'}
-          aria-label={`El agente recibe: ${targetName}. Cambiar`} title={`${projectName} · ${targetName}`}
-          onClick={(event) => setMenu(menu?.kind === 'target' ? null : { kind: 'target', anchor: event.currentTarget })}
-        >
-          {targetScene && <span className="agent__scene-num" aria-hidden="true">{pad(targetIndex + 1)}</span>}
-          <span className="agent__title">{targetScene ? targetScene.name : 'Todo el proyecto'}</span>
-          <ChevronDown className="i" aria-hidden="true" />
-        </button>
+        {/* What the agent works on: the scene selected in the sidebar. There is nothing to pick here. */}
+        <h2 className="agent__target" title={`${projectName} · ${targetScene ? targetScene.name : 'Todo el diagrama'}`}>
+          {targetScene && <span className="agent__scene-num">{pad(targetIndex + 1)}</span>}
+          <span className="agent__title">{targetScene ? targetScene.name : 'Todo el diagrama'}</span>
+        </h2>
         <button type="button" className="icon-btn" aria-label="Nueva conversación" title="Nueva conversación" disabled={!sessionId} onClick={() => store.newConversation(projectId, targetSceneId)}>
           <SquarePen className="i" aria-hidden="true" />
         </button>
-        {narrow && (
-          <button type="button" className="icon-btn" aria-label="Ocultar agente" title="Ocultar agente" onClick={onClose}>
-            <X className="i" aria-hidden="true" />
-          </button>
-        )}
+        {/* Folds the panel away, as the sidebar's own button does on the left. */}
+        <button type="button" className="icon-btn" aria-label="Ocultar el agente" title="Ocultar el agente" onClick={onClose}>
+          {narrow ? <X className="i" aria-hidden="true" /> : <PanelRight className="i" aria-hidden="true" />}
+        </button>
       </div>
 
       <div ref={log} className="agent__log" role="log" aria-label="Conversación con el agente">
@@ -389,8 +380,8 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
           <div className="notice" role="status">
             <LoaderCircle className="i i--spin" aria-hidden="true" />
             <div className="notice__body">
-              <span>{HARNESS_NAMES[runningElsewhere.harness]} está trabajando en {runningElsewhere.sceneId ? `la escena ${scenes.findIndex((scene) => scene.id === runningElsewhere.sceneId) + 1}` : 'todo el proyecto'}.</span>
-              <button type="button" className="notice__action" onClick={() => store.setTargetScene(projectId, runningElsewhere.sceneId ?? null)}>Ver la conversación</button>
+              <span>{HARNESS_NAMES[runningElsewhere.harness]} está trabajando en {runningElsewhere.sceneId ? `la escena ${scenes.findIndex((scene) => scene.id === runningElsewhere.sceneId) + 1}` : 'todo el diagrama'}.</span>
+              <button type="button" className="notice__action" onClick={() => { if (runningElsewhere.sceneId) onOpenScene(runningElsewhere.sceneId); }}>Ver la conversación</button>
             </div>
           </div>
         )}
@@ -450,12 +441,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
         </div>
       </div>
 
-      {menu?.kind === 'target' && (
-        <TargetMenu
-          anchor={menu.anchor} scenes={scenes} current={targetSceneId} onClose={() => setMenu(null)}
-          onPick={(id) => { setMenu(null); menu.anchor.focus(); store.setTargetScene(projectId, id); }}
-        />
-      )}
       {menu?.kind === 'harness' && (
         <HarnessMenu
           anchor={menu.anchor} list={state.harnesses.list} loading={state.harnesses.status === 'loading'} current={harness} onClose={() => setMenu(null)}
@@ -475,32 +460,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
       )}
       {undo?.plan && <UndoDialog state={{ ...undo, plan: undo.plan }} scenes={scenes} onCancel={() => setUndo(null)} onConfirm={(force) => void confirmUndo(force)} />}
     </aside>
-  );
-}
-
-function TargetMenu({ anchor, scenes, current, onClose, onPick }: {
-  anchor: HTMLElement; scenes: Scene[]; current: string | null; onClose: () => void; onPick: (id: string | null) => void;
-}) {
-  const list = useRef<HTMLDivElement>(null);
-  const keys = useMenuKeys(list);
-  return (
-    <Popover anchor={anchor} onClose={onClose} role="menu" label="Qué recibe el agente" className="menu menu--scenes" onKeyDown={keys}>
-      <div ref={list}>
-        <button type="button" role="menuitemradio" aria-checked={current === null} onClick={() => onPick(null)}>
-          <span className="menu__num" aria-hidden="true" />
-          <span className="menu__label">Todo el proyecto</span>
-          {current === null && <Check className="i" aria-hidden="true" />}
-        </button>
-        {scenes.length > 0 && <hr />}
-        {scenes.map((scene, index) => (
-          <button key={scene.id} type="button" role="menuitemradio" aria-checked={scene.id === current} onClick={() => onPick(scene.id)}>
-            <span className="menu__num">{index + 1}</span>
-            <span className="menu__label">{scene.name}</span>
-            {scene.id === current && <Check className="i" aria-hidden="true" />}
-          </button>
-        ))}
-      </div>
-    </Popover>
   );
 }
 

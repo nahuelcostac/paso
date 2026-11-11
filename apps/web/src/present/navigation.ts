@@ -1,7 +1,7 @@
 export type PresentAction = 'next' | 'previous' | 'first' | 'last' | 'exit';
 
 const KEYS: Record<string, PresentAction> = {
-  ArrowRight: 'next', ' ': 'next', PageDown: 'next',
+  ArrowRight: 'next', PageDown: 'next',
   ArrowLeft: 'previous', PageUp: 'previous',
   Home: 'first', End: 'last',
   Escape: 'exit',
@@ -29,4 +29,13 @@ export function preparationOrder(index: number, count: number, reach = 2) {
   const order = [index];
   for (let distance = 1; distance <= reach; distance++) order.push(index + distance, index - distance);
   return order.filter((position) => position >= 0 && position < count);
+}
+
+/** Keys that change how the step is seen, not which step: the laser and the zoom. They work with Shift, since `+` needs it on some keyboards. */
+export type ViewAction = 'zoomIn' | 'zoomOut' | 'zoomReset' | 'laser';
+const VIEW_KEYS: Record<string, ViewAction> = { '+': 'zoomIn', '=': 'zoomIn', '-': 'zoomOut', _: 'zoomOut', '0': 'zoomReset', l: 'laser', L: 'laser' };
+export function viewKeyAction(event: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey'>): ViewAction | undefined {
+  // Ctrl or Cmd with + and − is the browser's own zoom: left alone.
+  if (event.altKey || event.ctrlKey || event.metaKey) return undefined;
+  return VIEW_KEYS[event.key];
 }

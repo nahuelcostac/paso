@@ -13,6 +13,9 @@
 /* The number sits on the drawing's top-left corner, as a small bordered badge. */
 .frame__num { position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: var(--radius-sm); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: 0.04em; line-height: 1; }
 .frame__title { order: -1; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: var(--weight-semibold); }
+/* A step with a presentation camera: a small badge on the drawing's top-right corner. */
+.frame__framed { position: absolute; top: 10px; right: 10px; display: inline-grid; place-items: center; width: 22px; height: 20px; border-radius: var(--radius-sm); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-3); }
+.frame__framed .i { width: 13px; height: 13px; }
 /* An untitled step says so on the card, in CSS, so the button's text stays its number alone. */
 .frame__title--empty { color: var(--ink-3); font-weight: var(--weight-regular); }
 .frame__title--empty::before { content: 'Sin título'; }
@@ -40,3 +43,19 @@
 /* The agent marker: a flat pink fill behind ink, like a highlighter stroke. */
 .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: var(--radius-pill); font-size: var(--text-12); font-weight: var(--weight-semibold); line-height: 1; white-space: nowrap; flex: none; }
 .chip--agent { background: var(--agent); color: var(--on-agent); }
+
+/* In the Estudio a card's title is its own target: a click there, or F2 on the card, names the step, while the rest
+   of the card opens it on the Lienzo. The target lies over the card's label, so the title stays where it is drawn. */
+.step-card { position: relative; min-width: 0; }
+/* Room for the pencil, so a long title is cut before it. */
+.step-card .frame__title { margin-right: 20px; }
+.step-card__title { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: flex-end; height: 46px; padding: 0 var(--space-3); border: 0; border-radius: 0 0 var(--radius-card) var(--radius-card); background: transparent; color: var(--muted); cursor: text; }
+.step-card__title .i { opacity: 0; transition: opacity var(--motion-fast); }
+.step-card__title:hover { box-shadow: inset 0 1px 0 var(--line); }
+.step-card__title:hover .i { opacity: 1; }
+.step-card:hover .frame { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-md); }
+.step-card:hover .frame[aria-current='step'] { box-shadow: 0 0 0 2px var(--accent); }
+/* The field covers the label while the title is edited. */
+.step-card__rename { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; min-height: 46px; padding: 6px var(--space-2); border-radius: 0 0 var(--radius-card) var(--radius-card); background: var(--surface); }
+.step-card__rename .namefield { flex: 1; min-width: 0; }
+.step-card__rename .namefield__error { position: absolute; top: 100%; left: 0; right: 0; margin-top: var(--space-1); }
