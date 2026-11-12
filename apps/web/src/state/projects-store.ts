@@ -308,18 +308,18 @@ export class ProjectsStore {
     await this.refreshLoose();
   }
   /**
-   * Moves a scene to the end of another project: a loose diagram into a project, a scene out into the loose diagrams
-   * (`LOOSE_PROJECT_ID`), or between projects. The caller saves the open step first. The service copies, checks and
+   * Moves a scene into another project, last or at `index` in its scene list: a loose diagram into a project, a scene out
+   * into the loose diagrams (`LOOSE_PROJECT_ID`), or between projects. The caller saves the open step first. The service copies, checks and
    * only then removes, so a failure leaves the scene where it was.
    */
-  async moveScene(sourceId: string, sceneId: string, targetId: string) {
+  async moveScene(sourceId: string, sceneId: string, targetId: string, index?: number) {
     if (sourceId === targetId) return;
     if (isLooseProject(sourceId)) this.looseDiagram(sceneId); else this.okRow(sourceId);
     if (!isLooseProject(targetId)) this.okRow(targetId);
     const reread = (id: string) => isLooseProject(id) ? this.refreshLoose() : this.refresh(id);
     try {
       const fresh = await this.api.getScene(sourceId, sceneId);
-      await this.api.moveScene(sourceId, sceneId, fresh.revision, targetId);
+      await this.api.moveScene(sourceId, sceneId, fresh.revision, targetId, index);
     } catch (error) {
       await Promise.all([reread(sourceId), reread(targetId)]);
       if (error instanceof ApiRequestError && error.code === 'AGENT_RUNNING') throw new ActionError('Espera a que el agente termine.');

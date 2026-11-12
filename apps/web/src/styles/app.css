@@ -143,6 +143,11 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .loose-drop svg.i { flex: none; }
 .project-list--loose[data-drop='true'] .loose-drop { border-color: transparent; color: var(--ink); }
 .scene-row[data-dragging='true'] { opacity: 0.45; }
+/* Where a dragged scene would land among a project's scenes: a line above or below the scene under the pointer. */
+.scene-list > li[data-insert] { position: relative; }
+.scene-list > li[data-insert]::before { content: ''; position: absolute; left: var(--space-2); right: var(--space-1); height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; z-index: 2; }
+.scene-list > li[data-insert='before']::before { top: -1px; }
+.scene-list > li[data-insert='after']::before { bottom: -1px; }
 .drag-ghost {
   position: fixed; z-index: 1000; pointer-events: none; translate: 14px 10px;
   display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 6px 10px;

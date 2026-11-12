@@ -220,15 +220,15 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
    * The service keeps the files, so the step on screen opens again at its new place with the same revision.
    */
   /**
-   * Moves a scene to the end of another project, or out into the loose diagrams. Its unsaved edits are saved first, and
+   * Moves a scene into another project, last or at `index`, or out into the loose diagrams. Its unsaved edits are saved first, and
    * if one cannot be, nothing moves. The scene on screen is followed to where it went.
    */
-  const transferScene = async (sourceId: string, sceneId: string, targetId: string) => {
+  const transferScene = async (sourceId: string, sceneId: string, targetId: string, index?: number) => {
     await steps.flushAll();
     if (unsavedIn(sourceId, sceneId)) throw new ActionError('Tiene cambios sin guardar: resuélvelos y vuelve a intentarlo.');
     // Where the person was before the move: once the scene leaves, the board may already have stepped away from it.
     const here = routeRef.current;
-    await store.moveScene(sourceId, sceneId, targetId);
+    await store.moveScene(sourceId, sceneId, targetId, index);
     if (here.projectId === sourceId && here.sceneId === sceneId) {
       navigate({ projectId: targetId, view: here.view, sceneId, ...(here.stepId ? { stepId: here.stepId } : {}) }, { replace: true });
     }

@@ -117,7 +117,7 @@ Document bodies never contain revision fields.
 | GET, POST, PUT | `/projects/:p/scenes/:s/steps` | List `{ steps: [...] }`, create a snapshot, or reorder `{ ids }` |
 | GET, PUT, DELETE | `/projects/:p/scenes/:s/steps/:t` | Read, replace a complete versioned step, or delete |
 | POST | `/projects/:p/scenes/:s/steps/:t/duplicate` | `{ id? }`, returns 201 with the copy appended |
-| POST | `/projects/:p/scenes/:s/move` | `{ projectId }` and the scene's `If-Match`: moves the scene to the end of another project, or of `_loose`; returns `{ projectId, document, revision }` |
+| POST | `/projects/:p/scenes/:s/move` | `{ projectId, index? }` and the scene's `If-Match`: moves the scene into another project, or `_loose`, last or at `index`; returns `{ projectId, document, revision }` |
 | GET, PUT, DELETE | `/projects/:p/assets/:fileId.:ext` | Read binary bytes, upload immutable bytes, or delete an unused asset |
 | GET, POST | `/projects/:p/runs` | List `{ runs: [...] }` or start a run `{ id?, label? }`, returns 201 |
 | GET | `/projects/:p/runs/:r` | Read `{ run }` summary and conflict warnings |
@@ -168,8 +168,9 @@ its scene (400 `SCENE_REQUIRED` otherwise).
 
 ### Moving a scene
 
-`POST /projects/:p/scenes/:s/move` appends the scene to the project named by
-`projectId`, as its last scene, with the same scene, step and element IDs and the
+`POST /projects/:p/scenes/:s/move` puts the scene in the project named by
+`projectId`: last, or at `index` in its scene list (0 is first; past the end
+returns 400 `INVALID_INDEX`). It keeps the same scene, step and element IDs and the
 same file bytes, so step revisions do not change. It moves a loose diagram into a
 project, a scene out of a project into the loose diagrams (`projectId: "_loose"`,
 which creates `.loose` when it is missing), or a scene between projects. A project

@@ -24,7 +24,8 @@ const projectPatchInput = z.object({ name: z.string().min(1).optional(), icon: i
 const orderInput = z.object({ ids: z.array(idSchema) }).strict();
 const stepInput = stepSchema.omit({ schemaVersion: true }).partial().strict();
 const duplicateInput = z.object({ id: idSchema.optional(), title: z.string().max(500).optional() }).strict();
-const moveInput = z.object({ projectId: idSchema }).strict();
+/** `index` is where the scene goes in the target's scene list, 0 for first; without it, it goes last. */
+const moveInput = z.object({ projectId: idSchema, index: z.number().int().min(0).optional() }).strict();
 /** What an unfinished move left behind, so a restart can finish it or undo it. */
 const journalSchema = z.object({
   sceneId: idSchema, targetId: idSchema,
@@ -366,14 +367,14 @@ export class Store {
     });
   }
   /**
-   * Moves a scene to the end of another project, with its steps, element IDs and images: a loose diagram into a project,
+   * Moves a scene into another project, last or at `index`, with its steps, element IDs and images: a loose diagram into a project,
    * a scene out of one into the loose diagrams, or from one project to another. Files are copied, byte for byte, into a
    * staging folder and checked; then the folder is renamed into place and the target's scene list is written. That write
    * is the commit: before it the source is untouched, after it the target holds the scene and only the source copy is
    * left to remove. A journal in the source lets a restart finish or undo a move cut short.
    */
   async moveScene(sourceId: string, sceneId: string, input: unknown, revision?: string) {
-    const { projectId: targetId } = moveInput.parse(input);
+    const { projectId: targetId, index } = moveInput.parse(input);
     if (sourceId === targetId) throw new ApiError(400, 'MOVE_NOT_SUPPORTED', 'The scene is already in this project.');
     // Both projects are locked, always in the same order, so two moves cannot wait on each other.
     const [first, second] = [sourceId, targetId].sort();
@@ -433,8 +434,9 @@ export class Store {
       for (const step of entry.steps) await raw(this.require(source.records, stepPath(sourceId, sceneId, step.id)), `steps/${step.id}.json`);
 
       const nextTarget = structuredClone(target.tree);
-      nextTarget.project.sceneIds.push(sceneId);
-      nextTarget.scenes.push(structuredClone(entry));
+      if (index !== undefined && index > nextTarget.project.sceneIds.length) throw new ApiError(400, 'INVALID_INDEX', 'The position is past the end of the project.');
+      nextTarget.project.sceneIds.splice(index ?? nextTarget.project.sceneIds.length, 0, sceneId);
+      nextTarget.scenes.splice(index ?? nextTarget.scenes.length, 0, structuredClone(entry));
       this.touch(nextTarget);
       validateProjectTree(nextTarget);
       if (await this.disk.exists(`${targetId}/scenes/${sceneId}`)) throw new ApiError(409, 'PATH_COLLISION', 'Scene path already exists with another spelling.');

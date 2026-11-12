@@ -27,6 +27,8 @@ export type SceneTransfer = {
   /** True once for the click that ends a drag, which must not also open the scene. */
   consumeClick: () => boolean;
   move: (scene: Scene) => void;
+  /** Where a scene dragged here would land next to this one, shown as a line above or below it. */
+  insert: (sceneId: string) => 'before' | 'after' | undefined;
 };
 
 const failure = (error: unknown) => error instanceof Error ? error.message : 'Inténtalo de nuevo.';
@@ -79,7 +81,8 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
           const current = scene.id === currentId;
           const drag = transfer?.drag(scene);
           return (
-            <li key={scene.id}>
+            // A scene dragged from another project lands above or below this one.
+            <li key={scene.id} data-drop-scene={scene.id} data-drop-index={index} data-insert={transfer?.insert(scene.id)}>
               <div className="scene-row" data-current={current} data-dragging={drag?.dragging || undefined}>
                 <span className="scene-row__num" aria-hidden="true">{index + 1}</span>
                 {renaming === scene.id ? (

@@ -306,6 +306,21 @@ describe('moving a scene out of a project, or to another one', () => {
     expect((await moveFrom('source', 'source-stays', 'target')).status).toBe(200);
     expect((await api('/api/projects/source')).data.document.sceneIds).toEqual([]);
   });
+  it('puts the scene at a given place in the target, and refuses a place past its end', async () => {
+    await projectWithScene();
+    await target();
+    await api('/api/projects/target/scenes', 'POST', { id: 'target-last', name: 'Última' });
+    const at = async (sceneId: string, index: number) => api(`/api/projects/source/scenes/${sceneId}/move`, 'POST', { projectId: 'target', index },
+      (await api(`/api/projects/source/scenes/${sceneId}`)).data.revision);
+    expect((await at('source-goes', 3)).data.error.code).toBe('INVALID_INDEX');
+    expect((await at('source-goes', 1)).status).toBe(200);
+    expect((await api('/api/projects/target')).data.document.sceneIds).toEqual(['target-scene', 'source-goes', 'target-last']);
+    expect((await at('source-stays', 0)).status).toBe(200);
+    expect((await api('/api/projects/target')).data.document.sceneIds).toEqual(['source-stays', 'target-scene', 'source-goes', 'target-last']);
+    expect((await api('/api/projects/target/scenes')).data.scenes.map((scene: { document: { id: string } }) => scene.document.id))
+      .toEqual(['source-stays', 'target-scene', 'source-goes', 'target-last']);
+    expect((await api('/api/projects/source')).data.document.sceneIds).toEqual([]);
+  });
   it('finishes at start-up a move out of a project that a crash cut short after the commit', async () => {
     await projectWithScene();
     await target();
