@@ -165,7 +165,7 @@ describe('moving a loose diagram into a project', () => {
     expect(existsSync(join(hidden(), 'assets', 'pic.png'))).toBe(false);
     expect(existsSync(join(dataDir, 'target', 'assets', 'pic.png'))).toBe(true);
   });
-  it('needs the current revision of the diagram, and refuses unknown or reserved targets', async () => {
+  it('needs the current revision of the diagram, and refuses unknown targets and its own project', async () => {
     await looseDiagram();
     await target();
     const revision = await sceneRevision();
@@ -246,5 +246,81 @@ describe('moving a loose diagram into a project', () => {
     expect(existsSync(join(hidden(), 'scenes', 'diagram'))).toBe(false);
     expect(existsSync(join(hidden(), 'assets', 'pic.png'))).toBe(false);
     expect(existsSync(join(hidden(), '.moves', 'diagram.json'))).toBe(false);
+  });
+});
+
+/** A project whose second scene has two steps, one of them showing an image. */
+async function projectWithScene(id = 'source') {
+  expect((await api('/api/projects', 'POST', { id, name: 'Origen' })).status).toBe(201);
+  expect((await api(`/api/projects/${id}/scenes`, 'POST', { id: `${id}-stays`, name: 'Se queda' })).status).toBe(201);
+  expect((await api(`/api/projects/${id}/scenes`, 'POST', { id: `${id}-goes`, name: 'Se va' })).status).toBe(201);
+  const upload = await fetch(`${service.url}/api/projects/${id}/assets/pic.png`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: pngBytes });
+  expect(upload.status).toBe(200);
+  const first = await api(`/api/projects/${id}/scenes/${id}-goes/steps`, 'POST', { id: `${id}-one`, elements: [box] });
+  const second = await api(`/api/projects/${id}/scenes/${id}-goes/steps`, 'POST', {
+    id: `${id}-two`, elements: [box, image], files: { pic: { path: 'assets/pic.png', mimeType: 'image/png', created: 1 } },
+  });
+  return [first.data, second.data];
+}
+const moveFrom = async (projectId: string, sceneId: string, to: string) => api(
+  `/api/projects/${projectId}/scenes/${sceneId}/move`, 'POST', { projectId: to }, (await api(`/api/projects/${projectId}/scenes/${sceneId}`)).data.revision,
+);
+
+describe('moving a scene out of a project, or to another one', () => {
+  it('takes a scene out into the loose diagrams, which appear with it, with the same steps and revisions', async () => {
+    const steps = await projectWithScene();
+    expect(existsSync(hidden())).toBe(false);
+    const moved = await moveFrom('source', 'source-goes', '_loose');
+    expect(moved.status).toBe(200);
+    expect(moved.data).toMatchObject({ projectId: '_loose', document: { id: 'source-goes', name: 'Se va' } });
+    expect((await api(loose)).data.document.sceneIds).toEqual(['source-goes']);
+    expect((await api(`${loose}/scenes/source-goes/steps`)).data.steps).toEqual(steps);
+    const asset = await fetch(`${service.url}${loose}/assets/pic.png`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(Buffer.from(await asset.arrayBuffer())).toEqual(pngBytes);
+    // The project loses the scene and keeps its images, as when a scene is deleted.
+    expect((await api('/api/projects/source')).data.document.sceneIds).toEqual(['source-stays']);
+    expect(existsSync(join(dataDir, 'source', 'scenes', 'source-goes'))).toBe(false);
+    expect(existsSync(join(dataDir, 'source', 'assets', 'pic.png'))).toBe(true);
+    expect((await readdir(join(dataDir, 'source'))).sort()).toEqual(['assets', 'project.json', 'scenes']);
+    expect((await api('/api/projects')).data.projects.map((item: { id: string }) => item.id)).toEqual(['source']);
+
+    await restart();
+    expect((await api(loose)).data.document.sceneIds).toEqual(['source-goes']);
+    expect((await api('/api/projects/source')).data.document.sceneIds).toEqual(['source-stays']);
+    // And back in, to the end of the project.
+    expect((await moveFrom('_loose', 'source-goes', 'source')).status).toBe(200);
+    expect((await api('/api/projects/source')).data.document.sceneIds).toEqual(['source-stays', 'source-goes']);
+    expect((await api(loose)).data.document.sceneIds).toEqual([]);
+  });
+  it('moves a scene from one project to the end of another', async () => {
+    const steps = await projectWithScene();
+    await target();
+    expect((await moveFrom('source', 'source-goes', 'target')).status).toBe(200);
+    expect((await api('/api/projects/target')).data.document.sceneIds).toEqual(['target-scene', 'source-goes']);
+    expect((await api('/api/projects/target/scenes/source-goes/steps')).data.steps).toEqual(steps);
+    expect(existsSync(join(dataDir, 'target', 'assets', 'pic.png'))).toBe(true);
+    expect((await api('/api/projects/source')).data.document.sceneIds).toEqual(['source-stays']);
+    // No loose diagrams were involved, so none appear.
+    expect(existsSync(hidden())).toBe(false);
+    // Its last scene can leave a project too: the project stays, empty.
+    expect((await moveFrom('source', 'source-stays', 'target')).status).toBe(200);
+    expect((await api('/api/projects/source')).data.document.sceneIds).toEqual([]);
+  });
+  it('finishes at start-up a move out of a project that a crash cut short after the commit', async () => {
+    await projectWithScene();
+    await target();
+    await service.close();
+    await cp(join(dataDir, 'source', 'scenes', 'source-goes'), join(dataDir, 'target', 'scenes', 'source-goes'), { recursive: true });
+    await cp(join(dataDir, 'source', 'assets', 'pic.png'), join(dataDir, 'target', 'assets', 'pic.png'));
+    const projectFile = join(dataDir, 'target', 'project.json');
+    const project = JSON.parse(await readFile(projectFile, 'utf8'));
+    await writeFile(projectFile, `${JSON.stringify({ ...project, sceneIds: [...project.sceneIds, 'source-goes'] }, null, 2)}\n`);
+    await mkdir(join(dataDir, 'source', '.moves'), { recursive: true });
+    await writeFile(join(dataDir, 'source', '.moves', 'source-goes.json'), JSON.stringify({ sceneId: 'source-goes', targetId: 'target', assets: ['assets/pic.png'], addedAssets: ['assets/pic.png'] }));
+    await start();
+    expect((await api('/api/projects/target')).data.document.sceneIds).toEqual(['target-scene', 'source-goes']);
+    expect((await api('/api/projects/source')).data.document.sceneIds).toEqual(['source-stays']);
+    expect(existsSync(join(dataDir, 'source', 'scenes', 'source-goes'))).toBe(false);
+    expect(existsSync(join(dataDir, 'source', '.moves'))).toBe(false);
   });
 });

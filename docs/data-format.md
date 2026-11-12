@@ -44,10 +44,11 @@ if one exists, is ignored. Each scene is one loose diagram, in creation order in
 list, the search or «Abrir carpeta». `@paso/shared` exports `LOOSE_PROJECT_ID`,
 `LOOSE_PROJECT_FOLDER`, `LOOSE_PROJECT_NAME` and `isLooseProject`.
 
-Moving a loose diagram into a project appends its scene to that project's
-`sceneIds` with the same scene, step and element IDs. While a move is under way,
-the service may leave `.loose/.moves/<sceneId>.json` and
-`<project>/.incoming/<sceneId>/`; neither is part of a project, and both are gone
+A scene can move to the end of another project: a loose diagram into a project, a
+project's scene out into `.loose`, where it becomes a loose diagram, or from one
+project to another. It keeps the same scene, step and element IDs. While a move
+is under way, the service may leave `<source>/.moves/<sceneId>.json` and
+`<target>/.incoming/<sceneId>/`; neither is part of a project, and both are gone
 once the move finishes or is undone (see the service API).
 
 ## Documents

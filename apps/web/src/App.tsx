@@ -160,7 +160,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     catch (error) { await scenesOf(projectId); sceneFailure(error); }
     await scenesOf(projectId);
   };
-  const moveScene = async (projectId: string, id: string, delta: -1 | 1) => {
+  const reorderScene = async (projectId: string, id: string, delta: -1 | 1) => {
     try {
       const fresh = await api.getProject(projectId);
       const ids = [...fresh.document.sceneIds];
@@ -214,18 +214,23 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     if (window.matchMedia(NARROW).matches) setPanelOpen(false);
   };
   /** Steps of a loose diagram with work that is not on the service. Such a diagram is not moved. */
-  const unsavedIn = (id: string) => steps.unresolved().some(({ target }) => isLooseProject(target.projectId) && target.sceneId === id);
+  const unsavedIn = (projectId: string, sceneId: string) => steps.unresolved().some(({ target }) => target.projectId === projectId && target.sceneId === sceneId);
   /**
    * Moves a loose diagram into a project. The open step is saved first; one that cannot be saved blocks the move.
    * The service keeps the files, so the step on screen opens again at its new place with the same revision.
    */
-  const moveLoose = async (id: string, projectId: string) => {
+  /**
+   * Moves a scene to the end of another project, or out into the loose diagrams. Its unsaved edits are saved first, and
+   * if one cannot be, nothing moves. The scene on screen is followed to where it went.
+   */
+  const transferScene = async (sourceId: string, sceneId: string, targetId: string) => {
     await steps.flushAll();
-    if (unsavedIn(id)) throw new ActionError('Tiene cambios sin guardar: resuélvelos y vuelve a intentarlo.');
-    await store.moveLoose(id, projectId);
+    if (unsavedIn(sourceId, sceneId)) throw new ActionError('Tiene cambios sin guardar: resuélvelos y vuelve a intentarlo.');
+    // Where the person was before the move: once the scene leaves, the board may already have stepped away from it.
     const here = routeRef.current;
-    if (isLooseProject(here.projectId) && here.sceneId === id) {
-      navigate({ projectId, view: here.view, sceneId: id, ...(here.stepId ? { stepId: here.stepId } : {}) }, { replace: true });
+    await store.moveScene(sourceId, sceneId, targetId);
+    if (here.projectId === sourceId && here.sceneId === sceneId) {
+      navigate({ projectId: targetId, view: here.view, sceneId, ...(here.stepId ? { stepId: here.stepId } : {}) }, { replace: true });
     }
   };
   const deleteLoose = async (id: string) => {
@@ -351,7 +356,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           saveState={saveState}
           notices={notices}
           // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
-          sceneList={(projectRow) => {
+          sceneList={(projectRow, transfer) => {
             const open = isOpen(projectRow.id);
             if (open && !scenes) return null;
             const listed = open ? sceneDocuments : projectRow.sceneList;
@@ -364,8 +369,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
               }}
               onCreate={() => void createScene(projectRow.id)}
               onRename={(id, name) => renameScene(projectRow.id, id, name)}
-              onMove={(id, delta) => moveScene(projectRow.id, id, delta)}
+              onMove={(id, delta) => reorderScene(projectRow.id, id, delta)}
               onDelete={(id) => deleteScene(projectRow.id, id)}
+              transfer={transfer}
             />;
           }}
           state={state}
@@ -375,7 +381,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
             if (window.matchMedia(NARROW).matches) setPanelOpen(false);
           }}
           onCreateLoose={createLoose}
-          onMoveLoose={moveLoose}
+          onMoveScene={transferScene}
           onDeleteLoose={deleteLoose}
           currentId={route.projectId}
           creating={creating}

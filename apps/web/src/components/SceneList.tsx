@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, EllipsisVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, EllipsisVertical, FolderInput, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Scene } from '@paso/shared';
 import { Dialog } from './Dialog';
+import type { DragHandlers } from './LooseRow';
 import { NameField } from './NameField';
 import { Popover, useMenuKeys } from './Popover';
 
@@ -17,14 +18,23 @@ type Props = {
   onRename: (sceneId: string, name: string) => Promise<void>;
   onMove: (sceneId: string, delta: -1 | 1) => Promise<void>;
   onDelete: (sceneId: string) => Promise<void>;
+  transfer?: SceneTransfer;
+};
+
+/** Moving a scene elsewhere, which the sidebar runs: dragging it onto a project or the loose diagrams, or «Mover a…». */
+export type SceneTransfer = {
+  drag: (scene: Scene) => { handlers: DragHandlers; dragging: boolean };
+  /** True once for the click that ends a drag, which must not also open the scene. */
+  consumeClick: () => boolean;
+  move: (scene: Scene) => void;
 };
 
 const failure = (error: unknown) => error instanceof Error ? error.message : 'Inténtalo de nuevo.';
 const stepsText = (count: number) => count === 0 ? 'La escena no tiene pasos' : count === 1 ? 'Se borrará 1 paso' : `Se borrarán ${count} pasos`;
 
-function SceneMenu({ anchor, name, first, last, onClose, onRename, onMove, onDelete }: {
+function SceneMenu({ anchor, name, first, last, onClose, onRename, onMove, onTransfer, onDelete }: {
   anchor: HTMLElement; name: string; first: boolean; last: boolean; onClose: () => void;
-  onRename: () => void; onMove: (delta: -1 | 1) => void; onDelete: () => void;
+  onRename: () => void; onMove: (delta: -1 | 1) => void; onTransfer?: () => void; onDelete: () => void;
 }) {
   const list = useRef<HTMLDivElement>(null);
   const keys = useMenuKeys(list);
@@ -35,6 +45,7 @@ function SceneMenu({ anchor, name, first, last, onClose, onRename, onMove, onDel
         <button type="button" role="menuitem" onClick={run(onRename)}><Pencil className="i" aria-hidden="true" />Renombrar</button>
         <button type="button" role="menuitem" disabled={first} onClick={run(() => onMove(-1))}><ArrowUp className="i" aria-hidden="true" />Subir</button>
         <button type="button" role="menuitem" disabled={last} onClick={run(() => onMove(1))}><ArrowDown className="i" aria-hidden="true" />Bajar</button>
+        {onTransfer && <button type="button" role="menuitem" onClick={run(onTransfer)}><FolderInput className="i" aria-hidden="true" />Mover a…</button>}
         <button type="button" role="menuitem" className="menu__danger" onClick={run(onDelete)}><Trash2 className="i" aria-hidden="true" />Eliminar…</button>
       </div>
     </Popover>
@@ -43,9 +54,10 @@ function SceneMenu({ anchor, name, first, last, onClose, onRename, onMove, onDel
 
 /**
  * The open diagram's scenes, under its row in the sidebar, like pages: a click opens a scene on the board, and each has a
- * menu to rename, move or delete it. «Añadir diagrama» closes the list.
+ * menu to rename, move or delete it. «Añadir diagrama» closes the list. A scene can be dragged onto another project, or
+ * onto the loose diagrams, to move it there.
  */
-export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate, onRename, onMove, onDelete }: Props) {
+export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate, onRename, onMove, onDelete, transfer }: Props) {
   const [menu, setMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ scene: Scene; error?: string; busy?: boolean } | null>(null);
@@ -65,9 +77,10 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
       <ul className="scene-list" aria-label={`Escenas de ${diagram}`}>
         {scenes.map((scene, index) => {
           const current = scene.id === currentId;
+          const drag = transfer?.drag(scene);
           return (
             <li key={scene.id}>
-              <div className="scene-row" data-current={current}>
+              <div className="scene-row" data-current={current} data-dragging={drag?.dragging || undefined}>
                 <span className="scene-row__num" aria-hidden="true">{index + 1}</span>
                 {renaming === scene.id ? (
                   <div className="scene-row__text">
@@ -83,7 +96,10 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
                   </div>
                 ) : (
                   <>
-                    <button type="button" className="scene-row__open" aria-current={current ? 'true' : undefined} onClick={() => onSelect(scene.id)}>
+                    <button
+                      type="button" className="scene-row__open" aria-current={current ? 'true' : undefined}
+                      onClick={() => { if (!transfer?.consumeClick()) onSelect(scene.id); }} {...drag?.handlers}
+                    >
                       <span className="visually-hidden">Escena {index + 1}: </span><span className="scene-row__name">{scene.name}</span>
                     </button>
                     <button
@@ -112,6 +128,7 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
           onClose={() => setMenu(null)}
           onRename={() => { setError(null); setRenaming(menuScene.id); }}
           onMove={(delta) => { setError(null); void onMove(menuScene.id, delta).catch((failed) => setError(`No se pudo mover la escena. ${failure(failed)}`)); }}
+          onTransfer={transfer ? () => { setError(null); transfer.move(menuScene); } : undefined}
           onDelete={() => setDeleting({ scene: menuScene })}
         />
       )}

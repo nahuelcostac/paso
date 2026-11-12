@@ -150,10 +150,30 @@ describe('ProjectsStore: loose diagrams', () => {
     await store.removeLoose('gone');
     expect(store.getState().loose!.diagrams.map((diagram) => diagram.id)).toEqual(['d']);
 
-    await store.moveLoose('d', 'p');
+    await store.moveScene('_loose', 'd', 'p');
     expect(store.getState().loose!.diagrams).toEqual([]);
     const row = store.getState().rows.find((candidate) => candidate.id === 'p');
     expect(row?.kind === 'ok' && [row.project.sceneIds, row.scenes, row.steps]).toEqual([['d'], 1, 1]);
+  });
+
+  it('takes a scene out of a project into the loose diagrams, and moves one between projects', async () => {
+    await post('/api/projects', { id: 'p', name: 'Proyecto' });
+    await post('/api/projects', { id: 'q', name: 'Otro' });
+    await post('/api/projects/p/scenes', { id: 's1', name: 'Primera' });
+    await post('/api/projects/p/scenes', { id: 's2', name: 'Segunda' });
+    await post('/api/projects/p/scenes/s2/steps', { id: 's2-step' });
+    store.start();
+    await until(() => store.getState().rows.length === 2);
+    expect(store.getState().loose).toBeNull();
+
+    await store.moveScene('p', 's2', '_loose');
+    expect(store.getState().loose!.diagrams.map((diagram) => [diagram.id, diagram.scene.name, diagram.steps])).toEqual([['s2', 'Segunda', 1]]);
+    const source = store.getState().rows.find((candidate) => candidate.id === 'p');
+    expect(source?.kind === 'ok' && source.sceneList.map((scene) => scene.id)).toEqual(['s1']);
+
+    await store.moveScene('p', 's1', 'q');
+    const rows = Object.fromEntries(store.getState().rows.map((row) => [row.id, row.kind === 'ok' ? row.sceneList.map((scene) => scene.id) : null]));
+    expect(rows).toEqual({ p: [], q: ['s1'] });
   });
 
   it('says why a move failed and keeps the diagram', async () => {
@@ -164,11 +184,11 @@ describe('ProjectsStore: loose diagrams', () => {
     await post('/api/projects/_loose/scenes/d/steps', { id: 'clash-too' });
     store.start();
     await until(() => store.getState().loose?.diagrams.length === 1);
-    await expect(store.moveLoose('d', 'missing')).rejects.toBeInstanceOf(ActionError);
+    await expect(store.moveScene('_loose', 'd', 'missing')).rejects.toBeInstanceOf(ActionError);
     // A step ID the project already uses stops the move.
     await post('/api/projects/_loose/scenes/d/steps', { id: 'clash' });
     await until(() => store.getState().loose?.diagrams[0].steps === 2);
-    await expect(store.moveLoose('d', 'p')).rejects.toThrow('El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
+    await expect(store.moveScene('_loose', 'd', 'p')).rejects.toThrow('El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
     expect(store.getState().loose!.diagrams.map((diagram) => diagram.id)).toEqual(['d']);
   });
 

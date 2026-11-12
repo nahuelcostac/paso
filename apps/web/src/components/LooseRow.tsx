@@ -3,6 +3,14 @@ import { EllipsisVertical, Shapes } from 'lucide-react';
 import type { LooseDiagram } from '../state/projects-store';
 import { NameField } from './NameField';
 
+/** Pointer handlers that let a row be dragged: a loose diagram, or a scene, towards where it should go. */
+export type DragHandlers = {
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
+};
+
 export const stepCount = (steps: number) => steps === 0 ? 'Sin pasos' : steps === 1 ? '1 paso' : `${steps} pasos`;
 
 type Props = {
@@ -16,13 +24,8 @@ type Props = {
   onRename: (name: string) => Promise<void>;
   onRenameCancel: () => void;
   onRenameAbandon: (message: string) => void;
-  /** Pointer handlers that let the row be dragged onto a project. */
-  drag: {
-    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
-    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
-    onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
-    onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
-  };
+  /** Lets the row be dragged onto a project. */
+  drag: DragHandlers;
 };
 
 /**

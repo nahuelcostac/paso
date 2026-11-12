@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { isLooseProject } from '@paso/shared';
-import { ChevronsUpDown, CloudOff, Folder, PanelLeft, Search, ServerOff, Shapes, SquarePen, SquarePlus, TriangleAlert, X } from 'lucide-react';
+import { isLooseProject, LOOSE_PROJECT_ID, type Scene } from '@paso/shared';
+import { ChevronsUpDown, CloudOff, Folder, Layers, PanelLeft, Search, ServerOff, Shapes, SquarePen, SquarePlus, TriangleAlert, X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
 import { describeContents, fold, groupByRecency } from '../lib/format';
 import { ActionError, workspaceErrorText, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
@@ -14,6 +14,7 @@ import { MoveDialog } from './MoveDialog';
 import { NameField } from './NameField';
 import { ProjectRow } from './ProjectRow';
 import { RowMenu } from './RowMenu';
+import type { SceneTransfer } from './SceneList';
 import { WorkspaceMenu } from './WorkspaceMenu';
 
 type Props = {
@@ -31,8 +32,8 @@ type Props = {
   /** Opens another workspace. The app saves the open step first. */
   onSwitchWorkspace: (open: () => Promise<void>) => Promise<void>;
   onHide: () => void;
-  /** A project's scenes, shown under its row while it is expanded. */
-  sceneList?: (row: Extract<Row, { kind: 'ok' }>) => ReactNode;
+  /** A project's scenes, shown under its row while it is expanded. `transfer` lets each be moved elsewhere. */
+  sceneList?: (row: Extract<Row, { kind: 'ok' }>, transfer: SceneTransfer) => ReactNode;
   /** The open step's save state, said in the footer. */
   saveState?: 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
   /** Failures of the app that have no other place, such as a step elsewhere that could not be saved. */
@@ -42,8 +43,11 @@ type Props = {
   onOpenLoose: (id: string) => void;
   /** «Nuevo diagrama»: the app creates it with one empty step and opens it. Rejects with the words to show. */
   onCreateLoose: (name: string) => Promise<void>;
-  /** Moves a loose diagram into a project. The app saves the open step first. Rejects with the reason. */
-  onMoveLoose: (id: string, projectId: string) => Promise<void>;
+  /**
+   * Moves a scene to the end of another project: a loose diagram into a project, a scene out into the loose diagrams
+   * (`LOOSE_PROJECT_ID`) or into another project. The app saves the open step first. Rejects with the reason.
+   */
+  onMoveScene: (sourceId: string, sceneId: string, targetId: string) => Promise<void>;
   /** Deletes a loose diagram, and leaves it if it is on screen. Rejects with the reason. */
   onDeleteLoose: (id: string) => Promise<void>;
 };
@@ -58,13 +62,16 @@ const readExpanded = () => {
   } catch { return new Set<string>(); }
 };
 
+/** What is being moved: a loose diagram, whose source is the reserved project, or a project's scene. */
+type Moving = { source: string; id: string; name: string };
+
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Inténtalo de nuevo.';
 
 /**
  * The sidebar, laid out like tldraw's: the mark, the workspace switcher, search and «Nuevo proyecto», then the projects
  * grouped by when they last changed. Each workspace is a folder on this computer.
  */
-export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, saveState, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveLoose, onDeleteLoose }: Props) {
+export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, saveState, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onDeleteLoose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [picker, setPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null);
@@ -80,7 +87,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   const [creatingLoose, setCreatingLoose] = useState(false);
   const [looseMenu, setLooseMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [renamingLooseId, setRenamingLooseId] = useState<string | null>(null);
-  const [movingLoose, setMovingLoose] = useState<LooseDiagram | null>(null);
+  const [moving, setMoving] = useState<Moving | null>(null);
   const [deletingLoose, setDeletingLoose] = useState<LooseDiagram | null>(null);
   // Which projects show their scenes. A project opens expanded, and a press on its row folds or unfolds it; the others
   // stay as they were, so opening a loose diagram or another project folds nothing. Kept in this browser only.
@@ -142,24 +149,29 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   const groups = groupByRecency(ok, (row) => row.project.updatedAt);
   const showList = state.phase === 'ready' && (state.rows.length > 0 || looseAll.length > 0 || creating || creatingLoose);
 
-  // Dragging a loose diagram onto a project. It starts once the pointer has moved a few pixels, so a click still opens.
-  const [drag, setDrag] = useState<{ id: string; name: string; x: number; y: number; over: string | null } | null>(null);
-  const press = useRef<{ id: string; pointerId: number; x: number; y: number; started: boolean } | null>(null);
+  // Dragging a loose diagram onto a project, or a scene onto another project or out into the loose diagrams. It starts
+  // once the pointer has moved a few pixels, so a click still opens.
+  const [drag, setDrag] = useState<(Moving & { x: number; y: number; over: string | null }) | null>(null);
+  const press = useRef<(Moving & { pointerId: number; x: number; y: number; started: boolean }) | null>(null);
   const swallowClick = useRef(false);
-  const projectAt = (x: number, y: number) => {
+  const consumeClick = () => { const swallowed = swallowClick.current; swallowClick.current = false; return swallowed; };
+  /** Where a drop at this point would move the item: a project other than its own, or the loose diagrams. */
+  const targetAt = (x: number, y: number, source: string) => {
     const id = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-drop-project]')?.dataset.dropProject;
-    return id && state.rows.some((row) => row.id === id && row.kind === 'ok') ? id : null;
+    if (!id || id === source) return null;
+    return isLooseProject(id) || state.rows.some((row) => row.id === id && row.kind === 'ok') ? id : null;
   };
-  const moveLoose = async (diagram: LooseDiagram, projectId: string) => {
+  const targetName = (id: string) => isLooseProject(id) ? 'Diagramas sueltos' : named(id);
+  const transfer = async (item: Moving, targetId: string) => {
     setNotice(null);
-    try { await onMoveLoose(diagram.id, projectId); }
-    catch (error) { setNotice(`No se pudo mover «${diagram.scene.name}». ${reasonText(error)}`); }
+    try { await onMoveScene(item.source, item.id, targetId); }
+    catch (error) { setNotice(`No se pudo mover «${item.name}». ${reasonText(error)}`); }
   };
-  const dragHandlers = (diagram: LooseDiagram) => ({
+  const dragHandlers = (item: Moving) => ({
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
       swallowClick.current = false;
       if (event.button !== 0 || event.isPrimary === false) return;
-      press.current = { id: diagram.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false };
+      press.current = { ...item, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false };
       try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* the drag still works without capture */ }
     },
     onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
@@ -167,7 +179,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       if (!held || held.pointerId !== event.pointerId) return;
       if (!held.started && Math.hypot(event.clientX - held.x, event.clientY - held.y) < 5) return;
       held.started = true;
-      setDrag({ id: diagram.id, name: diagram.scene.name, x: event.clientX, y: event.clientY, over: projectAt(event.clientX, event.clientY) });
+      setDrag({ ...item, x: event.clientX, y: event.clientY, over: targetAt(event.clientX, event.clientY, item.source) });
     },
     onPointerUp: (event: ReactPointerEvent<HTMLElement>) => {
       const held = press.current;
@@ -175,11 +187,19 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       if (!held?.started) return;
       // The press ends a drag, not a click.
       swallowClick.current = true;
-      const over = projectAt(event.clientX, event.clientY);
+      const over = targetAt(event.clientX, event.clientY, item.source);
       setDrag(null);
-      if (over) void moveLoose(diagram, over);
+      if (over) void transfer(item, over);
     },
     onPointerCancel: () => { press.current = null; setDrag(null); },
+  });
+  const sceneTransfer = (projectId: string): SceneTransfer => ({
+    drag: (scene: Scene) => {
+      const item = { source: projectId, id: scene.id, name: scene.name };
+      return { handlers: dragHandlers(item), dragging: drag?.source === projectId && drag.id === scene.id };
+    },
+    consumeClick,
+    move: (scene: Scene) => { setNotice(null); setMoving({ source: projectId, id: scene.id, name: scene.name }); },
   });
   // Escape drops nothing.
   useEffect(() => {
@@ -188,7 +208,9 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     window.addEventListener('keydown', cancel, true);
     return () => window.removeEventListener('keydown', cancel, true);
   }, [drag]);
-  const dropName = drag?.over ? named(drag.over) : null;
+  const dropName = drag?.over ? targetName(drag.over) : null;
+  // A scene dragged out of a project can land among the loose diagrams, even while there are none.
+  const sceneOut = drag !== null && !isLooseProject(drag.source);
 
   const renderRow = (row: Row) => (
     <ProjectRow
@@ -212,7 +234,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       onRenameCancel={() => setRenamingId(null)}
       onRenameAbandon={(message) => { setRenamingId(null); setNotice(message); }}
       dropTarget={drag?.over === row.id}
-    >{row.kind === 'ok' && expanded.has(row.id) ? sceneList?.(row) : null}</ProjectRow>
+    >{row.kind === 'ok' && expanded.has(row.id) ? sceneList?.(row, sceneTransfer(row.id)) : null}</ProjectRow>
   );
   const renderLoose = (diagram: LooseDiagram) => (
     <LooseRow
@@ -220,8 +242,8 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       diagram={diagram}
       current={diagram.id === looseCurrentId}
       renaming={renamingLooseId === diagram.id}
-      dragging={drag?.id === diagram.id}
-      onOpen={() => { if (swallowClick.current) { swallowClick.current = false; return; } onOpenLoose(diagram.id); }}
+      dragging={drag !== null && isLooseProject(drag.source) && drag.id === diagram.id}
+      onOpen={() => { if (!consumeClick()) onOpenLoose(diagram.id); }}
       onMenu={(anchor) => setLooseMenu(looseMenu?.id === diagram.id ? null : { id: diagram.id, anchor })}
       onRename={async (name) => {
         try { await store.renameLoose(diagram.id, name); setRenamingLooseId(null); setNotice(null); }
@@ -229,7 +251,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       }}
       onRenameCancel={() => setRenamingLooseId(null)}
       onRenameAbandon={(message) => { setRenamingLooseId(null); setNotice(message); }}
-      drag={dragHandlers(diagram)}
+      drag={dragHandlers({ source: LOOSE_PROJECT_ID, id: diagram.id, name: diagram.scene.name })}
     />
   );
 
@@ -342,8 +364,11 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
               </section>
             )}
             {/* Loose diagrams: flat below the projects, with no heading of their own. */}
-            {(looseVisible.length > 0 || creatingLoose) && (
-              <ul className="project-list project-list--loose" aria-label="Diagramas sueltos">
+            {(looseVisible.length > 0 || creatingLoose || sceneOut) && (
+              <ul
+                className="project-list project-list--loose" aria-label="Diagramas sueltos"
+                data-drop-project={LOOSE_PROJECT_ID} data-drop={(sceneOut && drag?.over === LOOSE_PROJECT_ID) || undefined}
+              >
                 {creatingLoose && (
                   <li>
                     <div className="project project--loose" data-draft="true">
@@ -366,6 +391,9 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
                   </li>
                 )}
                 {looseVisible.map(renderLoose)}
+                {sceneOut && looseVisible.length === 0 && !creatingLoose && (
+                  <li className="loose-drop" aria-hidden="true"><Shapes className="i" />Suelta aquí para sacarla</li>
+                )}
               </ul>
             )}
             {query !== null && visible.length === 0 && looseVisible.length === 0 && <p className="projects__empty" role="status">Ningún diagrama coincide.</p>}
@@ -436,18 +464,19 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           name={looseById(looseMenu.id)!.scene.name}
           onClose={() => setLooseMenu(null)}
           onRename={() => { setNotice(null); setRenamingLooseId(looseMenu.id); }}
-          onMove={() => { setNotice(null); setMovingLoose(looseById(looseMenu.id)!); }}
+          onMove={() => { setNotice(null); const diagram = looseById(looseMenu.id)!; setMoving({ source: LOOSE_PROJECT_ID, id: diagram.id, name: diagram.scene.name }); }}
           onDelete={() => { setDeleteError(null); setDeletingLoose(looseById(looseMenu.id)!); }}
         />
       )}
-      {movingLoose && (
+      {moving && (
         <MoveDialog
-          name={movingLoose.scene.name}
-          projects={state.rows.filter((row): row is Extract<Row, { kind: 'ok' }> => row.kind === 'ok')}
-          onClose={() => setMovingLoose(null)}
+          name={moving.name}
+          kind={isLooseProject(moving.source) ? 'loose' : 'scene'}
+          projects={state.rows.filter((row): row is Extract<Row, { kind: 'ok' }> => row.kind === 'ok' && row.id !== moving.source)}
+          onClose={() => setMoving(null)}
           onMove={async (projectId) => {
-            try { await onMoveLoose(movingLoose.id, projectId); setNotice(null); }
-            catch (error) { throw new Error(`No se pudo mover el diagrama. ${reasonText(error)}`); }
+            try { await onMoveScene(moving.source, moving.id, projectId); setNotice(null); }
+            catch (error) { throw new Error(`No se pudo mover «${moving.name}». ${reasonText(error)}`); }
           }}
         />
       )}
@@ -470,12 +499,14 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       )}
       {drag && createPortal(
         <div className="drag-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
-          <Shapes className="i" />{drag.name}
+          {isLooseProject(drag.source) ? <Shapes className="i" /> : <Layers className="i" />}{drag.name}
         </div>,
         document.body,
       )}
       <p className="visually-hidden" role="status" aria-live="polite">
-        {drag ? (dropName ? `Suelta para mover «${drag.name}» a «${dropName}».` : `Arrastra «${drag.name}» sobre un proyecto para moverlo.`) : ''}
+        {drag ? (dropName ? `Suelta para mover «${drag.name}» a «${dropName}».` : sceneOut
+          ? `Arrastra «${drag.name}» sobre otro proyecto, o sobre los diagramas sueltos para sacarla.`
+          : `Arrastra «${drag.name}» sobre un proyecto para moverlo.`) : ''}
       </p>
       {picker && rowById(picker.id)?.kind === 'ok' && (
         <IconPicker

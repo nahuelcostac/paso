@@ -137,6 +137,12 @@ button.project__tile:hover { background: var(--surface-hover); color: var(--ink)
 /* The project a dragged loose diagram would land in. */
 li[data-drop='true'] > .project { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project .project__tile { color: var(--ink); }
+/* The loose diagrams take a scene dragged out of a project: the whole list lights up, or a place for it when it is empty. */
+.project-list--loose[data-drop='true'] { border-radius: var(--radius-md); background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.loose-drop { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 var(--space-2); border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--ink-3); font-size: var(--text-12); }
+.loose-drop svg.i { flex: none; }
+.project-list--loose[data-drop='true'] .loose-drop { border-color: transparent; color: var(--ink); }
+.scene-row[data-dragging='true'] { opacity: 0.45; }
 .drag-ghost {
   position: fixed; z-index: 1000; pointer-events: none; translate: 14px 10px;
   display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 6px 10px;

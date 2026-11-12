@@ -366,18 +366,22 @@ export class Store {
     });
   }
   /**
-   * Moves a loose diagram into a project as its last scene, with its steps, element IDs and images. Files are copied,
-   * byte for byte, into a staging folder and checked; then the folder is renamed into place and the project's scene
-   * list is written. That write is the commit: before it the loose diagram is untouched, after it the project holds
-   * the scene and only the loose copy is left to remove. A journal lets a restart finish or undo a move cut short.
+   * Moves a scene to the end of another project, with its steps, element IDs and images: a loose diagram into a project,
+   * a scene out of one into the loose diagrams, or from one project to another. Files are copied, byte for byte, into a
+   * staging folder and checked; then the folder is renamed into place and the target's scene list is written. That write
+   * is the commit: before it the source is untouched, after it the target holds the scene and only the source copy is
+   * left to remove. A journal in the source lets a restart finish or undo a move cut short.
    */
   async moveScene(sourceId: string, sceneId: string, input: unknown, revision?: string) {
     const { projectId: targetId } = moveInput.parse(input);
-    if (!isLooseProject(sourceId)) throw new ApiError(400, 'MOVE_NOT_SUPPORTED', 'Only loose diagrams can be moved into a project.');
-    if (isLooseProject(targetId)) throw new ApiError(400, 'MOVE_NOT_SUPPORTED', 'Choose a project to move the diagram into.');
+    if (sourceId === targetId) throw new ApiError(400, 'MOVE_NOT_SUPPORTED', 'The scene is already in this project.');
     // Both projects are locked, always in the same order, so two moves cannot wait on each other.
     const [first, second] = [sourceId, targetId].sort();
     return this.lock(first, () => this.lock(second, async () => {
+      // A scene taken out of a project becomes the first loose diagram if there is none yet.
+      if (isLooseProject(targetId) && await this.disk.exists(projectPath(sourceId)) && !(await this.disk.exists(projectPath(targetId)))) {
+        await this.disk.write(projectPath(targetId), jsonBytes(createProject(LOOSE_PROJECT_NAME, { id: LOOSE_PROJECT_ID })));
+      }
       const pending = await this.readJournal(sourceId, sceneId);
       if (pending && pending.targetId !== targetId) throw new ApiError(409, 'MOVE_PENDING', 'An earlier move of this diagram is unfinished. Restart Paso to complete it.');
       if (pending) await this.recoverMove(sourceId, pending);
@@ -388,7 +392,7 @@ export class Store {
       const sceneRecord = this.require(source.records, scenePath(sourceId, sceneId));
       this.match(sceneRecord, revision);
       if (this.runs?.hasActiveRun(sourceId) || this.runs?.hasActiveRun(targetId)) {
-        throw new ApiError(409, 'AGENT_RUNNING', 'Wait for the agent to finish before moving the diagram.');
+        throw new ApiError(409, 'AGENT_RUNNING', 'Wait for the agent to finish before moving the scene.');
       }
       const entry = source.tree.scenes.find(({ scene }) => scene.id === sceneId)!;
 
@@ -455,7 +459,7 @@ export class Store {
           throw error;
         }
       }
-      // Committed: the project holds the scene. Removing the loose copy is finished now, or at the next start.
+      // Committed: the target holds the scene. Removing the source copy is finished now, or at the next start.
       try { await this.recoverMove(sourceId, journal); } catch { /* The journal stays for the next start. */ }
       await this.reconcile(targetId);
       await this.reconcile(sourceId);
@@ -498,10 +502,11 @@ export class Store {
         await this.disk.write(projectPath(sourceId), jsonBytes(source));
       }
       await this.disk.remove(`${sourceId}/scenes/${sceneId}`);
-      // Images only the moved diagram used now live in the project.
-      await pruneAssets(sourceId, journal.assets);
+      // Images only the moved diagram used now live in the target. A project keeps its own, as deleting a scene does,
+      // since an agent run's restore point may still refer to them; the hidden loose folder is tidied.
+      if (isLooseProject(sourceId)) await pruneAssets(sourceId, journal.assets);
     } else {
-      // Never committed: the loose diagram is still whole. Only a copy is removed, and only while the original is there.
+      // Never committed: the source is still whole. Only a copy is removed, and only while the original is there.
       const source = await readProject(sourceId);
       if (!source?.sceneIds.includes(sceneId)) return;
       await this.disk.remove(`${targetId}/scenes/${sceneId}`);
@@ -510,14 +515,16 @@ export class Store {
     await this.disk.remove(journalPath(sourceId, sceneId));
     await this.disk.removeEmptyFolder(journalDir(sourceId));
   }
-  /** At start-up: every move a crash cut short is finished or undone. */
+  /** At start-up: every move a crash cut short is finished or undone. Each journal sits in its move's source. */
   private async recoverMoves() {
-    for (const entry of await this.disk.entries(journalDir(LOOSE_PROJECT_ID))) {
-      if (!entry.name.endsWith('.json') || !idSchema.safeParse(entry.name.slice(0, -5)).success) continue;
-      try {
-        const journal = await this.readJournal(LOOSE_PROJECT_ID, entry.name.slice(0, -5));
-        if (journal) await this.recoverMove(LOOSE_PROJECT_ID, journal);
-      } catch { /* Left for the next start; the projects themselves are read as they are. */ }
+    for (const sourceId of await this.disk.projectIds()) {
+      for (const entry of await this.disk.entries(journalDir(sourceId))) {
+        if (!entry.name.endsWith('.json') || !idSchema.safeParse(entry.name.slice(0, -5)).success) continue;
+        try {
+          const journal = await this.readJournal(sourceId, entry.name.slice(0, -5));
+          if (journal) await this.recoverMove(sourceId, journal);
+        } catch { /* Left for the next start; the projects themselves are read as they are. */ }
+      }
     }
   }
   private touch(tree: ProjectTree) {

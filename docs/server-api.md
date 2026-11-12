@@ -117,7 +117,7 @@ Document bodies never contain revision fields.
 | GET, POST, PUT | `/projects/:p/scenes/:s/steps` | List `{ steps: [...] }`, create a snapshot, or reorder `{ ids }` |
 | GET, PUT, DELETE | `/projects/:p/scenes/:s/steps/:t` | Read, replace a complete versioned step, or delete |
 | POST | `/projects/:p/scenes/:s/steps/:t/duplicate` | `{ id? }`, returns 201 with the copy appended |
-| POST | `/projects/_loose/scenes/:s/move` | `{ projectId }` and the scene's `If-Match`: moves a loose diagram into a project, returns `{ projectId, document, revision }` |
+| POST | `/projects/:p/scenes/:s/move` | `{ projectId }` and the scene's `If-Match`: moves the scene to the end of another project, or of `_loose`; returns `{ projectId, document, revision }` |
 | GET, PUT, DELETE | `/projects/:p/assets/:fileId.:ext` | Read binary bytes, upload immutable bytes, or delete an unused asset |
 | GET, POST | `/projects/:p/runs` | List `{ runs: [...] }` or start a run `{ id?, label? }`, returns 201 |
 | GET | `/projects/:p/runs/:r` | Read `{ run }` summary and conflict warnings |
@@ -166,25 +166,31 @@ creating a project with that ID returns 409 `RESERVED_PROJECT`, and
 `POST /projects/_loose/reveal` returns 404. An agent session on `_loose` must name
 its scene (400 `SCENE_REQUIRED` otherwise).
 
-`POST /projects/_loose/scenes/:s/move` appends the scene to the project named by
+### Moving a scene
+
+`POST /projects/:p/scenes/:s/move` appends the scene to the project named by
 `projectId`, as its last scene, with the same scene, step and element IDs and the
-same file bytes, so step revisions do not change. Images the scene uses are copied
-unless the project has the same bytes under the same file ID; those only the moved
-scene used are then removed from `.loose`. The move needs the scene's `If-Match`
-(428 or 409 otherwise) and fails with 409 `ID_COLLISION`, `ASSET_CONFLICT` or
-`AGENT_RUNNING` before writing anything. Only loose diagrams move: any other
-source, or `_loose` as the target, returns 400 `MOVE_NOT_SUPPORTED`. The app saves
-the open step before it calls the route, and does not move a diagram that has
-work it could not save.
+same file bytes, so step revisions do not change. It moves a loose diagram into a
+project, a scene out of a project into the loose diagrams (`projectId: "_loose"`,
+which creates `.loose` when it is missing), or a scene between projects. A project
+can be left with no scenes. Images the scene uses are copied unless the target has
+the same bytes under the same file ID. The images only the moved scene used are
+then removed when the source is `_loose`; a project keeps its own, as it does when
+a scene is deleted, since an agent run's restore point may still refer to them. The
+move needs the scene's `If-Match` (428 or 409 otherwise) and fails with 409
+`ID_COLLISION`, `ASSET_CONFLICT` or `AGENT_RUNNING` before writing anything. The
+same project as source and target returns 400 `MOVE_NOT_SUPPORTED`. The app saves
+the open step before it calls the route, and does not move a scene that has work
+it could not save.
 
 Both projects are locked for the move. The service writes a journal,
-`.loose/.moves/<sceneId>.json`, copies the images and the scene's files into
-`<project>/.incoming/<sceneId>`, reads every copy back and compares hashes, renames
-the staged folder to `scenes/<sceneId>`, and then writes the project's `sceneIds`.
+`<source>/.moves/<sceneId>.json`, copies the images and the scene's files into
+`<target>/.incoming/<sceneId>`, reads every copy back and compares hashes, renames
+the staged folder to `scenes/<sceneId>`, and then writes the target's `sceneIds`.
 That write is the commit. A failure before it removes the copies and leaves the
-loose diagram as it was; after it, the loose copy is removed. At start-up, before
-the first scan, every remaining journal is finished or undone the same way, so a
-crash never loses or duplicates the diagram.
+source as it was; after it, the source copy is removed. At start-up, before the
+first scan, every remaining journal in any project is finished or undone the same
+way, so a crash never loses or duplicates the scene.
 
 ## Events and external edits
 

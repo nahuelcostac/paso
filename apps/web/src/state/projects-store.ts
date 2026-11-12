@@ -308,24 +308,29 @@ export class ProjectsStore {
     await this.refreshLoose();
   }
   /**
-   * Moves a loose diagram into a project as its last scene. The caller saves the open step first. The service copies,
-   * checks and only then removes, so a failure leaves the diagram where it was.
+   * Moves a scene to the end of another project: a loose diagram into a project, a scene out into the loose diagrams
+   * (`LOOSE_PROJECT_ID`), or between projects. The caller saves the open step first. The service copies, checks and
+   * only then removes, so a failure leaves the scene where it was.
    */
-  async moveLoose(id: string, projectId: string) {
-    this.looseDiagram(id);
-    this.okRow(projectId);
+  async moveScene(sourceId: string, sceneId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    if (isLooseProject(sourceId)) this.looseDiagram(sceneId); else this.okRow(sourceId);
+    if (!isLooseProject(targetId)) this.okRow(targetId);
+    const reread = (id: string) => isLooseProject(id) ? this.refreshLoose() : this.refresh(id);
     try {
-      const fresh = await this.api.getScene(LOOSE_PROJECT_ID, id);
-      await this.api.moveScene(LOOSE_PROJECT_ID, id, fresh.revision, projectId);
+      const fresh = await this.api.getScene(sourceId, sceneId);
+      await this.api.moveScene(sourceId, sceneId, fresh.revision, targetId);
     } catch (error) {
-      await Promise.all([this.refreshLoose(), this.refresh(projectId)]);
+      await Promise.all([reread(sourceId), reread(targetId)]);
       if (error instanceof ApiRequestError && error.code === 'AGENT_RUNNING') throw new ActionError('Espera a que el agente termine.');
       if (error instanceof ApiRequestError && (error.code === 'ID_COLLISION' || error.code === 'ASSET_CONFLICT')) {
-        throw new ActionError('El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
+        throw new ActionError(isLooseProject(targetId)
+          ? 'Ya hay un diagrama suelto con pasos o imágenes con los mismos identificadores.'
+          : 'El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
       }
       return this.fail(error);
     }
-    await Promise.all([this.refreshLoose(), this.refresh(projectId)]);
+    await Promise.all([reread(sourceId), reread(targetId)]);
   }
 
   /** Opens another workspace and shows its projects. */
