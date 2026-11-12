@@ -108,7 +108,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const looseDiagram = looseOpen ? state.loose?.diagrams.find((diagram) => diagram.id === route.sceneId) : undefined;
   const looseRow = useMemo((): ProjectRow | undefined => state.loose && looseDiagram ? {
     kind: 'ok', id: LOOSE_PROJECT_ID, project: { ...state.loose.project, name: looseDiagram.scene.name },
-    revision: state.loose.revision, scenes: 1, steps: looseDiagram.steps,
+    revision: state.loose.revision, scenes: 1, steps: looseDiagram.steps, sceneList: [looseDiagram.scene],
   } : undefined, [state.loose, looseDiagram]);
   const row = looseOpen ? looseRow : state.rows.find((candidate) => candidate.id === route.projectId);
   const openProject = row?.kind === 'ok' ? row : undefined;
@@ -129,13 +129,22 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const sceneId = scenes?.find((item) => item.document.id === route.sceneId)?.document.id;
   const [creatingScene, setCreatingScene] = useState(false);
   const [sceneError, setSceneError] = useState<string>();
-  const createScene = async () => {
-    if (!openProject) return;
+  /** The project the sidebar acts on: the open one, or another expanded there. */
+  const isOpen = (projectId: string) => openProject?.id === projectId;
+  const scenesOf = async (projectId: string) => {
+    if (isOpen(projectId)) return (await refreshScenes()).map((item) => item.document);
+    await store.refresh(projectId);
+    const listed = store.getState().rows.find((candidate) => candidate.id === projectId);
+    return listed?.kind === 'ok' ? listed.sceneList : [];
+  };
+  const createScene = async (projectId: string) => {
     setCreatingScene(true); setSceneError(undefined);
     try {
-      const created = await actions.createScene(openProject.id, `Escena ${(scenes?.length ?? 0) + 1}`);
-      await refreshScenes();
-      navigate({ projectId: openProject.id, view: 'lienzo', ...created });
+      const listed = store.getState().rows.find((candidate) => candidate.id === projectId);
+      const count = isOpen(projectId) ? scenes?.length ?? 0 : listed?.kind === 'ok' ? listed.scenes : 0;
+      const created = await actions.createScene(projectId, `Escena ${count + 1}`);
+      await scenesOf(projectId);
+      navigate({ projectId, view: 'lienzo', ...created });
     } catch (error) { setSceneError(error instanceof Error ? error.message : 'No se pudo crear la escena.'); }
     finally { setCreatingScene(false); }
   };
@@ -146,38 +155,36 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     if (error instanceof ApiRequestError && error.status === 404) throw new Error('La escena ya no existe.');
     throw new Error('Inténtalo de nuevo.');
   };
-  const renameScene = async (id: string, name: string) => {
-    if (!openProject) return;
-    try { const fresh = await api.getScene(openProject.id, id); await api.renameScene(openProject.id, id, fresh.revision, name); }
-    catch (error) { await refreshScenes(); sceneFailure(error); }
-    await refreshScenes();
+  const renameScene = async (projectId: string, id: string, name: string) => {
+    try { const fresh = await api.getScene(projectId, id); await api.renameScene(projectId, id, fresh.revision, name); }
+    catch (error) { await scenesOf(projectId); sceneFailure(error); }
+    await scenesOf(projectId);
   };
-  const moveScene = async (id: string, delta: -1 | 1) => {
-    if (!openProject) return;
+  const moveScene = async (projectId: string, id: string, delta: -1 | 1) => {
     try {
-      const fresh = await api.getProject(openProject.id);
+      const fresh = await api.getProject(projectId);
       const ids = [...fresh.document.sceneIds];
       const at = ids.indexOf(id);
       if (at < 0 || at + delta < 0 || at + delta >= ids.length) return;
       [ids[at], ids[at + delta]] = [ids[at + delta], ids[at]];
-      await api.reorderScenes(openProject.id, fresh.revision, ids);
-    } catch (error) { await refreshScenes(); sceneFailure(error); }
-    await refreshScenes();
+      await api.reorderScenes(projectId, fresh.revision, ids);
+    } catch (error) { await scenesOf(projectId); sceneFailure(error); }
+    await scenesOf(projectId);
   };
-  const deleteScene = async (id: string) => {
-    if (!openProject) return;
-    const order = scenes?.map((item) => item.document.id) ?? [];
+  const deleteScene = async (projectId: string, id: string) => {
+    const listed = store.getState().rows.find((candidate) => candidate.id === projectId);
+    const order = isOpen(projectId) ? scenes?.map((item) => item.document.id) ?? [] : listed?.kind === 'ok' ? listed.sceneList.map((scene) => scene.id) : [];
     const at = order.indexOf(id);
     // The scene on screen goes: its neighbour opens, the next one or else the one before.
     const next = order[at + 1] ?? order[at - 1];
     try {
       await steps.flushAll();
-      const fresh = await api.getScene(openProject.id, id);
-      await api.deleteScene(openProject.id, id, fresh.revision);
-    } catch (error) { await refreshScenes(); sceneFailure(error); }
-    await refreshScenes();
+      const fresh = await api.getScene(projectId, id);
+      await api.deleteScene(projectId, id, fresh.revision);
+    } catch (error) { await scenesOf(projectId); sceneFailure(error); }
+    await scenesOf(projectId);
     // Another scene than the open one: the person stays where they are.
-    if (id === route.sceneId) navigate({ projectId: openProject.id, view: 'lienzo', ...(next ? { sceneId: next } : {}) }, { replace: true });
+    if (isOpen(projectId) && id === route.sceneId) navigate({ projectId, view: 'lienzo', ...(next ? { sceneId: next } : {}) }, { replace: true });
   };
 
   // Where each diagram was left, so opening it again lands on the same step. Kept in this browser only.
@@ -343,13 +350,24 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           onHide={() => setPanelOpen(false)}
           saveState={saveState}
           notices={notices}
-          sceneList={openProject && scenes ? <SceneList
-            diagram={openProject.project.name} scenes={sceneDocuments} currentId={sceneId} busy={creatingScene}
-            // In the overview a scene is selected where it is, for the chat; on the board it opens.
-            onSelect={(id) => navigate({ projectId: openProject.id, view: route.view, sceneId: id, stepId: scenes.find((item) => item.document.id === id)?.document.stepIds[0] })}
-            onCreate={() => void createScene()}
-            onRename={renameScene} onMove={moveScene} onDelete={deleteScene}
-          /> : undefined}
+          // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
+          sceneList={(projectRow) => {
+            const open = isOpen(projectRow.id);
+            if (open && !scenes) return null;
+            const listed = open ? sceneDocuments : projectRow.sceneList;
+            return <SceneList
+              diagram={projectRow.project.name} scenes={listed} currentId={open ? sceneId : undefined} busy={creatingScene}
+              // In the overview a scene is selected where it is, for the chat; on the board it opens.
+              onSelect={(id) => {
+                navigate({ projectId: projectRow.id, view: open ? route.view : 'lienzo', sceneId: id, stepId: listed.find((scene) => scene.id === id)?.stepIds[0] });
+                if (!open && window.matchMedia(NARROW).matches) setPanelOpen(false);
+              }}
+              onCreate={() => void createScene(projectRow.id)}
+              onRename={(id, name) => renameScene(projectRow.id, id, name)}
+              onMove={(id, delta) => moveScene(projectRow.id, id, delta)}
+              onDelete={(id) => deleteScene(projectRow.id, id)}
+            />;
+          }}
           state={state}
           looseCurrentId={looseOpen ? route.sceneId ?? null : null}
           onOpenLoose={(id) => {

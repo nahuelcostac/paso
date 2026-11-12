@@ -404,7 +404,7 @@ describe('the board and its overview', () => {
     const list = () => screen.getByRole('list', { name: 'Escenas de Uno' });
     const names = () => within(list()).getAllByRole('button', { name: /^Escena \d+: / }).map((button) => button.getAttribute('aria-current') ? `[${button.textContent}]` : button.textContent);
     await waitFor(() => expect(names()).toEqual(['Escena 1: Primera', '[Escena 2: Segunda]']), patience);
-    // Only the open diagram shows its scenes.
+    // Only the unfolded diagram, here the open one, shows its scenes.
     expect(screen.getAllByRole('list', { name: /^Escenas de / })).toHaveLength(1);
 
     await user.click(within(list()).getByRole('button', { name: 'Acciones de la escena «Segunda»' }));

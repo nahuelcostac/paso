@@ -3,7 +3,8 @@ import { LOOSE_PROJECT_ID, isLooseProject, type Project, type Scene } from '@pas
 import { ApiClient, ApiRequestError, UnavailableError, type AgentEvent, type ProjectListItem, type WorkspaceListing } from '../lib/api';
 
 export type ProjectRow =
-  | { kind: 'ok'; id: string; project: Project; revision: string; scenes: number; steps: number }
+  /** `sceneList` holds the scenes in order, so the sidebar can show them under the row without opening the project. */
+  | { kind: 'ok'; id: string; project: Project; revision: string; scenes: number; steps: number; sceneList: Scene[] }
   | { kind: 'error'; id: string; message: string };
 
 /** A loose diagram: one scene, with its steps, that belongs to no project. Its ID is the scene's. */
@@ -154,7 +155,7 @@ export class ProjectsStore {
     if ('error' in item) return { kind: 'error', id: item.id, message: item.error.message };
     const scenes = await this.api.listScenes(item.id);
     const steps = scenes.reduce((total, { document }) => total + document.stepIds.length, 0);
-    return { kind: 'ok', id: item.id, project: item.document, revision: item.revision, scenes: scenes.length, steps };
+    return { kind: 'ok', id: item.id, project: item.document, revision: item.revision, scenes: scenes.length, steps, sceneList: scenes.map(({ document }) => document) };
   }
 
   /** The loose diagrams, read from the reserved project. A workspace without any has no such project yet. */
@@ -267,7 +268,7 @@ export class ProjectsStore {
     try {
       const { document, revision } = await this.api.createProject({ name });
       this.supersede(document.id);
-      this.setRows((rows) => [...rows.filter((row) => row.id !== document.id), { kind: 'ok', id: document.id, project: document, revision, scenes: 0, steps: 0 }]);
+      this.setRows((rows) => [...rows.filter((row) => row.id !== document.id), { kind: 'ok', id: document.id, project: document, revision, scenes: 0, steps: 0, sceneList: [] }]);
       return document.id;
     } catch (error) { return this.fail(error); }
   }

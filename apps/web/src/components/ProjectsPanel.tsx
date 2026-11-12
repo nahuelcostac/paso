@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { isLooseProject } from '@paso/shared';
 import { ChevronsUpDown, CloudOff, Folder, PanelLeft, Search, ServerOff, Shapes, SquarePen, SquarePlus, TriangleAlert, X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
 import { describeContents, fold, groupByRecency } from '../lib/format';
@@ -30,8 +31,8 @@ type Props = {
   /** Opens another workspace. The app saves the open step first. */
   onSwitchWorkspace: (open: () => Promise<void>) => Promise<void>;
   onHide: () => void;
-  /** The open diagram's scenes, shown under its row. */
-  sceneList?: ReactNode;
+  /** A project's scenes, shown under its row while it is expanded. */
+  sceneList?: (row: Extract<Row, { kind: 'ok' }>) => ReactNode;
   /** The open step's save state, said in the footer. */
   saveState?: 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
   /** Failures of the app that have no other place, such as a step elsewhere that could not be saved. */
@@ -48,6 +49,14 @@ type Props = {
 };
 
 const SAVE_LABELS = { saved: 'Guardado en este equipo', dirty: 'Cambios pendientes', saving: 'Guardando…', failed: 'Sin guardar', conflict: 'Sin guardar' } as const;
+
+const EXPANDED_KEY = 'paso.expanded-projects';
+const readExpanded = () => {
+  try {
+    const saved: unknown = JSON.parse(window.localStorage.getItem(EXPANDED_KEY) ?? '[]');
+    return new Set(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : []);
+  } catch { return new Set<string>(); }
+};
 
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Inténtalo de nuevo.';
 
@@ -73,6 +82,17 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   const [renamingLooseId, setRenamingLooseId] = useState<string | null>(null);
   const [movingLoose, setMovingLoose] = useState<LooseDiagram | null>(null);
   const [deletingLoose, setDeletingLoose] = useState<LooseDiagram | null>(null);
+  // Which projects show their scenes. A project opens expanded, and a press on its row folds or unfolds it; the others
+  // stay as they were, so opening a loose diagram or another project folds nothing. Kept in this browser only.
+  const [expanded, setExpanded] = useState(readExpanded);
+  const setExpandedTo = (id: string, open: boolean) => setExpanded((current) => {
+    if (current.has(id) === open) return current;
+    const next = new Set(current);
+    if (open) next.add(id); else next.delete(id);
+    try { window.localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next])); } catch { /* a convenience only */ }
+    return next;
+  });
+  useEffect(() => { if (currentId && !isLooseProject(currentId)) setExpandedTo(currentId, true); }, [currentId]);
   const workspaceButton = useRef<HTMLButtonElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
   const rowById = (id: string) => state.rows.find((row) => row.id === id);
@@ -175,8 +195,14 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       key={row.id}
       row={row}
       current={row.id === currentId}
+      expanded={row.kind === 'ok' && expanded.has(row.id)}
       renaming={renamingId === row.id}
-      onOpen={() => onOpen(row.id)}
+      onOpen={() => {
+        // The open project folds and unfolds; another one opens, unfolded.
+        if (row.kind === 'ok' && row.id === currentId) { setExpandedTo(row.id, !expanded.has(row.id)); return; }
+        if (row.kind === 'ok') setExpandedTo(row.id, true);
+        onOpen(row.id);
+      }}
       onIcon={(anchor) => setPicker(picker?.id === row.id ? null : { id: row.id, anchor })}
       onMenu={(anchor) => setMenu(menu?.id === row.id ? null : { id: row.id, anchor })}
       onRename={async (name) => {
@@ -186,7 +212,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       onRenameCancel={() => setRenamingId(null)}
       onRenameAbandon={(message) => { setRenamingId(null); setNotice(message); }}
       dropTarget={drag?.over === row.id}
-    >{row.id === currentId && row.kind === 'ok' ? sceneList : null}</ProjectRow>
+    >{row.kind === 'ok' && expanded.has(row.id) ? sceneList?.(row) : null}</ProjectRow>
   );
   const renderLoose = (diagram: LooseDiagram) => (
     <LooseRow

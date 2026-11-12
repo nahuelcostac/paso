@@ -242,3 +242,61 @@ describe('loose diagrams in the sidebar', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Suelto' }, patience)).toBeInTheDocument();
   });
 });
+
+describe('projects fold and unfold in the sidebar', () => {
+  const sceneList = (name: string) => within(sidebar()).queryByRole('list', { name: `Escenas de ${name}` });
+
+  it('keeps an unfolded project unfolded while a new loose diagram opens', async () => {
+    const user = userEvent.setup();
+    await seedProject('p', 'Proyecto');
+    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    render(<App config={config} recovery={memory()} />);
+    await waitFor(() => expect(sceneList('Proyecto')).toBeInTheDocument(), patience);
+
+    await user.click(within(sidebar()).getByRole('button', { name: 'Nuevo diagrama' }));
+    await user.type(screen.getByLabelText('Nombre del diagrama suelto nuevo'), 'Pizarra{Enter}');
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/_loose\/lienzo\/[\w-]+\/[\w-]+$/), patience);
+    expect(sceneList('Proyecto')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Proyecto ?,/ })).toHaveAttribute('aria-expanded', 'true');
+
+    // From there a scene of the project opens it.
+    await user.click(within(sceneList('Proyecto')!).getByRole('button', { name: /^Escena 1: / }));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene\/[\w-]+$/), patience);
+  });
+
+  it('folds and unfolds the open project with a press on its row, and leaves the others as they were', async () => {
+    const user = userEvent.setup();
+    await seedProject('p', 'Proyecto');
+    await seedProject('q', 'Otro');
+    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    render(<App config={config} recovery={memory()} />);
+    await waitFor(() => expect(sceneList('Proyecto')).toBeInTheDocument(), patience);
+    const proyecto = screen.getByRole('button', { name: /^Proyecto ?,/ });
+    const otro = screen.getByRole('button', { name: /^Otro ?,/ });
+    expect(otro).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(proyecto);
+    expect(sceneList('Proyecto')).not.toBeInTheDocument();
+    expect(proyecto).toHaveAttribute('aria-expanded', 'false');
+    expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene/);
+    await user.click(proyecto);
+    expect(sceneList('Proyecto')).toBeInTheDocument();
+
+    // Another project opens unfolded; the first stays unfolded, and folds without being opened.
+    await user.click(otro);
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/lienzo/), patience);
+    await waitFor(() => expect(sceneList('Otro')).toBeInTheDocument(), patience);
+    expect(sceneList('Proyecto')).toBeInTheDocument();
+    await user.click(otro);
+    expect(sceneList('Otro')).not.toBeInTheDocument();
+    expect(sceneList('Proyecto')).toBeInTheDocument();
+
+    // A scene added to a project that is not open shows under it, and the state survives a reload.
+    await call('/api/projects/p/scenes', 'POST', { id: 'p-second', name: 'Escena 2' });
+    await waitFor(() => expect(within(sceneList('Proyecto')!).getByRole('button', { name: /^Escena 2: / })).toBeInTheDocument(), patience);
+    cleanup();
+    render(<App config={config} recovery={memory()} />);
+    await waitFor(() => expect(sceneList('Proyecto')).toBeInTheDocument(), patience);
+    expect(sceneList('Otro')).not.toBeInTheDocument();
+  });
+});

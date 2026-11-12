@@ -8,6 +8,8 @@ import { NameField } from './NameField';
 type Props = {
   row: Row;
   current: boolean;
+  /** Its scenes show under it. */
+  expanded?: boolean;
   renaming: boolean;
   onOpen: () => void;
   onIcon: (anchor: HTMLElement) => void;
@@ -17,7 +19,7 @@ type Props = {
   onRenameAbandon: (message: string) => void;
   /** A loose diagram is being dragged over this project: dropping it here moves it in. */
   dropTarget?: boolean;
-  /** Under the open diagram: its scenes. */
+  /** Under an expanded project: its scenes. */
   children?: ReactNode;
 };
 
@@ -25,7 +27,7 @@ type Props = {
  * One line per project: its icon, which opens the icon picker, then its name. The menu appears on hover or focus.
  * The size is read out with the name and shown as a tooltip, so the list stays one line per project.
  */
-export function ProjectRow({ row, current, renaming, onOpen, onIcon, onMenu, onRename, onRenameCancel, onRenameAbandon, dropTarget = false, children }: Props) {
+export function ProjectRow({ row, current, expanded = false, renaming, onOpen, onIcon, onMenu, onRename, onRenameCancel, onRenameAbandon, dropTarget = false, children }: Props) {
   const tile = useRef<HTMLButtonElement>(null);
   const more = useRef<HTMLButtonElement>(null);
 
@@ -58,7 +60,7 @@ export function ProjectRow({ row, current, renaming, onOpen, onIcon, onMenu, onR
             <NameField initial={name} label={`Nombre de ${name}`} onSave={onRename} onCancel={onRenameCancel} onAbandon={onRenameAbandon} />
           </div>
         ) : (
-          <button type="button" className="project__open" aria-current={current ? 'true' : undefined} onClick={onOpen} title={`${name} · ${size}`}>
+          <button type="button" className="project__open" aria-current={current ? 'true' : undefined} aria-expanded={expanded} onClick={onOpen} title={`${name} · ${size}`}>
             <span className="project__name">{name}</span>
             <span className="visually-hidden">, {size}</span>
           </button>
