@@ -17,6 +17,8 @@ type Props = {
   projectName: string;
   /** "4 escenas · 17 pasos", as the project list shows it, so the two never disagree. */
   listedSize: string;
+  /** A loose diagram: the reserved project is shown limited to this one scene. */
+  onlySceneId?: string;
   events: (listener: (event: ServiceEvent) => void) => () => void;
   thumbnails: ThumbnailCache;
   route: Route;
@@ -44,7 +46,7 @@ function insertAt(order: string[], from: number, to: number) {
  * The Estudio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
  * It opens from the Lienzo | Estudio switch in the corner; a step, the same switch or Escape goes back to the board.
  */
-export function Storyboard({ api, projectId, projectName, listedSize, events, thumbnails, route, navigate, stepAgentStates, notices, corner, renameStep }: Props) {
+export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, corner, renameStep }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);
   useEffect(() => { store.start(); return () => store.dispose(); }, [store]);
   const state = useStoryboard(store);
@@ -68,11 +70,12 @@ export function Storyboard({ api, projectId, projectName, listedSize, events, th
   const dragState = useRef<{ id: string; pointerId: number; y: number } | null>(null);
 
   const scenes = useMemo(() => {
-    if (!draft) return state.scenes;
-    const byId = new Map(state.scenes.map((scene) => [scene.id, scene]));
+    const listed = onlySceneId ? state.scenes.filter((scene) => scene.id === onlySceneId) : state.scenes;
+    if (!draft) return listed;
+    const byId = new Map(listed.map((scene) => [scene.id, scene]));
     const ordered = draft.map((id) => byId.get(id)).filter((scene): scene is SceneEntry => !!scene);
-    return ordered.length === state.scenes.length ? ordered : state.scenes;
-  }, [draft, state.scenes]);
+    return ordered.length === listed.length ? ordered : listed;
+  }, [draft, state.scenes, onlySceneId]);
   const order = useMemo(() => scenes.map((scene) => scene.id), [scenes]);
 
   const run = async (action: () => Promise<unknown>, what: string) => {

@@ -203,6 +203,10 @@ export class ApiClient {
   deleteScene(projectId: string, sceneId: string, revision: string) {
     return this.request<void>(this.scenePath(projectId, sceneId), { method: 'DELETE', revision });
   }
+  /** Moves a loose diagram (a scene of the reserved project) into a project, as its last scene. `revision` is the scene's. */
+  moveScene(projectId: string, sceneId: string, revision: string, targetProjectId: string) {
+    return this.request<{ projectId: string; document: Scene; revision: string }>(`${this.scenePath(projectId, sceneId)}/move`, { method: 'POST', body: { projectId: targetProjectId }, revision });
+  }
   /** Scene order lives in the project document, so this is guarded by the project's revision. */
   reorderScenes(projectId: string, revision: string, ids: string[]) {
     return this.request<ProjectEnvelope>(`/projects/${encodeURIComponent(projectId)}/scenes`, { method: 'PUT', body: { ids }, revision });

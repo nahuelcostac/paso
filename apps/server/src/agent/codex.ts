@@ -1,4 +1,5 @@
 import { idSchema } from '@paso/shared';
+import { describeTarget } from './where.js';
 import { connectCodexBoard, codexBoardTools, codexReadOnlyTools } from './codex-board.js';
 import { classifyCodexFailure, codexDefaultEffort, codexFailureMessage, codexVersion, prepareCodex } from './codex-policy.js';
 import { forgetCodex } from './forget.js';
@@ -41,7 +42,7 @@ export const codexAdapter: HarnessAdapter = {
       if (signal.aborted) { yield { type: 'finished', reason: 'cancelled' }; return; }
       board = await connectCodexBoard(request, signal);
       const rpc = (id: number, method: string, params: unknown) => proc?.write(JSON.stringify({ id, method, params }));
-      const where = `proyecto «${request.context.projectId}»` + (request.context.sceneId ? `, escena «${request.context.sceneId}»` : '');
+      const where = describeTarget(request.context);
       const onLine = (line: string) => {
         if (terminal || signal.aborted) return;
         let msg: unknown;

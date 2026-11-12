@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { idSchema } from '@paso/shared';
+import { idSchema, isLooseProject } from '@paso/shared';
 import { WebSocketServer, WebSocket } from 'ws';
 import { assetName } from './disk.js';
 import { ApiError, errorResponse } from './errors.js';
@@ -137,6 +137,8 @@ export async function startServer(options: StartServerOptions) {
     detect: (id) => detectHarness(id, options.harnessDetection ?? {}),
     validateTarget: async (projectId, sceneId) => {
       if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'Paso está cambiando de workspace.');
+      // A loose diagram is one scene: the agent gets that scene, never every loose diagram at once.
+      if (isLooseProject(projectId) && !sceneId) throw new ApiError(400, 'SCENE_REQUIRED', 'Name the loose diagram (its scene) the agent works on.');
       await current.store.read(projectId, sceneId);
     },
     board: () => ({
@@ -246,6 +248,8 @@ export async function startServer(options: StartServerOptions) {
       } else if (parts.length === 4 && parts[3] === 'reveal') {
         // «Abrir carpeta»: the project's own folder, named by its ID under the data directory.
         if (method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+        // The loose diagrams' hidden folder is not a project the person opens.
+        if (isLooseProject(projectId)) throw new ApiError(404, 'NOT_FOUND', 'Project not found.');
         await store.read(projectId);
         try { await (options.openFolder ?? openInFileManager)(join(await realpath(current.workspace.path), projectId)); }
         catch { throw new ApiError(500, 'REVEAL_FAILED', 'Could not open the project folder.'); }
@@ -296,6 +300,10 @@ export async function startServer(options: StartServerOptions) {
             else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision, sceneId, undefined, actor);
             else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId, undefined, actor); status = 204; }
             else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+          } else if (parts.length === 6 && parts[5] === 'move') {
+            // A loose diagram into a project: { projectId } names the project, If-Match carries the scene's revision.
+            if (method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+            result = await store.moveScene(projectId, sceneId, await json(), revision);
           } else if (parts[5] === 'steps') {
             if (parts.length === 6) {
               if (method === 'GET') result = await store.read(projectId, sceneId, undefined, 'steps');

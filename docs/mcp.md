@@ -96,7 +96,7 @@ IDs for projects, scenes and steps are service IDs, not names or paths.
 
 | Tool | Input and result |
 | --- | --- |
-| `list_projects` | No arguments. Lists existing projects, revisions and errors for invalid projects. |
+| `list_projects` | No arguments. Lists existing projects, revisions and errors for invalid projects. The reserved project `_loose` of loose diagrams is not listed; every other tool reaches it by ID, and the in-app agent is told its ID and scene when it works on a loose diagram. |
 | `read_project` | `projectId`. Returns its document and ordered scene documents with revisions. |
 | `read_scene` | `projectId`, `sceneId`. Returns the scene and ordered step IDs, titles, counts and revisions. |
 | `read_step` | `projectId`, `sceneId`, `stepId`. Returns the revision and a simple layout, including labels, connections and potential overlaps. |

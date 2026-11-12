@@ -1,4 +1,5 @@
 import { idSchema } from '@paso/shared';
+import { describeTarget } from './where.js';
 import { forgetClaude } from './forget.js';
 import { harnessEnvironment, startProcess } from './process.js';
 import type { AgentEvent, AgentRunRequest, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
@@ -60,9 +61,7 @@ export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | '
       },
     },
   };
-  const where = request.context.sceneId
-    ? `proyecto «${request.context.projectId}», escena «${request.context.sceneId}»`
-    : `proyecto «${request.context.projectId}»`;
+  const where = describeTarget(request.context);
   return [
     '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
     '--tools', '',

@@ -13,7 +13,7 @@ const stale = 'Pass the exact unquoted revision returned by read_step. On REVISI
 export function createBoardMcp(config: Configuration) {
   const api = new BoardApi(config);
   const server = new McpServer({ name: 'paso-board', version: '0.1.0' }, {
-    instructions: `Paso is a local whiteboard with project > scenes > steps. Each step is a full independent snapshot. List projects first. Create scenes and steps in an existing project, then add elements. Duplicate a step to build up an explanation without changing previous steps. ${conventions} ${stale} Call get_step_image after drawing; if unavailable, inspect read_step layout and overlaps or ask for a visual check in Paso.`,
+    instructions: `Paso is a local whiteboard with project > scenes > steps. Each step is a full independent snapshot. List projects first. The reserved project _loose holds loose diagrams, one scene each; it is never listed, so work in it only when Paso names it, and only in the named scene. Create scenes and steps in an existing project, then add elements. Duplicate a step to build up an explanation without changing previous steps. ${conventions} ${stale} Call get_step_image after drawing; if unavailable, inspect read_step layout and overlaps or ask for a visual check in Paso.`,
   });
   function tool<Schema extends z.ZodRawShape>(name: string, description: string, inputSchema: Schema, readOnly: boolean, handler: (input: z.infer<z.ZodObject<Schema>>) => Promise<unknown>, destructive = false) {
     server.registerTool<z.ZodRawShape, z.ZodObject<Schema>>(name, { description, inputSchema: z.object(inputSchema).strict(), annotations: { readOnlyHint: readOnly, destructiveHint: destructive, idempotentHint: readOnly, openWorldHint: false } }, async (input) => {

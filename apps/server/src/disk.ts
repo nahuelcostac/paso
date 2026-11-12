@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, readdir, realpath, rename, rm } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rename, rm, rmdir } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
-import { idSchema, parseProject, parseScene, parseStep, type Project, type Scene, type Step } from '@paso/shared';
+import { LOOSE_PROJECT_FOLDER, LOOSE_PROJECT_ID, idSchema, parseProject, parseScene, parseStep, type Project, type Scene, type Step } from '@paso/shared';
 import { ApiError, isMissing } from './errors.js';
 
 export type Document = Project | Scene | Step;
@@ -26,8 +26,13 @@ export class Disk {
     await mkdir(root, { recursive: true });
     return new Disk(await realpath(root));
   }
+  /** Paths name projects by ID. The reserved loose-diagrams project lives in its hidden folder instead. */
+  private folder(path: string) {
+    if (path === LOOSE_PROJECT_ID || path.startsWith(`${LOOSE_PROJECT_ID}/`)) return LOOSE_PROJECT_FOLDER + path.slice(LOOSE_PROJECT_ID.length);
+    return path;
+  }
   async path(path: string) {
-    const full = join(this.root, path);
+    const full = join(this.root, this.folder(path));
     const rel = relative(this.root, full);
     if (rel.startsWith(`..${sep}`) || rel === '..' || rel.startsWith(sep)) {
       throw new ApiError(400, 'INVALID_PATH', 'Path leaves data directory.');
@@ -69,6 +74,19 @@ export class Disk {
     } finally { await rm(temporary, { force: true }); }
   }
   async remove(path: string) { await rm(await this.path(path), { recursive: true, force: true }); }
+  async removeEmptyFolder(path: string) {
+    try { await rmdir(await this.path(path)); }
+    catch (error) { if (!isMissing(error) && !['ENOTEMPTY', 'EEXIST', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error; }
+  }
+  /** Renames a file or folder in one step. It never replaces: an existing destination fails. */
+  async rename(from: string, to: string) {
+    const source = await this.path(from);
+    const target = await this.path(to);
+    if (await this.exists(to)) throw new ApiError(409, 'PATH_COLLISION', 'Destination already exists.');
+    await mkdir(dirname(target), { recursive: true });
+    await this.path(to);
+    await rename(source, target);
+  }
 
   async scanProject(projectId: string): Promise<Map<string, RecordFile>> {
     idSchema.parse(projectId);
@@ -107,9 +125,13 @@ export class Disk {
     }
     return records;
   }
+  /** Every project folder, the reserved loose-diagrams project included when its hidden folder exists. */
   async projectIds() {
-    return (await this.entries('')).filter((entry) =>
-      (entry.isDirectory() || entry.isSymbolicLink()) && idSchema.safeParse(entry.name).success,
-    ).map((entry) => entry.name).sort();
+    const entries = await this.entries('');
+    const ids = entries.filter((entry) =>
+      (entry.isDirectory() || entry.isSymbolicLink()) && idSchema.safeParse(entry.name).success && entry.name !== LOOSE_PROJECT_ID,
+    ).map((entry) => entry.name);
+    if (entries.some((entry) => entry.name === LOOSE_PROJECT_FOLDER && (entry.isDirectory() || entry.isSymbolicLink()))) ids.push(LOOSE_PROJECT_ID);
+    return ids.sort();
   }
 }

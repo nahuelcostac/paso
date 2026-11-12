@@ -1,10 +1,15 @@
 import { useSyncExternalStore } from 'react';
-import type { Project } from '@paso/shared';
+import { LOOSE_PROJECT_ID, isLooseProject, type Project, type Scene } from '@paso/shared';
 import { ApiClient, ApiRequestError, UnavailableError, type AgentEvent, type ProjectListItem, type WorkspaceListing } from '../lib/api';
 
 export type ProjectRow =
   | { kind: 'ok'; id: string; project: Project; revision: string; scenes: number; steps: number }
   | { kind: 'error'; id: string; message: string };
+
+/** A loose diagram: one scene, with its steps, that belongs to no project. Its ID is the scene's. */
+export type LooseDiagram = { id: string; scene: Scene; revision: string; steps: number };
+/** The workspace's reserved project of loose diagrams, or null while it has none. */
+export type LooseState = { project: Project; revision: string; diagrams: LooseDiagram[] } | null;
 
 export type StoreState = {
   /** loading: nothing known yet. ready: rows are valid. unavailable: nothing to show and no connection. */
@@ -14,6 +19,8 @@ export type StoreState = {
   /** Why the service cannot be reached, when it cannot. */
   reason: 'network' | 'session' | 'server' | null;
   rows: ProjectRow[];
+  /** The loose diagrams, newest first. They are never project rows. */
+  loose: LooseState;
   /** The workspaces and the open one. Null until the first read. */
   workspaces: WorkspaceListing | null;
 };
@@ -51,7 +58,7 @@ export type ServiceEvent = {
 export class ProjectsStore {
   private eventListeners = new Set<(event: ServiceEvent) => void>();
   subscribeEvents = (listener: (event: ServiceEvent) => void) => { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener); }; };
-  private state: StoreState = { phase: 'loading', connected: false, reason: null, rows: [], workspaces: null };
+  private state: StoreState = { phase: 'loading', connected: false, reason: null, rows: [], loose: null, workspaces: null };
   private listeners = new Set<() => void>();
   private socket?: WebSocket;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
@@ -139,7 +146,7 @@ export class ProjectsStore {
       this.flushTimer = undefined;
       const ids = [...this.dirty];
       this.dirty.clear();
-      for (const id of ids) void this.refresh(id);
+      for (const id of ids) void (isLooseProject(id) ? this.refreshLoose() : this.refresh(id));
     }, 120);
   }
 
@@ -150,6 +157,30 @@ export class ProjectsStore {
     return { kind: 'ok', id: item.id, project: item.document, revision: item.revision, scenes: scenes.length, steps };
   }
 
+  /** The loose diagrams, read from the reserved project. A workspace without any has no such project yet. */
+  private async readLoose(): Promise<LooseState> {
+    let envelope: { document: Project; revision: string };
+    try { envelope = await this.api.getProject(LOOSE_PROJECT_ID); }
+    catch (error) { if (error instanceof ApiRequestError && error.status === 404) return null; throw error; }
+    const scenes = await this.api.listScenes(LOOSE_PROJECT_ID);
+    // Newest first: a new diagram is appended to the reserved project's scene list.
+    const diagrams = scenes.map(({ document, revision }) => ({ id: document.id, scene: document, revision, steps: document.stepIds.length })).reverse();
+    return { project: envelope.document, revision: envelope.revision, diagrams };
+  }
+  private looseVersion = 0;
+  /** Re-read the loose diagrams. Older answers never overwrite newer ones. */
+  async refreshLoose() {
+    const version = ++this.looseVersion;
+    let loose: LooseState;
+    try { loose = await this.readLoose(); }
+    catch (error) {
+      if (error instanceof UnavailableError) { this.release(); void this.lost(); }
+      return;
+    }
+    if (version !== this.looseVersion || this.disposed) return;
+    this.set({ loose });
+  }
+
   private async loadWorkspaces() {
     try { this.set({ workspaces: await this.api.listWorkspaces() }); } catch { /* The next event or reconnect reads it again. */ }
   }
@@ -158,7 +189,12 @@ export class ProjectsStore {
     const load = (this.loading ?? 0) + 1;
     this.loading = load;
     try {
-      const [items, workspaces] = await Promise.all([this.api.listProjects(), this.api.listWorkspaces()]);
+      const looseVersion = ++this.looseVersion;
+      const [items, workspaces, loose] = await Promise.all([this.api.listProjects(), this.api.listWorkspaces(), this.readLoose().catch((error) => {
+        if (error instanceof UnavailableError) throw error;
+        // Unreadable loose diagrams do not hide the projects; the next change reads them again.
+        return null;
+      })]);
       const rows = await Promise.all(items.map((item) => this.toRow(item).catch((error) => {
         // A project that broke between the two requests is shown as a row with its error.
         if (error instanceof ApiRequestError) return { kind: 'error', id: item.id, message: error.message } as ProjectRow;
@@ -168,7 +204,7 @@ export class ProjectsStore {
       if (this.loading !== load || this.disposed) return;
       this.attempts = 0;
       this.versions.clear();
-      this.set({ phase: 'ready', connected: true, reason: null, rows: sortRows(rows), workspaces });
+      this.set({ phase: 'ready', connected: true, reason: null, rows: sortRows(rows), workspaces, ...(looseVersion === this.looseVersion ? { loose } : {}) });
     } catch {
       // Reading failed after the stream opened: treat it like a lost connection.
       this.release();
@@ -178,6 +214,7 @@ export class ProjectsStore {
 
   /** Re-read one project. Older answers never overwrite newer ones. */
   async refresh(id: string) {
+    if (isLooseProject(id)) return this.refreshLoose();
     const version = (this.versions.get(id) ?? 0) + 1;
     this.versions.set(id, version);
     let row: ProjectRow | null;
@@ -242,6 +279,54 @@ export class ProjectsStore {
       this.setRows((rows) => rows.map((existing) => existing.id === id && existing.kind === 'ok' ? { ...existing, project: document, revision } : existing));
     } catch (error) { return this.fail(error, id); }
   }
+  private looseDiagram(id: string) {
+    const diagram = this.state.loose?.diagrams.find((candidate) => candidate.id === id);
+    if (!diagram) throw new ActionError('El diagrama ya no existe.');
+    return diagram;
+  }
+  /** Shows a loose diagram just created elsewhere, such as by the step actions, without waiting for its event. */
+  async addedLoose() { await this.refreshLoose(); }
+  async renameLoose(id: string, name: string) {
+    this.looseDiagram(id);
+    try {
+      const fresh = await this.api.getScene(LOOSE_PROJECT_ID, id);
+      await this.api.renameScene(LOOSE_PROJECT_ID, id, fresh.revision, name);
+    } catch (error) { await this.refreshLoose(); return this.fail(error); }
+    await this.refreshLoose();
+  }
+  async removeLoose(id: string) {
+    this.looseDiagram(id);
+    try {
+      const fresh = await this.api.getScene(LOOSE_PROJECT_ID, id);
+      await this.api.deleteScene(LOOSE_PROJECT_ID, id, fresh.revision);
+    } catch (error) {
+      await this.refreshLoose();
+      if (error instanceof ApiRequestError && error.status === 404) return;
+      return this.fail(error);
+    }
+    await this.refreshLoose();
+  }
+  /**
+   * Moves a loose diagram into a project as its last scene. The caller saves the open step first. The service copies,
+   * checks and only then removes, so a failure leaves the diagram where it was.
+   */
+  async moveLoose(id: string, projectId: string) {
+    this.looseDiagram(id);
+    this.okRow(projectId);
+    try {
+      const fresh = await this.api.getScene(LOOSE_PROJECT_ID, id);
+      await this.api.moveScene(LOOSE_PROJECT_ID, id, fresh.revision, projectId);
+    } catch (error) {
+      await Promise.all([this.refreshLoose(), this.refresh(projectId)]);
+      if (error instanceof ApiRequestError && error.code === 'AGENT_RUNNING') throw new ActionError('Espera a que el agente termine.');
+      if (error instanceof ApiRequestError && (error.code === 'ID_COLLISION' || error.code === 'ASSET_CONFLICT')) {
+        throw new ActionError('El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
+      }
+      return this.fail(error);
+    }
+    await Promise.all([this.refreshLoose(), this.refresh(projectId)]);
+  }
+
   /** Opens another workspace and shows its projects. */
   async switchWorkspace(id: string) {
     await this.api.activateWorkspace(id);
