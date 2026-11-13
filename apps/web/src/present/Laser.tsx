@@ -1,18 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 
-/** How long the trail behind the dot lasts. */
-const TRAIL_MS = 350;
+/** How long the trail behind the dot lasts, and how long the dot takes to fade once the pointer is released. */
+export const LASER_FADE_MS = 600;
+const TRAIL_MS = LASER_FADE_MS;
 
 type Point = { x: number; y: number; t: number };
 
 /**
  * The laser pointer: a red dot where the pointer is, with a short trail that fades. It shows while the pointer is held
- * down, and replaces the cursor meanwhile. `start` is where the press began.
+ * down, and replaces the cursor meanwhile. Once released (`held` false) the dot fades with the rest of the trail.
+ * `start` is where the press began.
  */
-export function Laser({ start }: { start?: { x: number; y: number } }) {
+export function Laser({ start, held = true }: { start?: { x: number; y: number }; held?: boolean }) {
   const points = useRef<Point[]>(start ? [{ ...start, t: 0 }] : []);
   const [, setFrame] = useState(0);
+  const released = useRef<number>(undefined);
+  if (!held && released.current === undefined) released.current = performance.now();
   useEffect(() => {
+    if (held) return;
+    // Keep drawing until the dot has faded.
+    let raf = 0;
+    const tick = () => { setFrame(performance.now()); if (performance.now() - released.current! < LASER_FADE_MS) raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [held]);
+  useEffect(() => {
+    if (!held) return;
     let raf = 0;
     const tick = () => {
       const now = performance.now();
@@ -28,7 +41,7 @@ export function Laser({ start }: { start?: { x: number; y: number } }) {
     };
     window.addEventListener('pointermove', move);
     return () => { window.removeEventListener('pointermove', move); cancelAnimationFrame(raf); };
-  }, []);
+  }, [held]);
 
   const list = points.current;
   const head = list[list.length - 1];
@@ -39,6 +52,6 @@ export function Laser({ start }: { start?: { x: number; y: number } }) {
       const from = list[index];
       return <line key={point.t + index} x1={from.x} y1={from.y} x2={point.x} y2={point.y} strokeWidth={2 + 5 * life} opacity={life} />;
     })}
-    {head && <circle cx={head.x} cy={head.y} r={6} />}
+    {head && <circle cx={head.x} cy={head.y} r={6} opacity={released.current === undefined ? 1 : Math.max(0, 1 - (now - released.current) / LASER_FADE_MS)} />}
   </svg>;
 }

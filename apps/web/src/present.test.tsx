@@ -222,8 +222,10 @@ describe('moving through the presentation', () => {
     expect(document.querySelector('.laser circle')).toHaveAttribute('cx', '600');   // the dot starts where the press is
     expect(dialog).toHaveAttribute('data-laser', 'true');
     fireEvent.pointerUp(dialog, { button: 0, isPrimary: true, pointerId: 1, clientX: 620, clientY: 210 });
-    expect(document.querySelector('.laser')).toBeNull();
+    // Released: the cursor comes back at once, and the dot fades for a moment before it goes.
     expect(dialog).not.toHaveAttribute('data-laser');
+    expect(document.querySelector('.laser circle')).not.toBeNull();
+    await waitFor(() => expect(document.querySelector('.laser')).toBeNull(), { timeout: 2000 });
     fireEvent.click(dialog, { clientX: window.innerWidth - 10 });
     fireEvent.click(dialog, { clientX: 10 });
     await expectShown(steps[0]);

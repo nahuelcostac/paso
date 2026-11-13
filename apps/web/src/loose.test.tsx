@@ -367,7 +367,8 @@ describe('moving a scene out of a project, or to another one', () => {
     await dragTo(from, target, 1);
     fireEvent.click(from);
     await waitFor(async () => expect(await sceneIds('q')).toEqual(['q-scene', 'p-scene']), patience);
-    expect(await sceneIds('p')).toEqual([]);
+    // The target is written first, as the commit; the source follows a moment later.
+    await waitFor(async () => expect(await sceneIds('p')).toEqual([]), patience);
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/lienzo\/p-scene\/[\w-]+$/), patience);
   });
 

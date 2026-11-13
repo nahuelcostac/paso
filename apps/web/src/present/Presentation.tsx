@@ -11,7 +11,7 @@ import { VIEW_ZOOM_STEP, zoomViewAt } from './camera-gestures';
 import { useCameraGestures } from './use-camera-gestures';
 import type { PresentFullscreen } from './fullscreen';
 import { keyAction, moveIndex, preparationOrder, viewKeyAction, type PresentAction, type ViewAction } from './navigation';
-import { Laser } from './Laser';
+import { Laser, LASER_FADE_MS } from './Laser';
 import { loadDeck, pageKey, renderPage, type Deck, type Page } from './pages';
 import { PageQueue, type QueueResult } from './page-queue';
 
@@ -185,17 +185,25 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const { panReady, panning } = useCameraGestures(root, zoom, setZoom, directMotion);
   // The laser shows only while the pointer is held down on the drawing. A press never changes the step: the pager's
   // arrows and the keys do. Space + drag and the middle button pan instead.
-  const [laser, setLaser] = useState<number>();
+  // After the release it fades out instead of vanishing. Each press is a new laser, so a new press during the fade starts afresh.
+  const [laser, setLaser] = useState<{ pointerId: number; press: number; held: boolean }>();
+  const presses = useRef(0);
   const holdLaser = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.isPrimary === false || panReady || (event.target instanceof Element && event.target.closest('button, .indicator, .present__bar'))) return;
     pointer.current = { x: event.clientX, y: event.clientY };
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* it still follows the pointer over the page */ }
-    setLaser(event.pointerId);
+    setLaser({ pointerId: event.pointerId, press: ++presses.current, held: true });
   };
-  const dropLaser = (event: React.PointerEvent<HTMLDivElement>) => { if (event.pointerId === laser) setLaser(undefined); };
+  const dropLaser = (event: React.PointerEvent<HTMLDivElement>) => {
+    setLaser((current) => current?.held && current.pointerId === event.pointerId ? { ...current, held: false } : current);
+  };
   useEffect(() => {
-    if (laser === undefined) return;
-    const off = () => setLaser(undefined);
+    if (!laser) return;
+    if (!laser.held) {
+      const gone = setTimeout(() => setLaser((current) => current?.press === laser.press ? undefined : current), LASER_FADE_MS);
+      return () => clearTimeout(gone);
+    }
+    const off = () => setLaser((current) => current && { ...current, held: false });
     window.addEventListener('blur', off);
     return () => window.removeEventListener('blur', off);
   }, [laser]);
@@ -250,7 +258,7 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const control = (action: PresentAction) => () => act(action);
   const zoomed = zoom.scale !== 1 || zoom.x !== 0 || zoom.y !== 0;
   return <div
-    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={laser !== undefined || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
+    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={laser?.held || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
     onPointerDown={holdLaser} onPointerUp={dropLaser} onPointerCancel={dropLaser} onLostPointerCapture={dropLaser}
   >
     <div className="present__paper" style={{ background: current?.paper }} />
@@ -262,7 +270,7 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
       </div>)}
       {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">No se pudo dibujar este paso.</p></div>}
     </div>
-    {laser !== undefined && <Laser start={pointer.current} />}
+    {laser && <Laser key={laser.press} start={pointer.current} held={laser.held} />}
     {/* A minimal frame: the mark and the way out on top, the step and where you are below. It fades with the pointer. */}
     <div className="present__bar present__bar--top">
       <Brand />
