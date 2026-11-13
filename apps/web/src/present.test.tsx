@@ -219,13 +219,18 @@ describe('moving through the presentation', () => {
     await expectShown(steps[0]);
     expect(document.querySelector('.laser')).toBeNull();
     fireEvent.pointerDown(dialog, { button: 0, isPrimary: true, pointerId: 1, clientX: 600, clientY: 200 });
-    expect(document.querySelector('.laser circle')).toHaveAttribute('cx', '600');   // the dot starts where the press is
     expect(dialog).toHaveAttribute('data-laser', 'true');
-    fireEvent.pointerUp(dialog, { button: 0, isPrimary: true, pointerId: 1, clientX: 620, clientY: 210 });
-    // Released: the cursor comes back at once, and the dot fades for a moment before it goes.
+    // The Lienzo's laser: a red trail that follows the pointer.
+    for (let x = 610; x <= 700; x += 10) fireEvent.pointerMove(window, { pointerId: 1, clientX: x, clientY: 200 + (x - 600) / 2 });
+    await waitFor(() => expect(document.querySelector('.laser path')?.getAttribute('d')).toMatch(/^M\d/));
+    expect(document.querySelector('.laser path')).toHaveAttribute('fill', 'red');
+    fireEvent.pointerUp(dialog, { button: 0, isPrimary: true, pointerId: 1, clientX: 700, clientY: 250 });
+    // Released: it fades for a moment, then goes.
     expect(dialog).not.toHaveAttribute('data-laser');
-    expect(document.querySelector('.laser circle')).not.toBeNull();
-    await waitFor(() => expect(document.querySelector('.laser')).toBeNull(), { timeout: 2000 });
+    expect(document.querySelector('.laser')).not.toBeNull();
+    await waitFor(() => expect(document.querySelector('.laser')).toBeNull(), { timeout: 3000 });
+    // Its cursor, over the drawing.
+    expect(dialog.style.getPropertyValue('--laser-cursor')).toMatch(/^url\("data:image\/svg\+xml,/);
     fireEvent.click(dialog, { clientX: window.innerWidth - 10 });
     fireEvent.click(dialog, { clientX: 10 });
     await expectShown(steps[0]);

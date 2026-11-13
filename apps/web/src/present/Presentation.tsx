@@ -11,7 +11,7 @@ import { VIEW_ZOOM_STEP, zoomViewAt } from './camera-gestures';
 import { useCameraGestures } from './use-camera-gestures';
 import type { PresentFullscreen } from './fullscreen';
 import { keyAction, moveIndex, preparationOrder, viewKeyAction, type PresentAction, type ViewAction } from './navigation';
-import { Laser, LASER_FADE_MS } from './Laser';
+import { Laser, LASER_FADE_MS, laserCursor } from './Laser';
 import { loadDeck, pageKey, renderPage, type Deck, type Page } from './pages';
 import { PageQueue, type QueueResult } from './page-queue';
 
@@ -183,30 +183,34 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const [motion, setMotion] = useState<'none' | 'zoom' | 'camera'>('none');
   const directMotion = useCallback(() => setMotion('none'), []);
   const { panReady, panning } = useCameraGestures(root, zoom, setZoom, directMotion);
-  // The laser shows only while the pointer is held down on the drawing. A press never changes the step: the pager's
-  // arrows and the keys do. Space + drag and the middle button pan instead.
-  // After the release it fades out instead of vanishing. Each press is a new laser, so a new press during the fade starts afresh.
-  const [laser, setLaser] = useState<{ pointerId: number; press: number; held: boolean }>();
+  // The laser draws while the pointer is held down on the drawing, as the Lienzo's laser tool does, and fades after the
+  // release. A press never changes the step: the pager's arrows and the keys do. Space + drag and the middle button pan
+  // instead. Each press is its own trail, so one still fading stays while the next one draws.
+  const [lasers, setLasers] = useState<Array<{ pointerId: number; press: number; held: boolean }>>([]);
   const presses = useRef(0);
+  const lasersNow = useRef(lasers);
+  lasersNow.current = lasers;
+  const release = useCallback((pointerId?: number) => {
+    const done = lasersNow.current.filter((laser) => laser.held && (pointerId === undefined || laser.pointerId === pointerId)).map((laser) => laser.press);
+    if (done.length === 0) return;
+    setLasers((current) => current.map((laser) => done.includes(laser.press) ? { ...laser, held: false } : laser));
+    setTimeout(() => setLasers((current) => current.filter((laser) => !done.includes(laser.press))), LASER_FADE_MS);
+  }, []);
   const holdLaser = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.isPrimary === false || panReady || (event.target instanceof Element && event.target.closest('button, .indicator, .present__bar'))) return;
     pointer.current = { x: event.clientX, y: event.clientY };
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* it still follows the pointer over the page */ }
-    setLaser({ pointerId: event.pointerId, press: ++presses.current, held: true });
+    const press = ++presses.current;
+    setLasers((current) => [...current, { pointerId: event.pointerId, press, held: true }]);
   };
-  const dropLaser = (event: React.PointerEvent<HTMLDivElement>) => {
-    setLaser((current) => current?.held && current.pointerId === event.pointerId ? { ...current, held: false } : current);
-  };
+  const dropLaser = (event: React.PointerEvent<HTMLDivElement>) => release(event.pointerId);
+  const holding = lasers.some((laser) => laser.held);
   useEffect(() => {
-    if (!laser) return;
-    if (!laser.held) {
-      const gone = setTimeout(() => setLaser((current) => current?.press === laser.press ? undefined : current), LASER_FADE_MS);
-      return () => clearTimeout(gone);
-    }
-    const off = () => setLaser((current) => current && { ...current, held: false });
+    if (!holding) return;
+    const off = () => release();
     window.addEventListener('blur', off);
     return () => window.removeEventListener('blur', off);
-  }, [laser]);
+  }, [holding, release]);
   const home = useRef<Zoom>(NO_ZOOM);
   const last = useRef<{ stepId?: string; camera: string; frame?: typeof frame }>({ camera: '' });
   useEffect(() => {
@@ -258,7 +262,8 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const control = (action: PresentAction) => () => act(action);
   const zoomed = zoom.scale !== 1 || zoom.x !== 0 || zoom.y !== 0;
   return <div
-    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={laser?.held || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
+    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={holding || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
+    style={{ '--laser-cursor': laserCursor(theme) } as React.CSSProperties}
     onPointerDown={holdLaser} onPointerUp={dropLaser} onPointerCancel={dropLaser} onLostPointerCapture={dropLaser}
   >
     <div className="present__paper" style={{ background: current?.paper }} />
@@ -270,7 +275,7 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
       </div>)}
       {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">No se pudo dibujar este paso.</p></div>}
     </div>
-    {laser && <Laser key={laser.press} start={pointer.current} held={laser.held} />}
+    {lasers.map((laser) => <Laser key={laser.press} start={pointer.current} held={laser.held} />)}
     {/* A minimal frame: the mark and the way out on top, the step and where you are below. It fades with the pointer. */}
     <div className="present__bar present__bar--top">
       <Brand />
