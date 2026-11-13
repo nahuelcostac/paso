@@ -128,6 +128,40 @@ button.project__tile:hover { background: var(--surface-hover); color: var(--ink)
 .project:hover .project__more, .project:focus-within .project__more, .project__more[aria-expanded='true'] { opacity: 1; }
 @media (hover: none) { .project__more { opacity: 1; } }
 .project--skeleton { gap: 10px; }
+
+/* Loose diagrams: flat below the projects, with no heading. Each can be dragged onto a project. */
+.project-list--loose { margin-top: var(--space-3); }
+.project-group + .project-list--loose, .project-list + .project-list--loose { margin-top: var(--space-4); }
+.project--loose[data-dragging='true'] { opacity: 0.45; }
+.projects[data-dragging='true'], .projects[data-dragging='true'] * { cursor: grabbing !important; user-select: none; }
+/* The project a dragged loose diagram would land in. */
+li[data-drop='true'] > .project { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project .project__tile { color: var(--ink); }
+/* The loose diagrams take a scene dragged out of a project: the whole list lights up, or a place for it when it is empty. */
+.project-list--loose[data-drop='true'] { border-radius: var(--radius-md); background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.loose-drop { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 var(--space-2); border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--ink-3); font-size: var(--text-12); }
+.loose-drop svg.i { flex: none; }
+.project-list--loose[data-drop='true'] .loose-drop { border-color: transparent; color: var(--ink); }
+.scene-row[data-dragging='true'] { opacity: 0.45; }
+/* Where a dragged scene would land among a project's scenes: a line above or below the scene under the pointer. */
+.scene-list > li[data-insert] { position: relative; }
+.scene-list > li[data-insert]::before { content: ''; position: absolute; left: var(--space-2); right: var(--space-1); height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; z-index: 2; }
+.scene-list > li[data-insert='before']::before { top: -1px; }
+.scene-list > li[data-insert='after']::before { bottom: -1px; }
+.drag-ghost {
+  position: fixed; z-index: 1000; pointer-events: none; translate: 14px 10px;
+  display: flex; align-items: center; gap: 6px; max-width: 240px; padding: 6px 10px;
+  border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-lg), inset 0 0 0 1px var(--line-strong);
+  font-size: var(--text-13); font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.drag-ghost svg.i { flex: none; color: var(--ink-3); }
+
+/* «Mover a proyecto…»: the projects to choose from. */
+.move-list { display: flex; flex-direction: column; gap: 1px; max-height: 280px; margin-top: var(--space-3); overflow-y: auto; }
+.move-list__item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-md); color: var(--ink-2); font-weight: var(--weight-medium); text-align: left; }
+.move-list__item svg.i { flex: none; color: var(--ink-3); }
+.move-list__item:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
+.move-list__name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .project--skeleton .project__tile { background: var(--surface-sunken); }
 .skeleton { display: block; border-radius: 4px; background: var(--surface-sunken); }
 .skeleton--name { height: 12px; width: 60%; }

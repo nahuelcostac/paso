@@ -117,6 +117,7 @@ Document bodies never contain revision fields.
 | GET, POST, PUT | `/projects/:p/scenes/:s/steps` | List `{ steps: [...] }`, create a snapshot, or reorder `{ ids }` |
 | GET, PUT, DELETE | `/projects/:p/scenes/:s/steps/:t` | Read, replace a complete versioned step, or delete |
 | POST | `/projects/:p/scenes/:s/steps/:t/duplicate` | `{ id? }`, returns 201 with the copy appended |
+| POST | `/projects/:p/scenes/:s/move` | `{ projectId, index? }` and the scene's `If-Match`: moves the scene into another project, or `_loose`, last or at `index`; returns `{ projectId, document, revision }` |
 | GET, PUT, DELETE | `/projects/:p/assets/:fileId.:ext` | Read binary bytes, upload immutable bytes, or delete an unused asset |
 | GET, POST | `/projects/:p/runs` | List `{ runs: [...] }` or start a run `{ id?, label? }`, returns 201 |
 | GET | `/projects/:p/runs/:r` | Read `{ run }` summary and conflict warnings |
@@ -152,6 +153,45 @@ of identical bytes is safe. Deleting an asset requires its `If-Match` ETag and
 no manifest references, including references in deleted elements or unused
 manifest entries. Binary reads use `application/octet-stream`, `attachment`
 and `nosniff`; the client reconstructs the MIME type from the step manifest.
+
+### Loose diagrams
+
+A loose diagram is a scene of the reserved project `_loose`, stored in the hidden
+folder `.loose` of the open workspace (see the data format). It uses the ordinary
+scene and step routes with `_loose` as the project ID. The project appears with
+its first scene: `POST /projects/_loose/scenes` creates `project.json` when it is
+missing, and until then `GET /projects/_loose` answers 404. `GET /projects` never
+lists it. Renaming or deleting `_loose` itself returns 400 `RESERVED_PROJECT`,
+creating a project with that ID returns 409 `RESERVED_PROJECT`, and
+`POST /projects/_loose/reveal` returns 404. An agent session on `_loose` must name
+its scene (400 `SCENE_REQUIRED` otherwise).
+
+### Moving a scene
+
+`POST /projects/:p/scenes/:s/move` puts the scene in the project named by
+`projectId`: last, or at `index` in its scene list (0 is first; past the end
+returns 400 `INVALID_INDEX`). It keeps the same scene, step and element IDs and the
+same file bytes, so step revisions do not change. It moves a loose diagram into a
+project, a scene out of a project into the loose diagrams (`projectId: "_loose"`,
+which creates `.loose` when it is missing), or a scene between projects. A project
+can be left with no scenes. Images the scene uses are copied unless the target has
+the same bytes under the same file ID. The images only the moved scene used are
+then removed when the source is `_loose`; a project keeps its own, as it does when
+a scene is deleted, since an agent run's restore point may still refer to them. The
+move needs the scene's `If-Match` (428 or 409 otherwise) and fails with 409
+`ID_COLLISION`, `ASSET_CONFLICT` or `AGENT_RUNNING` before writing anything. The
+same project as source and target returns 400 `MOVE_NOT_SUPPORTED`. The app saves
+the open step before it calls the route, and does not move a scene that has work
+it could not save.
+
+Both projects are locked for the move. The service writes a journal,
+`<source>/.moves/<sceneId>.json`, copies the images and the scene's files into
+`<target>/.incoming/<sceneId>`, reads every copy back and compares hashes, renames
+the staged folder to `scenes/<sceneId>`, and then writes the target's `sceneIds`.
+That write is the commit. A failure before it removes the copies and leaves the
+source as it was; after it, the source copy is removed. At start-up, before the
+first scan, every remaining journal in any project is finished or undone the same
+way, so a crash never loses or duplicates the scene.
 
 ## Events and external edits
 

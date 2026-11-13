@@ -167,6 +167,19 @@ describe('Claude Code session: arguments, environment and isolation', () => {
     await run(id, 'otra');
     expect(runs()[2].argv).not.toContain('--effort');
   });
+  it('works on one loose diagram: its scene is required, and the prompt names it as a loose diagram', async () => {
+    const created = await api('/api/projects/_loose/scenes', 'POST', { name: 'Suelto', id: 'loose-scene' });
+    expect(created.status).toBe(201);
+    const whole = await api('/api/agent/sessions', 'POST', { harness: 'claude', projectId: '_loose' });
+    expect(whole.status).toBe(400);
+    expect(whole.data.error.code).toBe('SCENE_REQUIRED');
+    const id = await session('_loose', { sceneId: 'loose-scene' });
+    const { end } = await run(id, 'Dibuja una caja');
+    expect(end).toEqual({ type: 'finished', reason: 'completed' });
+    const prompt = runs()[0].argv.find((arg) => arg.startsWith('Eres el asistente'))!;
+    expect(prompt).toContain('diagrama suelto: proyecto reservado «_loose», escena «loose-scene»');
+    expect(prompt).toContain('no crees escenas nuevas');
+  });
   it('builds the same arguments without a scene and with browser support', () => {
     const args = claudeArguments({ context: { projectId: 'p' }, board: { serviceUrl: 'http://127.0.0.1:1', sessionToken: 'x'.repeat(40), mcp: { command: 'node', args: ['a'], browserExecutable: '/b' } } });
     expect(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.paso.env.PASO_MCP_BROWSER_EXECUTABLE).toBe('${PASO_MCP_BROWSER_EXECUTABLE}');

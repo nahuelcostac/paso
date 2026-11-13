@@ -1,6 +1,6 @@
 /* Presentar: the drawing on paper, with a minimal frame. The mark and «Salir» on top, the step's title and the
    pager below. Everything but the pager fades with the pointer. See docs/design/direction.md. */
-.present { position: fixed; inset: 0; z-index: 40; overflow: hidden; isolation: isolate; background: var(--paper); user-select: none; -webkit-user-select: none; }
+.present { position: fixed; inset: 0; z-index: 40; overflow: hidden; isolation: isolate; background: var(--paper); user-select: none; -webkit-user-select: none; touch-action: pinch-zoom; }
 .present[data-idle='true'] { cursor: none; }
 /* Focus lives here only so that keys arrive. A ring around the whole screen would be chrome. */
 .present:focus-visible { box-shadow: none !important; }
@@ -33,13 +33,12 @@
 .present__exit kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink-3); font: var(--weight-medium) var(--text-11) / 1 var(--font-ui); }
 @media (prefers-reduced-motion: reduce) { .present__bar, .present__stage { transition: none; } }
 
-/* The laser pointer: a red dot with a short fading trail, over the drawing and under the frame. It replaces the cursor. */
-.present[data-laser] { cursor: none; }
+/* The laser, as the Lienzo's laser tool: its cursor over the drawing, and while the pointer is held a red trail that fades, over the drawing and under the frame. */
+.present { cursor: var(--laser-cursor, auto); }
+.present__bar, .indicator { cursor: auto; }
 .present[data-pan-ready] { cursor: grab; }
 .present[data-panning] { cursor: grabbing; }
 .laser { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-.laser line { stroke: #ff2d55; stroke-linecap: round; }
-.laser circle { fill: #ff2d55; filter: drop-shadow(0 0 6px rgb(255 45 85 / 0.9)) drop-shadow(0 0 14px rgb(255 45 85 / 0.5)); }
 
 /* The pager: centred at the bottom, on a grey pill, and always there. */
 .indicator { position: absolute; z-index: 4; left: 50%; bottom: 14px; translate: -50% 0; display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); white-space: nowrap; }
