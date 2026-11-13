@@ -160,13 +160,15 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     catch (error) { await scenesOf(projectId); sceneFailure(error); }
     await scenesOf(projectId);
   };
-  const reorderScene = async (projectId: string, id: string, delta: -1 | 1) => {
+  /** A scene dropped above or below another of its project. It is placed by its neighbour, so a change made meanwhile elsewhere is kept. */
+  const reorderScene = async (projectId: string, id: string, besideId: string, place: 'before' | 'after') => {
     try {
       const fresh = await api.getProject(projectId);
-      const ids = [...fresh.document.sceneIds];
-      const at = ids.indexOf(id);
-      if (at < 0 || at + delta < 0 || at + delta >= ids.length) return;
-      [ids[at], ids[at + delta]] = [ids[at + delta], ids[at]];
+      const ids = fresh.document.sceneIds.filter((candidate) => candidate !== id);
+      const beside = ids.indexOf(besideId);
+      if (beside < 0 || !fresh.document.sceneIds.includes(id)) throw new ApiRequestError(404, 'NOT_FOUND', 'gone');
+      ids.splice(beside + (place === 'after' ? 1 : 0), 0, id);
+      if (ids.every((candidate, at) => candidate === fresh.document.sceneIds[at])) return;
       await api.reorderScenes(projectId, fresh.revision, ids);
     } catch (error) { await scenesOf(projectId); sceneFailure(error); }
     await scenesOf(projectId);
@@ -369,7 +371,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
               }}
               onCreate={() => void createScene(projectRow.id)}
               onRename={(id, name) => renameScene(projectRow.id, id, name)}
-              onMove={(id, delta) => reorderScene(projectRow.id, id, delta)}
               onDelete={(id) => deleteScene(projectRow.id, id)}
               transfer={transfer}
             />;
@@ -382,6 +383,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           }}
           onCreateLoose={createLoose}
           onMoveScene={transferScene}
+          onReorderScene={reorderScene}
           onDeleteLoose={deleteLoose}
           currentId={route.projectId}
           creating={creating}

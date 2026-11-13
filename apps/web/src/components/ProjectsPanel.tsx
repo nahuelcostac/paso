@@ -49,6 +49,8 @@ type Props = {
    * Rejects with the reason.
    */
   onMoveScene: (sourceId: string, sceneId: string, targetId: string, index?: number) => Promise<void>;
+  /** Puts a scene above or below another scene of its own project. Rejects with the words to show. */
+  onReorderScene: (projectId: string, sceneId: string, besideId: string, place: 'before' | 'after') => Promise<void>;
   /** Deletes a loose diagram, and leaves it if it is on screen. Rejects with the reason. */
   onDeleteLoose: (id: string) => Promise<void>;
 };
@@ -74,7 +76,7 @@ const reasonText = (error: unknown) => error instanceof ActionError ? error.mess
  * The sidebar, laid out like tldraw's: the mark, the workspace switcher, search and «Nuevo proyecto», then the projects
  * grouped by when they last changed. Each workspace is a folder on this computer.
  */
-export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, saveState, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onDeleteLoose }: Props) {
+export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, saveState, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [picker, setPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null);
@@ -152,32 +154,45 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   const groups = groupByRecency(ok, (row) => row.project.updatedAt);
   const showList = state.phase === 'ready' && (state.rows.length > 0 || looseAll.length > 0 || creating || creatingLoose);
 
-  // Dragging a loose diagram onto a project, or a scene onto another project or out into the loose diagrams. It starts
-  // once the pointer has moved a few pixels, so a click still opens.
+  // Dragging a loose diagram onto a project, a scene onto another project or out into the loose diagrams, or a scene to
+  // another place in its own project. It starts once the pointer has moved a few pixels, so a click still opens.
   const [drag, setDrag] = useState<(Moving & { x: number; y: number; over: Drop | null }) | null>(null);
   const press = useRef<(Moving & { pointerId: number; x: number; y: number; started: boolean }) | null>(null);
   const swallowClick = useRef(false);
   const consumeClick = () => { const swallowed = swallowClick.current; swallowClick.current = false; return swallowed; };
   /**
    * Where a drop at this point would move the item: a project other than its own, or the loose diagrams. Over a scene
-   * of an unfolded project, above or below it by the half of the row the pointer is on; elsewhere, last.
+   * of an unfolded project, above or below it by the half of the row the pointer is on; elsewhere, last. In its own
+   * project, only over another place among its scenes.
    */
-  const targetAt = (x: number, y: number, source: string): Drop | null => {
+  const targetAt = (x: number, y: number, item: Moving): Drop | null => {
     const under = document.elementFromPoint(x, y);
     const holder = under?.closest<HTMLElement>('[data-drop-project]');
     const id = holder?.dataset.dropProject;
-    if (!holder || !id || id === source) return null;
-    if (isLooseProject(id)) return { id };
+    if (!holder || !id) return null;
+    if (isLooseProject(id)) return id === item.source ? null : { id };
     if (!state.rows.some((row) => row.id === id && row.kind === 'ok')) return null;
     const scene = under?.closest<HTMLElement>('[data-drop-scene]');
-    if (!scene || !holder.contains(scene)) return { id };
+    if (!scene || !holder.contains(scene)) return id === item.source ? null : { id };
     const box = scene.getBoundingClientRect();
     const place = y >= box.top + box.height / 2 ? 'after' : 'before';
-    return { id, index: Number(scene.dataset.dropIndex) + (place === 'after' ? 1 : 0), sceneId: scene.dataset.dropScene, place };
+    const index = Number(scene.dataset.dropIndex) + (place === 'after' ? 1 : 0);
+    if (id === item.source) {
+      // Right above or below itself, it would stay where it is.
+      const own = [...holder.querySelectorAll<HTMLElement>('[data-drop-scene]')].find((candidate) => candidate.dataset.dropScene === item.id);
+      const from = own ? Number(own.dataset.dropIndex) : -1;
+      if (from < 0 || index === from || index === from + 1) return null;
+    }
+    return { id, index, sceneId: scene.dataset.dropScene, place };
   };
   const targetName = (id: string) => isLooseProject(id) ? 'Diagramas sueltos' : named(id);
   const transfer = async (item: Moving, target: Drop) => {
     setNotice(null);
+    if (target.id === item.source && target.sceneId && target.place) {
+      try { await onReorderScene(item.source, item.id, target.sceneId, target.place); }
+      catch (error) { setNotice(`No se pudo mover «${item.name}». ${error instanceof Error ? error.message : 'Inténtalo de nuevo.'}`); }
+      return;
+    }
     try { await onMoveScene(item.source, item.id, target.id, target.index); }
     catch (error) { setNotice(`No se pudo mover «${item.name}». ${reasonText(error)}`); }
   };
@@ -193,7 +208,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       if (!held || held.pointerId !== event.pointerId) return;
       if (!held.started && Math.hypot(event.clientX - held.x, event.clientY - held.y) < 5) return;
       held.started = true;
-      setDrag({ ...item, x: event.clientX, y: event.clientY, over: targetAt(event.clientX, event.clientY, item.source) });
+      setDrag({ ...item, x: event.clientX, y: event.clientY, over: targetAt(event.clientX, event.clientY, item) });
     },
     onPointerUp: (event: ReactPointerEvent<HTMLElement>) => {
       const held = press.current;
@@ -201,7 +216,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       if (!held?.started) return;
       // The press ends a drag, not a click.
       swallowClick.current = true;
-      const over = targetAt(event.clientX, event.clientY, item.source);
+      const over = targetAt(event.clientX, event.clientY, item);
       setDrag(null);
       if (over) void transfer(item, over);
     },
@@ -230,6 +245,14 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     const beside = over.sceneId && row?.kind === 'ok' ? row.sceneList.find((scene) => scene.id === over.sceneId)?.name : undefined;
     return beside ? `${targetName(over.id)}», ${over.place === 'after' ? 'debajo' : 'encima'} de «${beside}` : targetName(over.id);
   })();
+  // In its own project, the scene only changes place.
+  const reorderName = (() => {
+    const over = drag?.over;
+    if (!drag || !over || over.id !== drag.source || !over.sceneId) return null;
+    const row = rowById(over.id);
+    const beside = row?.kind === 'ok' ? row.sceneList.find((scene) => scene.id === over.sceneId)?.name : undefined;
+    return beside ? `${over.place === 'after' ? 'debajo' : 'encima'} de «${beside}»` : null;
+  })();
   // A scene dragged out of a project can land among the loose diagrams, even while there are none.
   const sceneOut = drag !== null && !isLooseProject(drag.source);
 
@@ -254,7 +277,8 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       }}
       onRenameCancel={() => setRenamingId(null)}
       onRenameAbandon={(message) => { setRenamingId(null); setNotice(message); }}
-      dropTarget={drag?.over?.id === row.id}
+      // A scene changing place in its own project marks only the line, not the project.
+      dropTarget={drag?.over?.id === row.id && drag.source !== row.id}
     >{row.kind === 'ok' && expanded.has(row.id) ? sceneList?.(row, sceneTransfer(row.id)) : null}</ProjectRow>
   );
   const renderLoose = (diagram: LooseDiagram) => (
@@ -525,8 +549,8 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
         document.body,
       )}
       <p className="visually-hidden" role="status" aria-live="polite">
-        {drag ? (dropName ? `Suelta para mover «${drag.name}» a «${dropName}».` : sceneOut
-          ? `Arrastra «${drag.name}» sobre otro proyecto, o sobre los diagramas sueltos para sacarla.`
+        {drag ? (reorderName ? `Suelta para colocar «${drag.name}» ${reorderName}.` : dropName ? `Suelta para mover «${drag.name}» a «${dropName}».` : sceneOut
+          ? `Arrastra «${drag.name}» a otro sitio de su proyecto, sobre otro proyecto, o sobre los diagramas sueltos para sacarla.`
           : `Arrastra «${drag.name}» sobre un proyecto para moverlo.`) : ''}
       </p>
       {picker && rowById(picker.id)?.kind === 'ok' && (

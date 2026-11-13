@@ -27,6 +27,11 @@ vi.mock('./editor/StepCanvas', async () => {
   } };
 });
 vi.mock('./editor/use-thumbnails', () => ({ useThumbnails: () => ({ svgs: {}, titles: {} }) }));
+// jsdom has no PointerEvent: without it, a pointer event fired in a test carries no button or coordinates.
+if (typeof window.PointerEvent === 'undefined') {
+  class TestPointerEvent extends MouseEvent { pointerId: number; constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; } }
+  window.PointerEvent = TestPointerEvent as unknown as typeof PointerEvent;
+}
 vi.mock('./editor/scene-content', () => ({ restoreSceneContent: async (steps: Array<{ elements: Array<{ isDeleted: boolean; x: number; y: number; width: number; height: number }> }>) => {
   const elements = steps.map((step) => step.elements.filter((element) => !element.isDeleted));
   return { elements, bounds: elements.filter((drawn) => drawn.length > 0).map((drawn) => [Math.min(...drawn.map((e) => e.x)), Math.min(...drawn.map((e) => e.y)), Math.max(...drawn.map((e) => e.x + e.width)), Math.max(...drawn.map((e) => e.y + e.height))]) };
@@ -207,13 +212,32 @@ describe('moving through the presentation', () => {
     expect(hashStep()).toBe(steps[0]);
     expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', steps[0]);
   });
-  it('moves with a click on either half of the screen', async () => {
+  it('shows the laser only while the pointer is held down, and a click never changes the step', async () => {
     const user = userEvent.setup();
     const { steps } = await open([[box('a')], [box('b')]]);
     const dialog = await start(user);
     await expectShown(steps[0]);
-    fireEvent.click(dialog, { clientX: window.innerWidth - 10 }); await expectShown(steps[1]);
-    fireEvent.click(dialog, { clientX: 10 }); await expectShown(steps[0]);
+    expect(document.querySelector('.laser')).toBeNull();
+    fireEvent.pointerDown(dialog, { button: 0, isPrimary: true, pointerId: 1, clientX: 600, clientY: 200 });
+    expect(document.querySelector('.laser circle')).toHaveAttribute('cx', '600');   // the dot starts where the press is
+    expect(dialog).toHaveAttribute('data-laser', 'true');
+    fireEvent.pointerUp(dialog, { button: 0, isPrimary: true, pointerId: 1, clientX: 620, clientY: 210 });
+    expect(document.querySelector('.laser')).toBeNull();
+    expect(dialog).not.toHaveAttribute('data-laser');
+    fireEvent.click(dialog, { clientX: window.innerWidth - 10 });
+    fireEvent.click(dialog, { clientX: 10 });
+    await expectShown(steps[0]);
+    // Not on the pager, and not while Space is held to pan.
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Paso siguiente' }), { button: 0, isPrimary: true, pointerId: 2 });
+    expect(document.querySelector('.laser')).toBeNull();
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' });
+    fireEvent.pointerDown(dialog, { button: 0, isPrimary: true, pointerId: 3, clientX: 300, clientY: 300 });
+    expect(document.querySelector('.laser')).toBeNull();
+    fireEvent.pointerUp(window, { button: 0, pointerId: 3 });
+    fireEvent.keyUp(window, { key: ' ', code: 'Space' });
+    // L no longer turns it on.
+    await user.keyboard('l');
+    expect(document.querySelector('.laser')).toBeNull();
   });
   it('goes to the first and last step, and back and forth, from the pager, without the click also moving it', async () => {
     const user = userEvent.setup();
@@ -229,13 +253,13 @@ describe('moving through the presentation', () => {
     await user.click(screen.getByRole('button', { name: 'Paso siguiente' })); await expectShown(steps[1]);
     for (const name of ['Primer paso', 'Paso anterior', 'Paso siguiente', 'Último paso']) expect(screen.getByRole('button', { name })).toHaveAttribute('tabindex', '-1');
   });
-  it('zooms around the pointer and turns the laser on and off, from the keyboard, keeping the step', async () => {
+  it('zooms around the pointer from the keyboard, keeping the step', async () => {
     const user = userEvent.setup();
     const { steps } = await open([[box('a')], [box('b')]]);
     await start(user);
     await expectShown(steps[0]);
     const stage = document.querySelector<HTMLElement>('.present__stage')!;
-    fireEvent.mouseMove(window, { clientX: 200, clientY: 100 });
+    fireEvent.pointerMove(window, { clientX: 200, clientY: 100 });
     await user.keyboard('+');
     expect(Number(/scale\(([\d.]+)\)/.exec(stage.style.transform)![1])).toBeCloseTo(1.1);
     await user.keyboard('+');
@@ -247,12 +271,6 @@ describe('moving through the presentation', () => {
     expect(Number(/scale\(([\d.]+)\)/.exec(stage.style.transform)![1])).toBeCloseTo(1.1);
     await user.keyboard('0');
     expect(stage.style.transform).toBe('');
-    expect(document.querySelector('.laser')).toBeNull();
-    await user.keyboard('l');
-    expect(document.querySelector('.laser circle')).not.toBeNull();   // the dot starts where the pointer is
-    expect(screen.getByRole('dialog', { name: 'Presentación' })).toHaveAttribute('data-laser', 'true');
-    await user.keyboard('L');
-    expect(document.querySelector('.laser')).toBeNull();
     await expectShown(steps[1]);
   });
   it('keeps wheel zoom and pan between steps, reserves Space for panning and resets with 0', async () => {

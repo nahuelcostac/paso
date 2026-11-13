@@ -395,7 +395,7 @@ describe('the board and its overview', () => {
     expect(window.location.hash).toBe('#/one/lienzo/s1/s1t1');
   });
 
-  it('renames, moves and deletes scenes from the sidebar, like pages', async () => {
+  it('renames and deletes scenes from the sidebar, like pages', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera', 'Segunda']);
@@ -415,11 +415,10 @@ describe('the board and its overview', () => {
     await waitFor(() => expect(names()).toEqual(['Escena 1: Primera', '[Escena 2: El final]']), patience);
     expect((JSON.parse(await readFile(join(dataDir, 'one', 'scenes', 's2', 'scene.json'), 'utf8')) as { name: string }).name).toBe('El final');
 
+    // Scenes change place by dragging them, so the menu has no «Subir» or «Bajar».
     await user.click(within(list()).getByRole('button', { name: 'Acciones de la escena «El final»' }));
-    expect(await screen.findByRole('menuitem', { name: 'Bajar' })).toBeDisabled();
-    await user.click(screen.getByRole('menuitem', { name: 'Subir' }));
-    await waitFor(async () => expect((await readProject('one')).sceneIds).toEqual(['s2', 's1']), patience);
-    await waitFor(() => expect(names()).toEqual(['[Escena 1: El final]', 'Escena 2: Primera']), patience);
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual(['Renombrar', 'Mover a…', 'Eliminar…']);
+    await user.keyboard('{Escape}');
 
     // Deleting another scene leaves the board where it is.
     await user.click(within(list()).getByRole('button', { name: 'Acciones de la escena «Primera»' }));

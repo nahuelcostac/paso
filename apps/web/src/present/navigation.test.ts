@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clickAction, keyAction, moveIndex, preparationOrder, viewKeyAction } from './navigation';
+import { keyAction, moveIndex, preparationOrder, viewKeyAction } from './navigation';
 
 const press = (key: string, modifiers: Partial<KeyboardEvent> = {}) => keyAction({ key, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...modifiers });
 
@@ -20,10 +20,6 @@ describe('moving between steps', () => {
   });
   it('jumps to the first and last', () => { expect(moveIndex('first', 2, 3)).toBe(0); expect(moveIndex('last', 0, 3)).toBe(2); });
   it('has nowhere to go in a scene of one step', () => { for (const action of ['next', 'previous', 'first', 'last'] as const) expect(moveIndex(action, 0, 1)).toBe(0); });
-  it('splits a click at the middle of the screen', () => {
-    expect(clickAction(100, 1000)).toBe('previous'); expect(clickAction(499, 1000)).toBe('previous');
-    expect(clickAction(500, 1000)).toBe('next'); expect(clickAction(900, 1000)).toBe('next');
-  });
 });
 
 describe('what to prepare', () => {
@@ -34,7 +30,7 @@ describe('what to prepare', () => {
 
 describe('keys that change the view', () => {
   const view = (key: string, modifiers: Partial<KeyboardEvent> = {}) => viewKeyAction({ key, altKey: false, ctrlKey: false, metaKey: false, ...modifiers });
-  it.each([['+', 'zoomIn'], ['=', 'zoomIn'], ['-', 'zoomOut'], ['0', 'zoomReset'], ['l', 'laser'], ['L', 'laser']])('%j means %s', (key, action) => {
+  it.each([['+', 'zoomIn'], ['=', 'zoomIn'], ['-', 'zoomOut'], ['0', 'zoomReset']])('%j means %s', (key, action) => {
     expect(view(key)).toBe(action);
   });
   it('leaves the browser its own zoom, and other keys alone', () => {
@@ -42,5 +38,6 @@ describe('keys that change the view', () => {
     expect(view('-', { ctrlKey: true })).toBeUndefined();
     expect(view('ArrowRight')).toBeUndefined();
     expect(view('k')).toBeUndefined();
+    expect(view('l')).toBeUndefined();   // the laser is the pointer held down, not a key
   });
 });

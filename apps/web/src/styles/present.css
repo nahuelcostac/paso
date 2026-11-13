@@ -1,6 +1,6 @@
 /* Presentar: the drawing on paper, with a minimal frame. The mark and «Salir» on top, the step's title and the
    pager below. Everything but the pager fades with the pointer. See docs/design/direction.md. */
-.present { position: fixed; inset: 0; z-index: 40; overflow: hidden; isolation: isolate; background: var(--paper); user-select: none; -webkit-user-select: none; }
+.present { position: fixed; inset: 0; z-index: 40; overflow: hidden; isolation: isolate; background: var(--paper); user-select: none; -webkit-user-select: none; touch-action: pinch-zoom; }
 .present[data-idle='true'] { cursor: none; }
 /* Focus lives here only so that keys arrive. A ring around the whole screen would be chrome. */
 .present:focus-visible { box-shadow: none !important; }
@@ -33,7 +33,7 @@
 .present__exit kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink-3); font: var(--weight-medium) var(--text-11) / 1 var(--font-ui); }
 @media (prefers-reduced-motion: reduce) { .present__bar, .present__stage { transition: none; } }
 
-/* The laser pointer: a red dot with a short fading trail, over the drawing and under the frame. It replaces the cursor. */
+/* The laser pointer, while the pointer is held down: a red dot with a short fading trail, over the drawing and under the frame. It replaces the cursor. */
 .present[data-laser] { cursor: none; }
 .present[data-pan-ready] { cursor: grab; }
 .present[data-panning] { cursor: grabbing; }

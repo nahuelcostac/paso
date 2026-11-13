@@ -10,7 +10,7 @@ import { anchorRect, cameraZoom, NO_ZOOM, presentationFrame, type Viewport, type
 import { VIEW_ZOOM_STEP, zoomViewAt } from './camera-gestures';
 import { useCameraGestures } from './use-camera-gestures';
 import type { PresentFullscreen } from './fullscreen';
-import { clickAction, keyAction, moveIndex, preparationOrder, viewKeyAction, type PresentAction, type ViewAction } from './navigation';
+import { keyAction, moveIndex, preparationOrder, viewKeyAction, type PresentAction, type ViewAction } from './navigation';
 import { Laser } from './Laser';
 import { loadDeck, pageKey, renderPage, type Deck, type Page } from './pages';
 import { PageQueue, type QueueResult } from './page-queue';
@@ -79,12 +79,11 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const idle = useIdleCursor(CURSOR_IDLE_MS);
   // Manual camera changes stay between steps without a saved camera.
   const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
-  const [laser, setLaser] = useState(false);
   const pointer = useRef<{ x: number; y: number }>(undefined);
   useEffect(() => {
-    const move = (event: MouseEvent) => { pointer.current = { x: event.clientX, y: event.clientY }; };
-    window.addEventListener('mousemove', move);
-    return () => window.removeEventListener('mousemove', move);
+    const move = (event: PointerEvent) => { pointer.current = { x: event.clientX, y: event.clientY }; };
+    window.addEventListener('pointermove', move);
+    return () => window.removeEventListener('pointermove', move);
   }, []);
 
   const queue = useMemo(() => new PageQueue<Page>(() => setProgress((value) => value + 1), (page) => URL.revokeObjectURL(page.url)), []);
@@ -184,6 +183,22 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const [motion, setMotion] = useState<'none' | 'zoom' | 'camera'>('none');
   const directMotion = useCallback(() => setMotion('none'), []);
   const { panReady, panning } = useCameraGestures(root, zoom, setZoom, directMotion);
+  // The laser shows only while the pointer is held down on the drawing. A press never changes the step: the pager's
+  // arrows and the keys do. Space + drag and the middle button pan instead.
+  const [laser, setLaser] = useState<number>();
+  const holdLaser = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || event.isPrimary === false || panReady || (event.target instanceof Element && event.target.closest('button, .indicator, .present__bar'))) return;
+    pointer.current = { x: event.clientX, y: event.clientY };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* it still follows the pointer over the page */ }
+    setLaser(event.pointerId);
+  };
+  const dropLaser = (event: React.PointerEvent<HTMLDivElement>) => { if (event.pointerId === laser) setLaser(undefined); };
+  useEffect(() => {
+    if (laser === undefined) return;
+    const off = () => setLaser(undefined);
+    window.addEventListener('blur', off);
+    return () => window.removeEventListener('blur', off);
+  }, [laser]);
   const home = useRef<Zoom>(NO_ZOOM);
   const last = useRef<{ stepId?: string; camera: string; frame?: typeof frame }>({ camera: '' });
   useEffect(() => {
@@ -198,7 +213,6 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
     // stepCamera is read through its signature, so a new object with the same box does not move the view.
   }, [stepId, cameraSignature, frame, viewport]);
   const view = useCallback((action: ViewAction) => {
-    if (action === 'laser') { setLaser((on) => !on); return; }
     if (action === 'zoomReset') { setMotion('zoom'); setZoom(home.current); return; }
     const size = viewportNow();
     const around = pointer.current ?? { x: size.width / 2, y: size.height / 2 };
@@ -233,12 +247,11 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
 
   const frameOf = (page: Page) => anchorRect(page.anchor, presentationFrame(page.content, viewport));
   const count = deck?.steps.length ?? 0;
-  // The pager's own controls. A click on them must not also count as a click on the half of the screen they sit on.
-  const control = (action: PresentAction) => (event: React.MouseEvent) => { event.stopPropagation(); act(action); };
+  const control = (action: PresentAction) => () => act(action);
   const zoomed = zoom.scale !== 1 || zoom.x !== 0 || zoom.y !== 0;
   return <div
-    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={laser || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
-    onClick={(event) => act(clickAction(event.clientX, window.innerWidth))}
+    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={laser !== undefined || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
+    onPointerDown={holdLaser} onPointerUp={dropLaser} onPointerCancel={dropLaser} onLostPointerCapture={dropLaser}
   >
     <div className="present__paper" style={{ background: current?.paper }} />
     {/* The zoom magnifies the pages only: the frame and the pager stay as they are. */}
@@ -249,19 +262,19 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
       </div>)}
       {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">No se pudo dibujar este paso.</p></div>}
     </div>
-    {laser && <Laser start={pointer.current} />}
+    {laser !== undefined && <Laser start={pointer.current} />}
     {/* A minimal frame: the mark and the way out on top, the step and where you are below. It fades with the pointer. */}
     <div className="present__bar present__bar--top">
       <Brand />
-      <button type="button" className="present__exit" tabIndex={-1} onClick={(event) => { event.stopPropagation(); exit(); }}>
+      <button type="button" className="present__exit" tabIndex={-1} onClick={() => exit()}>
         <X className="i" aria-hidden="true" />Salir<kbd>Esc</kbd>
       </button>
     </div>
     <div className="present__bar present__bar--bottom">
       <p className="present__title">{step?.document.title}</p>
-      <p className="present__hint" aria-hidden="true" title="Pellizca o usa Ctrl/Cmd + rueda para zoom. Desplaza con dos dedos, la rueda o Espacio + arrastrar.">← → pasos · L láser · + − zoom{zoomed && zoom !== home.current ? ` · ${Math.round(zoom.scale * 100)}%, 0 vuelve` : ''}</p>
+      <p className="present__hint" aria-hidden="true" title="Pellizca o usa Ctrl/Cmd + rueda para zoom. Desplaza con dos dedos, la rueda o Espacio + arrastrar.">← → pasos · mantén pulsado: láser · + − zoom{zoomed && zoom !== home.current ? ` · ${Math.round(zoom.scale * 100)}%, 0 vuelve` : ''}</p>
     </div>
-    {count > 0 && <div className="indicator" onClick={(event) => event.stopPropagation()}>
+    {count > 0 && <div className="indicator">
       <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Primer paso" title="Primer paso (Inicio)" disabled={index === 0} onClick={control('first')}><ChevronFirst className="i" aria-hidden="true" /></button>
       <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Paso anterior" title="Paso anterior (←)" disabled={index === 0} onClick={control('previous')}><ChevronLeft className="i" aria-hidden="true" /></button>
       <span className="indicator__where" role="status" aria-label={`Paso ${index + 1} de ${count}`}>

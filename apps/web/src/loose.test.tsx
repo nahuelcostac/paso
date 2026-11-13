@@ -420,6 +420,52 @@ describe('moving a scene out of a project, or to another one', () => {
     expect(document.querySelector('[data-insert]')).not.toBeInTheDocument();
   });
 
+  it('puts a scene above or below another one of its own project by dragging it, and the board stays', async () => {
+    await seedProject('p', 'Proyecto');
+    await call('/api/projects/p/scenes', 'POST', { id: 'p-two', name: 'Segunda' });
+    await call('/api/projects/p/scenes', 'POST', { id: 'p-three', name: 'Tercera' });
+    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    render(<App config={config} recovery={memory()} />);
+    await waitFor(() => expect(sceneButton('Proyecto', 3)).toBeInTheDocument(), patience);
+    const row = (n: number) => sceneButton('Proyecto', n).closest('li')!;
+    const boxes = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const at = Number(this.dataset.dropIndex ?? 0);
+      return { top: 100 + at * 30, bottom: 130 + at * 30, height: 30, left: 0, right: 200, width: 200, x: 0, y: 100 + at * 30, toJSON() {} } as DOMRect;
+    });
+    const original = document.elementFromPoint;
+    try {
+      const from = sceneButton('Proyecto', 1);
+      // Right below itself, on the next scene's upper half, it would stay put: no line.
+      document.elementFromPoint = () => row(2);
+      fireEvent.pointerDown(from, { pointerId: 1, isPrimary: true, button: 0, clientX: 10, clientY: 105 });
+      fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 135 });
+      await waitFor(() => expect(document.querySelector('.drag-ghost')).toBeInTheDocument());
+      expect(document.querySelector('[data-insert]')).not.toBeInTheDocument();
+      // The lower half of «Tercera»: last. Only the line shows, not the project as a target.
+      document.elementFromPoint = () => row(3);
+      fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 185 });
+      await waitFor(() => expect(row(3)).toHaveAttribute('data-insert', 'after'));
+      expect(screen.getByRole('button', { name: /^Proyecto ?,/ }).closest('li')).not.toHaveAttribute('data-drop');
+      expect(document.body).toHaveTextContent('Suelta para colocar «Escena 1» debajo de «Tercera».');
+      fireEvent.pointerUp(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 185 });
+      fireEvent.click(from);
+      await waitFor(async () => expect(await sceneIds('p')).toEqual(['p-two', 'p-three', 'p-scene']), patience);
+      await waitFor(() => expect(sceneButton('Proyecto', 3)).toHaveAttribute('aria-current', 'true'), patience);
+
+      // «Tercera», now second, onto the upper half of the first: first.
+      document.elementFromPoint = () => row(1);
+      const third = sceneButton('Proyecto', 2);
+      fireEvent.pointerDown(third, { pointerId: 2, isPrimary: true, button: 0, clientX: 10, clientY: 135 });
+      fireEvent.pointerMove(third, { pointerId: 2, isPrimary: true, clientX: 40, clientY: 105 });
+      await waitFor(() => expect(row(1)).toHaveAttribute('data-insert', 'before'));
+      fireEvent.pointerUp(third, { pointerId: 2, isPrimary: true, clientX: 40, clientY: 105 });
+      await waitFor(async () => expect(await sceneIds('p')).toEqual(['p-three', 'p-two', 'p-scene']), patience);
+    } finally { document.elementFromPoint = original; boxes.mockRestore(); }
+    expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene/);
+    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Escenas de Proyecto' })).getAllByRole('button', { name: /^Escena \d: / }).map((button) => button.textContent))
+      .toEqual(['Escena 1: Tercera', 'Escena 2: Segunda', 'Escena 3: Escena 1']), patience);
+  });
+
   it('moves a scene from its menu, to the loose diagrams or to another project', async () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
