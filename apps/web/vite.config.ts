@@ -66,7 +66,7 @@ export default defineConfig(({ command }) => ({
     },
     transformIndexHtml() {
       const token = process.env.PASO_SESSION_TOKEN;
-      if (command !== 'serve') return [];
+      if (command !== 'serve' || process.env.PASO_DESKTOP_DEV === '1') return [];
       if (!token || !/^[A-Za-z0-9_-]{32,256}$/.test(token)) throw new Error('Start Paso with pnpm dev.');
       return [{ tag: 'meta', attrs: { name: 'paso-session-token', content: token }, injectTo: 'head' }];
     },
