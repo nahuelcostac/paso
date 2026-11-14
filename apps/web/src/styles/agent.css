@@ -29,18 +29,17 @@
   height: 12px;
 }
 
-/* Agent panel on the Storyboard: a floating cream card, as before IN-05. No rule under its head: space separates. */
+/* Agent panel on the Estudio: a column flush with the window's edges, like the sidebar, on the chrome's grey and edged
+   with a thin line. No rule under its head: space separates. As a drawer it floats, with rounded corners. */
 .agent {
   grid-column: 3;
   grid-row: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin: var(--space-2) var(--space-2) var(--space-2) 0;
   position: relative;
-  border-radius: var(--radius-panel);
   background: var(--surface);
-  box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
+  border-left: var(--border);
 }
 :root[data-resizing] { cursor: col-resize; user-select: none; -webkit-user-select: none; }
 :root[data-resizing] iframe, :root[data-resizing] canvas { pointer-events: none; }
@@ -310,6 +309,8 @@ button.chip:hover {
   width: min(var(--panel-agent), calc(100vw - var(--space-2) * 2));
   margin: 0;
   z-index: 6;
+  border-left: 0;
+  border-radius: var(--radius-panel);
   box-shadow: 0 0 0 1px var(--line), var(--shadow-lg);
 }
 .agent[data-narrow][data-open='true'] { display: flex; }
