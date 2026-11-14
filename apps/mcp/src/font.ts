@@ -1,8 +1,11 @@
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openSync, type Font } from 'fontkit';
 
-export const fontDirectory = join(dirname(createRequire(import.meta.url).resolve('@excalidraw/excalidraw')), 'fonts');
+const bundledFonts = fileURLToPath(new URL('./fonts/', import.meta.url));
+export const fontDirectory = existsSync(bundledFonts) ? bundledFonts : join(dirname(createRequire(import.meta.url).resolve('@excalidraw/excalidraw')), 'fonts');
 // Excalidraw 0.18.1 fonts/Excalifont/index.ts unicodeRange descriptors.
 const subsets = [
   ['a88b72a24fb54c9f94e3b5fdaa7481c9', '20-7e,a0-a3,a5-a6,a8-ab,ad-b1,b4,b6-b8,ba-ff,131,152-153,2bc,2c6,2da,2dc,304,308,2013-2014,2018-201a,201c-201e,2020,2022,2024-2026,2030,2039-203a,20ac,2122,2212'],

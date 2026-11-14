@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, net, session, shell } from 'electron';
-import { startServer } from '@paso/server';
+import { startServer } from './service.mjs';
 import { homedir } from 'node:os';
 import { join, resolve, sep, extname, dirname } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -14,7 +14,7 @@ const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 async function start() {
   service = await startServer({
     dataDir, port: 0,
-    agent: { mcp: { command: join(root, 'runtime', 'node'), entry: join(root, 'node_modules', '@paso', 'mcp', 'dist', 'cli.js') } },
+    agent: { mcp: { command: process.execPath, entry: join(root, 'mcp', 'cli.mjs'), electronRunAsNode: true } },
     openFolder: async (path) => { const error = await shell.openPath(path); if (error) throw new Error(error); },
   });
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
