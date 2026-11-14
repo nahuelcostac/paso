@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "main": "main.mjs",
-  "files": ["main.mjs", "preload.cjs"],
+  "files": ["main.mjs", "preload.cjs", "lib"],
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "node --check main.mjs && node --check preload.cjs && node --check build.mjs",
+    "typecheck": "node --check main.mjs && node --check preload.cjs && node --check build.mjs && for file in lib/*.mjs icon/build.mjs; do node --check \"$file\" || exit 1; done",
     "package": "pnpm --filter @paso/desktop... build && pnpm --filter @paso/web build && node package.mjs"
   },
   "dependencies": {

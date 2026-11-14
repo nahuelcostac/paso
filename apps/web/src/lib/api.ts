@@ -1,5 +1,6 @@
 import type { Project, Scene, Step } from '@paso/shared';
 import type { Target, Binaries } from '../editor/step-store';
+import type { DesktopBridge } from './desktop';
 
 export type ClientConfig = { baseUrl: string; token: string };
 
@@ -118,7 +119,7 @@ export type RunSummary = {
 };
 
 export function configFromPage(): ClientConfig {
-  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? (window as Window & { pasoDesktop?: { token: string } }).pasoDesktop?.token ?? '';
+  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? (window as Window & { pasoDesktop?: DesktopBridge }).pasoDesktop?.token ?? '';
   return { baseUrl: window.location.origin, token };
 }
 

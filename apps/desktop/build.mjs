@@ -4,3 +4,4 @@ import { fileURLToPath } from 'node:url';
 const root = dirname(fileURLToPath(import.meta.url));
 await mkdir(join(root, 'dist'), { recursive: true });
 await Promise.all(['main.mjs', 'preload.cjs'].map((file) => cp(join(root, file), join(root, 'dist', file))));
+await cp(join(root, 'lib'), join(root, 'dist', 'lib'), { recursive: true });
