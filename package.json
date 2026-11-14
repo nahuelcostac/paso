@@ -11,7 +11,8 @@
     "build": "pnpm -r build",
     "lint": "eslint .",
     "typecheck": "pnpm --filter \"@paso/server...\" build && pnpm -r typecheck",
-    "test": "pnpm --filter \"@paso/mcp...\" build && vitest run"
+    "test": "pnpm --filter \"@paso/mcp...\" build && vitest run",
+    "dev:desktop": "node scripts/dev-desktop.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
