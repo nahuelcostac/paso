@@ -1,0 +1,17 @@
+{
+  "name": "@paso/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "files": ["main.mjs", "preload.cjs"],
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "node --check main.mjs && node --check preload.cjs && node --check build.mjs",
+    "package": "pnpm --filter @paso/desktop... build && pnpm --filter @paso/web build && node package.mjs"
+  },
+  "dependencies": {
+    "@paso/mcp": "workspace:*",
+    "@paso/server": "workspace:*"
+  }
+}
