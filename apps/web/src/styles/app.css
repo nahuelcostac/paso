@@ -22,16 +22,16 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* The small spaced uppercase label above a title: «ESCENA 1 DE 3», «PASO 01». */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
-/* Shell: no header. Three columns: the sidebar (or its folded rail), the board, and the agent (or its folded rail).
+/* Shell: no header. Three columns: the sidebar (or its folded strip), the board, and the agent (or its folded strip).
    Each side keeps its own controls, so nothing runs across the top of the window. */
 .app {
   --left: var(--panel-projects); --right: 0px;
   display: grid; height: 100%;
   grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr) var(--right);
 }
-.app--panel-closed { --left: var(--rail-w); }
+.app--panel-closed { --left: var(--fold-w); }
 .app--agent { --right: var(--panel-agent); }
-.app--agent-rail { --right: var(--rail-w); }
+.app--agent-folded { --right: var(--fold-w); }
 
 /* A side's inner edge, as in Overleaf: a small tab with a chevron folds and unfolds it, and the edge drags to change its
    width. It sits on the line between the side and the board, at the middle of the window. A thin ink line shows the
@@ -55,20 +55,33 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 }
 .splitter__tab:hover { background: var(--surface-hover); color: var(--ink); }
 .splitter__tab svg { width: 14px; height: 14px; stroke-width: 2.25; }
+/* Folded, the side is only a thin strip on the chrome's grey, edged with a line, with the tab to open it filling its
+   middle. The edge inside the window still drags it open.
+   On a narrow window the strip stays while the side opens over the content. */
+.splitter[data-folded]::before, .app--agent-folded .splitter--right::before {
+  content: ''; position: absolute; top: 0; bottom: 0; width: var(--fold-w); background: var(--surface);
+}
+.splitter--left::before { right: 0; border-right: var(--border); }
+.splitter--right::before { left: 0; border-left: var(--border); }
+.splitter[data-folded] .splitter__tab { width: var(--fold-w); height: 56px; border-radius: 0; background: transparent; box-shadow: none; }
+.splitter[data-folded] .splitter__tab:hover { background: var(--surface-hover); }
+.splitter--left[data-folded] .splitter__tab { left: calc(-1 * var(--fold-w)); }
+.splitter--right[data-folded] .splitter__tab { left: 0; }
+.splitter--left[data-folded] .splitter__edge { left: -2px; width: 8px; }
+.splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
 .board, .main-message, .lienzo, .canvas { grid-column: 2; grid-row: 1; }
 
-/* A folded side: a narrow column of icon buttons on the chrome's paper, edged with a thin line. */
-.rail { grid-row: 1; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-3) 0; background: var(--surface); min-height: 0; }
-.rail--left { grid-column: 1; border-right: var(--border); }
-.rail--right { grid-column: 3; border-left: var(--border); }
-.rail__mark { margin-bottom: var(--space-2); }
-.rail__agent { display: grid; place-items: center; width: var(--control-h); height: var(--control-h); color: var(--ink-2); }
-/* The agent at work, with the panel folded: a pink pulse, the step it is changing, and Detener. */
-.rail__status { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding-top: var(--space-2); border-top: var(--border); }
-.rail__pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--agent); animation: rail-pulse 1.4s ease-in-out infinite; }
-.rail__status .icon-btn svg.i { width: 12px; height: 12px; fill: currentColor; }
-@keyframes rail-pulse { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .rail__pulse { animation: none; } }
+/* The agent at work with its panel folded: a floating pill at the foot of the Estudio, by the chat's tab, with a pink
+   pulse, the step it is changing as a pink chip, and Detener. */
+.agent-working {
+  position: absolute; z-index: 5; right: calc(var(--right) + var(--space-4)); bottom: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
+}
+.agent-working__pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--agent); animation: working-pulse 1.4s ease-in-out infinite; }
+.agent-working .icon-btn svg.i { width: 12px; height: 12px; fill: currentColor; }
+@keyframes working-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .agent-working__pulse { animation: none; } }
 
 
 .brand { display: flex; align-items: center; gap: 10px; flex: none; }
@@ -352,7 +365,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* Under 1160px the save state keeps its place for screen readers but gives its room to the agent status. */
 /* A narrow window: the sidebar opens over the content, with a scrim beside it that closes it. */
 @media (max-width: 1063px) {
-  .app { --left: var(--rail-w); }
+  .app { --left: var(--fold-w); }
   .projects { position: fixed; inset: 0 auto 0 0; width: min(280px, calc(100vw - 48px)); z-index: 15; border-right: 0; box-shadow: 0 0 0 1px var(--line), var(--shadow-lg); }
   .projects-scrim { display: block; position: fixed; inset: 0; z-index: 14; background: var(--scrim); }
 }

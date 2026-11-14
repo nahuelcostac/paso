@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AGENT_WIDTH, PROJECTS_WIDTH, RAIL, Splitter, useAgentWidth, useProjectsWidth } from './Splitter';
+import { AGENT_WIDTH, FOLDED, PROJECTS_WIDTH, Splitter, useAgentWidth, useProjectsWidth } from './Splitter';
 
 function Chat({ left = PROJECTS_WIDTH.initial }: { left?: number }) {
   const width = useAgentWidth(left, false);
@@ -66,7 +66,7 @@ describe('the chat width', () => {
     expect(now()).toBe(360);   // a wider sidebar leaves less: 1100 - 300 - 440
     cleanup();
     window.innerWidth = 1440;
-    render(<Chat left={RAIL} />);
+    render(<Chat left={FOLDED} />);
     expect(now()).toBe(720);
   });
 

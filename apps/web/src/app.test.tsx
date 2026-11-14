@@ -437,7 +437,7 @@ describe('the board and its overview', () => {
     expect((await readProject('one')).sceneIds).toEqual(['s1']);
   });
 
-  it('has no header: the tab on the sidebar\'s edge folds it into a rail, which starts a diagram, and opens it again', async () => {
+  it('has no header: the tab on the sidebar\'s edge folds it away, leaving only the tab, which opens it again', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     render(<App config={config} />);
@@ -449,13 +449,12 @@ describe('the board and its overview', () => {
     await user.click(tab);
     expect(screen.queryByRole('complementary', { name: 'Diagramas' })).not.toBeInTheDocument();
     expect(tab).toHaveAccessibleName('Mostrar diagramas');
-    const rail = screen.getByRole('navigation', { name: 'Diagramas' });
-    await user.click(within(rail).getByRole('button', { name: 'Nuevo proyecto' }));
-    expect(await screen.findByLabelText('Nombre del diagrama nuevo')).toHaveFocus();
-    await user.keyboard('{Escape}');
-    await user.click(screen.getByRole('button', { name: 'Ocultar diagramas' }));
-    await user.click(screen.getByRole('button', { name: 'Mostrar diagramas' }));
+    expect(screen.queryByRole('navigation', { name: 'Diagramas' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nuevo proyecto' })).not.toBeInTheDocument();
+    expect(document.querySelector('.app')).toHaveClass('app--panel-closed');
+    await user.click(tab);
     expect(screen.getByRole('complementary', { name: 'Diagramas' })).toBeInTheDocument();
+    expect(tab).toHaveAccessibleName('Ocultar diagramas');
   });
 
   it('opens each diagram again on the step where it was left', async () => {

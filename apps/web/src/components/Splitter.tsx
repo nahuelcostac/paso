@@ -5,8 +5,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 export const PROJECTS_WIDTH = { initial: 240, min: 200, max: 420 } as const;
 /** The chat's widths, in pixels. `initial` is --panel-agent in tokens.css. */
 export const AGENT_WIDTH = { initial: 360, min: 320, max: 720 } as const;
-/** A folded side: --rail-w in tokens.css. */
-export const RAIL = 52;
+/** A folded side: the thin strip that holds its tab, --fold-w in tokens.css. */
+export const FOLDED = 16;
 /** What the overview keeps beside the chat: the room for its cards. The chat is only in the overview. */
 export const BOARD_MIN = { storyboard: 440 } as const;
 const STEP = 16;
@@ -58,7 +58,7 @@ export function useProjectsWidth(boardMin: number = BOARD_MIN.storyboard) {
 }
 
 /**
- * The chat's width. It never takes the board's room beside the left column (`left`, the sidebar or its rail), and as a
+ * The chat's width. It never takes the board's room beside the left column (`left`, the sidebar or its strip), and as a
  * drawer it leaves a strip of the board in view.
  */
 export function useAgentWidth(left: number, drawer: boolean, boardMin: number = BOARD_MIN.storyboard) {
