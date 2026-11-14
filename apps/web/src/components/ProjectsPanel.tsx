@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { isLooseProject, LOOSE_PROJECT_ID, type Scene } from '@paso/shared';
 import { ChevronsUpDown, CloudOff, Folder, Layers, Search, ServerOff, Shapes, SquarePen, SquarePlus, TriangleAlert, X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
+import { nativeFolderChooser } from '../lib/desktop';
 import { describeContents, fold, groupByRecency } from '../lib/format';
 import { ActionError, workspaceErrorText, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
 import { Brand } from './Brand';
@@ -138,6 +139,15 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     try { await onSwitchWorkspace(action); setQuery(null); }
     catch (error) { setNotice(`${failure} ${workspaceErrorText(error)}`); }
     finally { setSwitching(false); }
+  };
+  /** «Nuevo workspace…»: the system's folder dialog in the desktop app, the in-app explorer in a browser. */
+  const addWorkspace = async () => {
+    const choose = nativeFolderChooser();
+    if (!choose) { setChoosingFolder(true); return; }
+    setNotice(null);
+    const path = await choose(activeWorkspace && !activeWorkspace.default ? activeWorkspace.path : undefined).catch(() => undefined);
+    if (path === undefined) { setNotice('No se pudo abrir el selector de carpetas.'); return; }
+    if (path) await workspaceAction(() => store.addWorkspace(path), 'No se pudo añadir la carpeta.');
   };
 
   const offline = !state.connected && state.phase === 'ready';
@@ -477,7 +487,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           activeId={listing.activeId}
           onClose={() => setWorkspaceMenu(false)}
           onSwitch={(id) => void workspaceAction(() => store.switchWorkspace(id), 'No se pudo abrir el workspace.')}
-          onAdd={() => setChoosingFolder(true)}
+          onAdd={() => void addWorkspace()}
           onReveal={() => { setNotice(null); void store.revealWorkspace(listing.activeId).catch(() => setNotice('No se pudo abrir la carpeta del workspace.')); }}
           onRemove={() => void workspaceAction(() => store.removeWorkspace(listing.activeId), 'No se pudo quitar el workspace.')}
         />

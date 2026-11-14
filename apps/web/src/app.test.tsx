@@ -263,6 +263,51 @@ describe('workspaces in the sidebar', () => {
   }, 20000);
 });
 
+describe('«Nuevo workspace…» in the desktop app', () => {
+  type Bridge = { chooseFolder?: (near?: string) => Promise<string | null> };
+  const desktop = window as Window & { pasoDesktop?: Bridge };
+  afterEach(() => { delete desktop.pasoDesktop; });
+
+  it('uses the system folder dialog instead of the explorer, and a cancel or a refused folder changes nothing', async () => {
+    const user = userEvent.setup();
+    otherRoot = await realpath(await mkdtemp(join(tmpdir(), 'paso-web-native-')));
+    await mkdir(join(otherRoot, 'Charlas'));
+    const asked: Array<string | undefined> = [];
+    let answer: string | null | Error = null;
+    desktop.pasoDesktop = { chooseFolder: async (near) => { asked.push(near); if (answer instanceof Error) throw answer; return answer; } };
+    render(<App config={config} />);
+    const sidebar = await screen.findByRole('complementary', { name: 'Diagramas' }, patience);
+    const openMenu = async (name: string) => {
+      await waitFor(() => expect(within(sidebar).getByRole('button', { name: `Workspace: ${name}` })).toBeEnabled(), patience);
+      await user.click(within(sidebar).getByRole('button', { name: `Workspace: ${name}` }));
+      await user.click(await screen.findByRole('menuitem', { name: 'Nuevo workspace…' }, patience));
+    };
+
+    // Cancelled: no explorer, no notice, the same workspace.
+    await openMenu('Mis diagramas');
+    await waitFor(() => expect(asked).toEqual([undefined]), patience);
+    expect(screen.queryByRole('dialog', { name: 'Nuevo workspace' })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Workspace: Mis diagramas' })).toBeInTheDocument();
+
+    // Picked: the folder becomes the open workspace.
+    answer = join(otherRoot, 'Charlas');
+    await openMenu('Mis diagramas');
+    await within(sidebar).findByRole('button', { name: 'Workspace: Charlas' }, patience);
+    expect(screen.queryByRole('dialog', { name: 'Nuevo workspace' })).not.toBeInTheDocument();
+
+    // From a folder workspace the dialog starts beside it; the service still refuses a folder already on the list.
+    await openMenu('Charlas');
+    await waitFor(() => expect(asked).toEqual([undefined, undefined, join(otherRoot!, 'Charlas')]), patience);
+    expect(await within(sidebar).findByRole('alert', undefined, patience)).toHaveTextContent('No se pudo añadir la carpeta. Esta carpeta ya es el workspace «Charlas».');
+
+    // The dialog itself failing is told too.
+    answer = new Error('no dialog');
+    await openMenu('Charlas');
+    expect(await within(sidebar).findByRole('alert', undefined, patience)).toHaveTextContent('No se pudo abrir el selector de carpetas.');
+  }, 20000);
+});
+
 describe('«Abrir carpeta»', () => {
   it('sits under «Renombrar» and opens the project folder; a failure is told in the panel', async () => {
     const user = userEvent.setup();
