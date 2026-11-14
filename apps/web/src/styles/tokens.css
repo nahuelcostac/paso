@@ -129,7 +129,7 @@
   /* -------------------------------------------------------------------- layout */
   --panel-projects: 240px;
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
-  --rail-w: 52px; /* a folded sidebar or agent panel */
+  --fold-w: 16px; /* a folded sidebar or agent panel: a thin strip that holds the tab to open it */
   --carousel-h: 108px;
   --control-h: 32px;
   --canvas-min-w: 744px; /* Excalidraw turns mobile below 730px; Presentar, icon only, still clears the toolbar at 744px */

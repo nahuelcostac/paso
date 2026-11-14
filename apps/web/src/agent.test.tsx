@@ -343,8 +343,9 @@ describe('a turn as it happens', () => {
     // With the panel in view, the top bar says nothing.
     expect(screen.queryByRole('status', { name: 'Agente trabajando' })).not.toBeInTheDocument();
 
-    // Folded, the panel leaves it to its rail.
-    await user.click(within(panel).getByRole('button', { name: 'Ocultar el agente' }));
+    // Folded, the panel leaves it to a small floating status.
+    expect(within(panel).queryByRole('button', { name: 'Cerrar el agente' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ocultar el agente' }));
     expect(screen.queryByRole('complementary', { name: 'Agente' })).not.toBeInTheDocument();
     const status = await screen.findByRole('status', { name: 'Agente trabajando' }, patience);
     expect(status).toHaveTextContent('Claude Code está cambiando el paso');
@@ -606,7 +607,7 @@ describe('the history of conversations', () => {
 });
 
 describe('narrow windows', () => {
-  it('opens the panel as a drawer from its rail, and shows the agent status there while it is closed', async () => {
+  it('opens the panel as a drawer from the tab on its edge, and shows the agent status while it is closed', async () => {
     window.innerWidth = 900;
     await call('POST', '/harnesses', { id: 'claude' });
     adapterImpl = async function* (_request, signal) {
@@ -620,6 +621,8 @@ describe('narrow windows', () => {
     const panel = screen.getByRole('complementary', { name: 'Agente', hidden: true });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(panel).not.toHaveAttribute('data-open');
+    // A drawer does not dock: there is no edge to drag, only the tab.
+    expect(screen.queryByRole('separator', { name: 'Anchura del chat' })).not.toBeInTheDocument();
 
     await user.click(toggle);
     expect(panel).toHaveAttribute('data-open', 'true');
