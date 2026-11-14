@@ -7,6 +7,8 @@ import type { AgentRunRequest, FailureCode } from './types.js';
 
 export const codexVersion = '0.166.0';
 export const codexDefaultModel = 'gpt-6.1-sol';
+/** The level a turn uses when the person chose none. */
+export const codexDefaultEffort = 'low';
 const disabledFeatures = [
   'shell_tool', 'unified_exec', 'apps', 'plugins', 'remote_plugin', 'memories', 'multi_agent', 'multi_agent_v2',
   'goals', 'view_image', 'image_generation', 'computer_use', 'browser_use', 'in_app_browser', 'shell_snapshot',
@@ -18,7 +20,11 @@ const disabledFeatures = [
 export function codexCatalog(model: string) {
   return { models: [{
     slug: model, display_name: model, description: 'Paso board assistant',
-    default_reasoning_level: 'low', supported_reasoning_levels: [{ effort: 'low', description: 'Brief board edits' }],
+    // The levels a message may pick (`effortLevels.codex`). Without one, a turn uses the default.
+    default_reasoning_level: codexDefaultEffort, supported_reasoning_levels: [
+      { effort: 'low', description: 'Brief board edits' }, { effort: 'medium', description: 'Balanced' },
+      { effort: 'high', description: 'Deeper reasoning' }, { effort: 'xhigh', description: 'Deepest reasoning' },
+    ],
     shell_type: 'disabled', visibility: 'list', supported_in_api: true, priority: 0,
     base_instructions: 'Eres el asistente de Paso. Solo puedes usar las herramientas del tablero. Responde en español.',
     include_skills_usage_instructions: false, include_plugin_usage_instructions: false, include_apps_usage_instructions: false,

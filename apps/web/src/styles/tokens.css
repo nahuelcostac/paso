@@ -32,66 +32,66 @@
   /* ------------------------------------------------------------------ colour
      Each pair is light-dark(light, dark). Use the names, never raw values. */
 
-  /* One warm paper family, in layers. The workspace (behind the Storyboard and around the floating panels) is an
-     off-white; the chrome (header, panels, chat, dialogs, menus) is the same paper one tone deeper; step cards and
-     what you type into are plain white. Dark mirrors it: the workspace is the deepest, the chrome a step up. */
-  --page: light-dark(#fbfaf8, #141210);
-  /* The Storyboard's own layer: white cards with thin warm lines. .board swaps these in for --surface, --surface-sunken,
+  /* Plain neutral greys, with no tint, in layers. The workspace (behind the Estudio) is an off-white; the chrome
+     (sidebar, rails, chat, dialogs, menus) is one tone deeper; step cards and what you type into are plain white. Dark
+     mirrors it: the workspace is the deepest, the chrome a step up. */
+  --page: light-dark(#fafafa, #111113);
+  /* The Estudio's own layer: white cards with thin lines. .board swaps these in for --surface, --surface-sunken,
      --surface-hover, --line and --line-strong. */
-  --work-surface: light-dark(#ffffff, #1d1a16);
-  --work-sunken: light-dark(#f5f3ef, #25221d);
-  --work-hover: light-dark(#eeebe5, #2d2924);
-  --work-line: light-dark(#e9e5de, #2e2a24);
-  --work-line-strong: light-dark(#d9d3c9, #433d35);
-  /* The chrome: header, floating panels, chat, dialogs, menus. Solid, never translucent. */
-  --surface: light-dark(#f4f1eb, #221f1a);
+  --work-surface: light-dark(#ffffff, #1a1a1d);
+  --work-sunken: light-dark(#f4f4f5, #222226);
+  --work-hover: light-dark(#ececee, #2a2a2e);
+  --work-line: light-dark(#e7e7ea, #2c2c31);
+  --work-line-strong: light-dark(#d4d4d8, #3f3f46);
+  /* The chrome: sidebar, rails, chat, dialogs, menus. Solid, never translucent. */
+  --surface: light-dark(#f6f6f7, #1e1e21);
   /* Lighter than the chrome: what you type into inside a panel (the chat's composer). */
-  --surface-raised: light-dark(#ffffff, #2c2823);
+  --surface-raised: light-dark(#ffffff, #28282c);
   /* A sunken fill on the chrome: hover, the user's chat bubble, the pager, a selected row. */
-  --surface-sunken: light-dark(#ebe7df, #2c2823);
+  --surface-sunken: light-dark(#ececee, #28282c);
   /* Hover on a sunken fill. */
-  --surface-hover: light-dark(#e3ded4, #36312b);
+  --surface-hover: light-dark(#e4e4e7, #323237);
 
   /* Paper: drawings only, and the Lienzo's step strip, which stays white beside the canvas. Dark value is Excalidraw's own. */
   --paper: light-dark(#ffffff, #121212);
 
   /* Lines on the chrome: thin borders between surfaces and around cards. */
-  --line: light-dark(#e4dfd5, #332e28);
+  --line: light-dark(#e5e5e8, #303035);
   /* Stronger edge: hovered cards, inputs, dashed slots. */
-  --line-strong: light-dark(#d2cbbe, #48423a);
+  --line-strong: light-dark(#d4d4d8, #46464d);
 
-  /* Behind a modal dialog, and the lift of popovers, dialogs and the floating panels. Warm, like the paper. */
-  --scrim: light-dark(rgb(40 30 14 / 0.24), rgb(0 0 0 / 0.55));
-  --shadow-sm: 0 1px 2px light-dark(rgb(60 46 24 / 0.05), rgb(0 0 0 / 0.3));
-  --shadow-md: 0 1px 2px light-dark(rgb(60 46 24 / 0.06), rgb(0 0 0 / 0.3)), 0 4px 12px light-dark(rgb(60 46 24 / 0.06), rgb(0 0 0 / 0.25));
-  --shadow-lg: 0 2px 6px light-dark(rgb(60 46 24 / 0.07), rgb(0 0 0 / 0.3)), 0 16px 40px light-dark(rgb(60 46 24 / 0.14), rgb(0 0 0 / 0.5));
+  /* Behind a modal dialog, and the lift of popovers, dialogs and the floating panels. */
+  --scrim: light-dark(rgb(16 16 20 / 0.24), rgb(0 0 0 / 0.55));
+  --shadow-sm: 0 1px 2px light-dark(rgb(24 24 27 / 0.05), rgb(0 0 0 / 0.3));
+  --shadow-md: 0 1px 2px light-dark(rgb(24 24 27 / 0.06), rgb(0 0 0 / 0.3)), 0 4px 12px light-dark(rgb(24 24 27 / 0.06), rgb(0 0 0 / 0.25));
+  --shadow-lg: 0 2px 6px light-dark(rgb(24 24 27 / 0.07), rgb(0 0 0 / 0.3)), 0 16px 40px light-dark(rgb(24 24 27 / 0.14), rgb(0 0 0 / 0.5));
 
-  /* Text: warm inks. --ink-3 passes AA on every layer; --muted is for icons and disabled text only. */
-  --ink: light-dark(#1d1a15, #f2ede3);
-  --ink-2: light-dark(#4b453a, #d9d3c6);
-  --ink-3: light-dark(#665d4f, #b3aa9a);
-  --muted: light-dark(#8f8676, #8a8172);
-  --on-ink: light-dark(#fffdf8, #1d1a15); /* text on an --ink fill */
+  /* Text: neutral inks. --ink-3 passes AA on every layer; --muted is for icons and disabled text only. */
+  --ink: light-dark(#18181b, #f4f4f5);
+  --ink-2: light-dark(#45454d, #d4d4d8);
+  --ink-3: light-dark(#5f5f67, #a8a8b0);
+  --muted: light-dark(#8b8b94, #84848c);
+  --on-ink: light-dark(#ffffff, #18181b); /* text on an --ink fill */
 
-  /* The accent is the ink itself: actions (Presentar, send, the first scene), the chosen view, the open step and the
-     current project. No second colour competes with the agent's pink. */
+  /* The accent is the ink itself: actions (Presentar, send, the first scene), the open step and the current diagram.
+     No second colour competes with the agent's pink. */
   --accent: var(--ink);
   --on-accent: var(--on-ink); /* text on an --accent fill */
-  --accent-strong: light-dark(#3a352d, #ffffff); /* hover and pressed */
+  --accent-strong: light-dark(#3f3f46, #ffffff); /* hover and pressed */
   --accent-ink: var(--ink); /* accent as text or icon on a surface */
-  --accent-soft: light-dark(#e9e5dd, #36312b); /* a selected row or option: a warm grey fill */
-  --accent-line: light-dark(#bdb4a5, #6a6255); /* its edge */
+  --accent-soft: light-dark(#e9e9ec, #323237); /* a selected row or option: a grey fill */
+  --accent-line: light-dark(#b4b4bb, #63636b); /* its edge */
 
   /* The agent marker: what the agent touched. A pink fill behind --on-agent text, so a board can be scanned for the
-     agent's work at a glance. It is the only colour in the chrome: everything else is paper and ink. */
+     agent's work at a glance. It is the only colour in the chrome: everything else is grey and ink. */
   --agent: #ff7ab2;
-  --on-agent: #1d1a15;
+  --on-agent: #18181b;
   --agent-ink: light-dark(#a3124f, #ff9ec6); /* agent text with no fill behind it */
 
-  --ok: light-dark(#3a9d6e, #5cc293); /* the «Guardado» dot */
+  --ok: light-dark(#2f9e6e, #5cc293); /* the «Guardado» dot */
   --danger-ink: light-dark(#b42318, #ff9a8f);
-  --danger-soft: light-dark(#fbece6, #3d2621);
-  --focus: light-dark(#7a7060, #b3aa9a); /* a warm grey that reaches 3:1 on every layer */
+  --danger-soft: light-dark(#fdecea, #3b2323);
+  --focus: light-dark(#71717a, #a1a1aa); /* a grey that reaches 3:1 on every layer */
 
   /* ---------------------------------------------------------------- typography
      Inter everywhere, numbers in tabular figures. 12px is the minimum, except the spaced uppercase eyebrow (11px). */
@@ -129,11 +129,10 @@
   /* -------------------------------------------------------------------- layout */
   --panel-projects: 240px;
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
-  --topbar-h: 60px;
-  --subbar-h: 48px;
+  --fold-w: 16px; /* a folded sidebar or agent panel: a thin strip that holds the tab to open it */
   --carousel-h: 108px;
   --control-h: 32px;
-  --canvas-min-w: 808px; /* Excalidraw clips "Biblioteca" somewhere under 780px and turns mobile below 730px */
+  --canvas-min-w: 744px; /* Excalidraw turns mobile below 730px; Presentar, icon only, still clears the toolbar at 744px */
 
   /* --------------------------------------------------------------------- shape */
   --radius-sm: 6px; /* small controls, badges, thumbnails in the carousel */
@@ -146,7 +145,7 @@
   --border: 1px solid var(--line);
 
   /* --------------------------------------------------------------------- focus
-     A warm grey ring that reaches 3:1 on every layer. Apply as box-shadow on :focus-visible so it
+     A grey ring that reaches 3:1 on every layer. Apply as box-shadow on :focus-visible so it
      follows the radius and is not clipped. The inner ring separates it from the element. */
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus);
 
@@ -179,7 +178,7 @@
 
 /*
  * Excalidraw theme: its primary colour becomes Paso's ink, its UI takes Inter, and its floating controls become white
- * cards with a thin warm line, like the Storyboard's step cards. The doubled class wins regardless of
+ * cards with a thin line, like the Estudio's step cards. The doubled class wins regardless of
  * stylesheet order. Variable names come from @excalidraw/excalidraw 0.18.1: re-check them when upgrading.
  */
 .excalidraw.excalidraw,
@@ -211,20 +210,20 @@
   --color-brand-hover: var(--accent-strong);
   --color-brand-active: var(--accent-soft);
 
-  /* One variable drives the active tool and every selected option in the properties panel: a soft warm grey with ink,
+  /* One variable drives the active tool and every selected option in the properties panel: a soft grey with ink,
      so a panel full of selected options stays calm. */
   --color-surface-primary-container: var(--accent-soft);
   --color-on-primary-container: var(--accent-ink);
 }
 
-/* Selection box and handles: --focus's warm grey, so selecting reads like focusing. Excalidraw hands this value straight
+/* Selection box and handles: --focus's grey, so selecting reads like focusing. Excalidraw hands this value straight
    to the canvas, which rejects light-dark() and silently draws black, so each theme needs a literal colour. The dark
-   canvas is drawn through Excalidraw's filter: #5f574b comes out as about #a7a096, close to dark --focus. */
+   canvas is drawn through Excalidraw's filter: #585858 comes out as about #a1a1a1, close to dark --focus. */
 .excalidraw.excalidraw {
-  --color-selection: #7a7060;
+  --color-selection: #71717a;
 }
 .excalidraw.excalidraw.theme--dark {
-  --color-selection: #5f574b;
+  --color-selection: #585858;
 }
 
 /* Its corner buttons are flat by default: give them the same card as the islands. */

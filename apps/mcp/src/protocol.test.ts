@@ -103,8 +103,16 @@ describe('compiled stdio MCP with a compiled local service', () => {
     expect(renamed.document).toMatchObject({ title: 'New', speakerNotes: 'After' });
     expect(JSON.stringify(await call('update_step', { ...target('a'), revision: a.revision, title: 'Stale' }))).toContain('REVISION_CONFLICT');
     expect(JSON.stringify(await call('delete_step', { ...target('a'), revision: a.revision }))).toContain('REVISION_CONFLICT');
-    const copy = await value<Envelope<Step>>('duplicate_step', { ...target('a'), revision: renamed.revision, id: 'copy', title: 'Copy title' });
-    expect(copy.document).toMatchObject({ title: 'Copy title', speakerNotes: 'After' });
+    // The presentation camera: set, read back, refused when malformed, and removed with null.
+    const framed = await value<Envelope<Step>>('update_step', { ...target('a'), revision: renamed.revision, camera: { x: 10, y: 20, width: 300, height: 200 } });
+    expect(framed.document).toMatchObject({ title: 'New', camera: { x: 10, y: 20, width: 300, height: 200 } });
+    expect(await value<{ camera?: unknown }>('read_step', target('a'))).toMatchObject({ camera: { x: 10, y: 20, width: 300, height: 200 } });
+    expect(JSON.stringify(await call('update_step', { ...target('a'), revision: framed.revision, camera: { x: 0, y: 0, width: 0, height: 10 } }))).toMatch(/isError|too_small|greater than 0/);
+    const unframed = await value<Envelope<Step>>('update_step', { ...target('a'), revision: framed.revision, camera: null });
+    expect(unframed.document).not.toHaveProperty('camera');
+    const reframed = await value<Envelope<Step>>('update_step', { ...target('a'), revision: unframed.revision, camera: { x: 0, y: 0, width: 50, height: 50 } });
+    const copy = await value<Envelope<Step>>('duplicate_step', { ...target('a'), revision: reframed.revision, id: 'copy', title: 'Copy title' });
+    expect(copy.document).toMatchObject({ title: 'Copy title', speakerNotes: 'After', camera: { x: 0, y: 0, width: 50, height: 50 } });
     await value('delete_step', { ...target('b'), revision: b.revision });
     await api(`${p}/runs/run/finish`, 'POST');
     const { plan } = await api<{ plan: { requiresForce: boolean; confirmationToken: string; changes: { stepsToRestore: { id: string }[]; stepsToRecreate: { id: string }[]; stepsToDelete: { id: string }[] } } }>(`${p}/runs/run/undo`);

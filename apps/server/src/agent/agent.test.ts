@@ -151,6 +151,35 @@ describe('Claude Code session: arguments, environment and isolation', () => {
     const second = runs()[2].argv;
     expect(second[second.indexOf('--resume') + 1]).toBe(session1);
   });
+  it('passes the reasoning effort of a message only when chosen, and refuses one the harness does not have', async () => {
+    const p = await project();
+    const id = await session(p);
+    await run(id, 'hola');
+    expect(runs()[0].argv).not.toContain('--effort');
+    expect((await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'hola', effort: 'turbo' })).status).toBe(400);
+    expect((await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'hola', effort: 3 })).status).toBe(400);
+    const sent = await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'piensa', effort: 'max' });
+    expect(sent.status).toBe(202);
+    await waitFor(async () => (await api(`/api/agent/sessions/${id}`)).data.state === 'idle' && runs().length === 2 || undefined, 'the second run');
+    const argv = runs()[1].argv;
+    expect(argv[argv.indexOf('--effort') + 1]).toBe('max');
+    // Each message picks its own: the next one without a choice goes back to the harness's default.
+    await run(id, 'otra');
+    expect(runs()[2].argv).not.toContain('--effort');
+  });
+  it('works on one loose diagram: its scene is required, and the prompt names it as a loose diagram', async () => {
+    const created = await api('/api/projects/_loose/scenes', 'POST', { name: 'Suelto', id: 'loose-scene' });
+    expect(created.status).toBe(201);
+    const whole = await api('/api/agent/sessions', 'POST', { harness: 'claude', projectId: '_loose' });
+    expect(whole.status).toBe(400);
+    expect(whole.data.error.code).toBe('SCENE_REQUIRED');
+    const id = await session('_loose', { sceneId: 'loose-scene' });
+    const { end } = await run(id, 'Dibuja una caja');
+    expect(end).toEqual({ type: 'finished', reason: 'completed' });
+    const prompt = runs()[0].argv.find((arg) => arg.startsWith('Eres el asistente'))!;
+    expect(prompt).toContain('diagrama suelto: proyecto reservado «_loose», escena «loose-scene»');
+    expect(prompt).toContain('no crees escenas nuevas');
+  });
   it('builds the same arguments without a scene and with browser support', () => {
     const args = claudeArguments({ context: { projectId: 'p' }, board: { serviceUrl: 'http://127.0.0.1:1', sessionToken: 'x'.repeat(40), mcp: { command: 'node', args: ['a'], browserExecutable: '/b' } } });
     expect(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.paso.env.PASO_MCP_BROWSER_EXECUTABLE).toBe('${PASO_MCP_BROWSER_EXECUTABLE}');
@@ -178,7 +207,10 @@ describe('Claude Code session: arguments, environment and isolation', () => {
 
 describe('event normalization', () => {
   it('turns Claude output into normalized events without arguments, results or Claude fields', async () => {
-    const { events } = await run(await session(await project()), 'SCENARIO:ok');
+    const { events: all } = await run(await session(await project()), 'SCENARIO:ok');
+    // Paso adds the person's message after `started`; the rest is what the harness said.
+    expect(all.slice(0, 2)).toEqual([{ type: 'started' }, { type: 'message', text: 'SCENARIO:ok' }]);
+    const events = [all[0], ...all.slice(2)];
     // The replay log leaves out text_delta (the live stream has them, see the WebSocket test).
     expect(events.map((e) => e.type)).toEqual(['started', 'session', 'text', 'tool_use', 'tool_result', 'tool_use', 'tool_result', 'text', 'finished']);
     expect(events[1]).toMatchObject({ type: 'session', resumeToken: expect.stringMatching(/^fake-session-/), model: 'fake-model' });
@@ -321,29 +353,67 @@ describe('sessions, limits and resume', () => {
     expect((await api(`/api/agent/sessions/${b}/messages`, 'POST', { text: 'hola' })).data.error.code).toBe('TOO_MANY_RUNS');
     await api(`/api/agent/sessions/${a}/cancel`, 'POST');
   });
-  it('keeps a resumable index with no messages in it, and resumes after a restart', async () => {
-    const p = await project();
-    const id = await session(p, { sceneId: 's1' });
-    expect((await api(`/api/agent/sessions/${id}/resume`, 'POST')).status).toBe(409); // Nothing to resume yet.
-    const { events } = await run(id, 'SCENARIO:ok un mensaje privado');
-    const token_ = (events.find((e) => e.type === 'session') as Extract<AgentEvent, { type: 'session' }>).resumeToken;
-    const indexFile = join(root, 'agent-sessions.json');
-    const stored = await readFile(indexFile, 'utf8');
-    expect(stored).toContain(token_);
-    expect(stored).not.toMatch(/privado|ARGUMENT|SECRET|Hola/);
-    expect(stored).not.toContain(token);
-    expect((await stat(indexFile)).mode & 0o777).toBe(0o600);
-    await service.close(); await start();
-    const listed = await api(`/api/agent/sessions?projectId=${p}`);
-    expect(listed.data.sessions).toMatchObject([{ id, harness: 'claude', projectId: p, sceneId: 's1', state: 'idle', resumable: true }]);
-    expect((await api(`/api/agent/sessions/${id}/resume`, 'POST')).data).toMatchObject({ id, resumable: true });
-    await run(id, 'continuamos');
-    const argv = runs().at(-1)!.argv;
-    expect(argv[argv.indexOf('--resume') + 1]).toBe(token_);
-    expect((await api('/api/agent/sessions/00000000-0000-4000-8000-000000000000/resume', 'POST')).status).toBe(404);
-    // Deleting a session forgets it.
-    expect((await api(`/api/agent/sessions/${id}`, 'DELETE')).status).toBe(204);
-    expect(JSON.parse(await readFile(indexFile, 'utf8'))).toEqual([]);
+  it('keeps a history of each conversation, resumes it after a restart, and deletes it everywhere', async () => {
+    const claudeConfig = join(root, 'claude-config');
+    const before = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = claudeConfig;
+    try {
+      const p = await project();
+      const id = await session(p, { sceneId: 's1' });
+      expect((await api(`/api/agent/sessions/${id}/resume`, 'POST')).status).toBe(409); // Nothing to resume yet.
+      const { events } = await run(id, 'SCENARIO:ok   un mensaje\nprivado');
+      // The person's message is part of the run's events, right after `started`.
+      expect(events.slice(0, 2)).toEqual([{ type: 'started' }, { type: 'message', text: 'SCENARIO:ok   un mensaje\nprivado' }]);
+      const token_ = (events.find((e) => e.type === 'session') as Extract<AgentEvent, { type: 'session' }>).resumeToken;
+      // The index holds the title (the start of the first message) and the size, never answers or the service token.
+      const indexFile = join(root, 'agent-sessions.json');
+      const stored = await readFile(indexFile, 'utf8');
+      expect(stored).toContain(token_);
+      expect(JSON.parse(stored)).toMatchObject([{ id, title: 'SCENARIO:ok un mensaje privado', turns: 1 }]);
+      expect(stored).not.toMatch(/ARGUMENT|SECRET|Hola/);
+      expect(stored).not.toContain(token);
+      expect((await stat(indexFile)).mode & 0o777).toBe(0o600);
+      // The history is a private file next to the index, outside the projects.
+      const historyFile = join(root, 'agent-transcripts', `${id}.json`);
+      // It is written just after the session is free again.
+      await waitFor(() => existsSync(historyFile) || undefined, 'the history file');
+      expect((await stat(historyFile)).mode & 0o777).toBe(0o600);
+      expect(await readFile(historyFile, 'utf8')).toContain('un mensaje');
+      expect(await readFile(historyFile, 'utf8')).not.toContain(token);
+
+      await service.close(); await start();
+      const listed = await api(`/api/agent/sessions?projectId=${p}`);
+      expect(listed.data.sessions).toMatchObject([{ id, harness: 'claude', projectId: p, sceneId: 's1', state: 'idle', resumable: true, title: 'SCENARIO:ok un mensaje privado', turns: 1 }]);
+      // After a restart the conversation is still there to read, in order.
+      const replay = (await api(`/api/agent/sessions/${id}/events`)).data;
+      expect(replay.events.map((e: { event: AgentEvent }) => e.event.type)).toEqual(events.filter((e) => e.type !== 'text_delta').map((e) => e.type));
+      expect((await api(`/api/agent/sessions/${id}/resume`, 'POST')).data).toMatchObject({ id, resumable: true });
+      const next = await run(id, 'continuamos');
+      const argv = runs().at(-1)!.argv;
+      expect(argv[argv.indexOf('--resume') + 1]).toBe(token_);
+      // The second run carries on the numbering (deltas are not kept, so it has gaps), and the history now has both.
+      const all = (await api(`/api/agent/sessions/${id}/events`)).data.events as { seq: number; runId: string; event: AgentEvent }[];
+      expect(all.every((e, i) => i === 0 || e.seq > all[i - 1].seq)).toBe(true);
+      expect(new Set(all.map((e) => e.runId)).size).toBe(2);
+      expect(all.filter((e) => e.event.type === 'message').map((e) => (e.event as { text: string }).text)).toEqual(['SCENARIO:ok   un mensaje\nprivado', 'continuamos']);
+      expect(all.at(-1)!.runId).toBe(next.runId);
+      expect((await api(`/api/agent/sessions/${id}`)).data).toMatchObject({ turns: 2, title: 'SCENARIO:ok un mensaje privado' });
+      expect((await api('/api/agent/sessions/00000000-0000-4000-8000-000000000000/resume', 'POST')).status).toBe(404);
+
+      // Deleting a conversation forgets it, its history and Claude Code's own transcript of it.
+      const folder = join(claudeConfig, 'projects', (await realpath(join(root, 'agent-workspace'))).replace(/[^A-Za-z0-9]/g, '-'));
+      await mkdir(join(folder, token_), { recursive: true });
+      await writeFile(join(folder, `${token_}.jsonl`), '{}');
+      await writeFile(join(folder, 'otra-conversacion.jsonl'), '{}');
+      expect((await api(`/api/agent/sessions/${id}`, 'DELETE')).status).toBe(204);
+      expect(JSON.parse(await readFile(indexFile, 'utf8'))).toEqual([]);
+      expect(existsSync(historyFile)).toBe(false);
+      expect(existsSync(join(folder, `${token_}.jsonl`))).toBe(false);
+      expect(existsSync(join(folder, token_))).toBe(false);
+      expect(existsSync(join(folder, 'otra-conversacion.jsonl'))).toBe(true);
+    } finally {
+      if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = before;
+    }
   });
   it('rejects resuming into a project that no longer exists', async () => {
     const p = await project();

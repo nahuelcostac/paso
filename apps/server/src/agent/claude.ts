@@ -1,4 +1,6 @@
 import { idSchema } from '@paso/shared';
+import { describeTarget } from './where.js';
+import { forgetClaude } from './forget.js';
 import { harnessEnvironment, startProcess } from './process.js';
 import type { AgentEvent, AgentRunRequest, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
 
@@ -46,7 +48,7 @@ export const failureMessage = (code: FailureCode) => messages[code];
  *  - `--setting-sources ""`: no user, project or local settings, hooks or CLAUDE.md files.
  *  - `--disable-slash-commands`: text starting with `/` is not a command or skill.
  */
-export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | 'model' | 'context' | 'board'>) {
+export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | 'model' | 'effort' | 'context' | 'board'>) {
   const mcp = {
     mcpServers: {
       [boardServerName]: {
@@ -59,9 +61,7 @@ export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | '
       },
     },
   };
-  const where = request.context.sceneId
-    ? `proyecto «${request.context.projectId}», escena «${request.context.sceneId}»`
-    : `proyecto «${request.context.projectId}»`;
+  const where = describeTarget(request.context);
   return [
     '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
     '--tools', '',
@@ -76,6 +76,7 @@ export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | '
     'Solo puedes usar las herramientas del tablero de Paso: no hay terminal, archivos ni web. ' +
     'Lee el paso antes de editarlo y responde en español, de forma breve.',
     ...(request.model ? ['--model', request.model] : []),
+    ...(request.effort ? ['--effort', request.effort] : []),
     ...(request.resumeToken ? ['--resume', request.resumeToken] : []),
   ];
 }
@@ -234,6 +235,7 @@ const exitGraceMs = 5000;
 
 export const claudeAdapter: HarnessAdapter = {
   id: 'claude',
+  forget: (token, workDir) => forgetClaude(token, workDir),
   run(request, signal) {
     const events = queue<AgentEvent>();
     const stream = new ClaudeStream();

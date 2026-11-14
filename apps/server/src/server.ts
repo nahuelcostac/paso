@@ -1,17 +1,18 @@
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { idSchema } from '@paso/shared';
+import { idSchema, isLooseProject } from '@paso/shared';
 import { WebSocketServer, WebSocket } from 'ws';
 import { assetName } from './disk.js';
 import { ApiError, errorResponse } from './errors.js';
 import { authorize } from './security.js';
 import { Store } from './store.js';
 import { HarnessRegistry, detectHarness, registryPath, type DetectionOptions } from './harnesses.js';
-import { RunStore } from './runs.js';
+import { RunStore, runsDirectoryPath } from './runs.js';
 import { openInFileManager, type OpenFolder } from './reveal.js';
 import { join, dirname, resolve } from 'node:path';
 import { realpath } from 'node:fs/promises';
 import { handleAgentRoute } from './agent/api.js';
+import { WorkspaceRegistry, createFolder, listFolders, workspacesPath, type Workspace } from './workspaces.js';
 import { SessionManager } from './agent/sessions.js';
 import type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId } from './agent/types.js';
 
@@ -41,6 +42,8 @@ export type StartServerOptions = {
   harnessRegistryPath?: string; harnessDetection?: DetectionOptions;
   agent?: AgentOptions;
   runsDir?: string; runRetentionLimit?: number;
+  /** Where the list of workspaces is kept. Default: `workspaces.json` next to the data directory. */
+  workspacesPath?: string;
   /** How «Abrir carpeta» shows a project's folder. Default: the system's file manager. A desktop host can pass its own,
    * such as Electron's shell.openPath. */
   openFolder?: OpenFolder;
@@ -71,16 +74,73 @@ export async function startServer(options: StartServerOptions) {
   const sessionToken = options.sessionToken ?? randomBytes(32).toString('base64url');
   if (!/^[A-Za-z0-9_-]{32,256}$/.test(sessionToken)) throw new Error('Session token must contain 32 to 256 base64url characters.');
   const harnesses = new HarnessRegistry(registryPath(options.dataDir, options.harnessRegistryPath), options.harnessDetection ?? {});
-  const runs = await RunStore.create(options.dataDir, { runsDir: options.runsDir, retentionLimit: options.runRetentionLimit });
-  const store = await Store.create(options.dataDir, options.pollIntervalMs, runs);
   let port = options.port ?? 3001;
   const agent = options.agent ?? {};
   const mcpEntry = agent.mcp?.entry ?? join(import.meta.dirname, '..', '..', 'mcp', 'dist', 'cli.js');
   const dataRoot = resolve(options.dataDir);
+  const defaultRuns = runsDirectoryPath(options.dataDir, options.runsDir);
+  const agentWorkDir = agent.workDir ?? join(dirname(dataRoot), 'agent-workspace');
+  // Restore points of the other workspaces live with the app's data, never in the person's folders.
+  const runsFor = (workspace: Workspace) => workspace.path === dataRoot ? defaultRuns : join(dirname(defaultRuns), 'workspaces', workspace.id, 'runs');
+  const workspaces = await WorkspaceRegistry.create(workspacesPath(options.dataDir, options.workspacesPath), dataRoot,
+    [dirname(dataRoot), defaultRuns, agentWorkDir]);
+
+  const websocket = new WebSocketServer({ noServer: true, maxPayload: 1024, handleProtocols: (protocols) => protocols.has('paso') ? 'paso' : false });
+  const broadcast = (event: unknown) => {
+    const message = JSON.stringify(event);
+    for (const client of websocket.clients) {
+      if (client.bufferedAmount > 1024 * 1024) client.terminate();
+      else if (client.readyState === WebSocket.OPEN) client.send(message);
+    }
+  };
+
+  /** The open workspace: its store, its restore points and its subscription to the event stream. */
+  type Open = { workspace: Workspace; store: Store; runs: RunStore; unsubscribe: () => void };
+  const open = async (workspace: Workspace): Promise<Open> => {
+    // The default folder is created on first use. Another workspace must still exist: a folder the person moved or
+    // deleted is reported, never quietly created again.
+    if (workspace.path !== dataRoot && !(await workspaces.list()).workspaces.find((item) => item.id === workspace.id)?.available) {
+      throw new ApiError(422, 'WORKSPACE_UNAVAILABLE', 'La carpeta de este workspace no existe o no se puede leer.');
+    }
+    const runs = await RunStore.create(workspace.path, { runsDir: runsFor(workspace), retentionLimit: options.runRetentionLimit });
+    const store = await Store.create(workspace.path, options.pollIntervalMs, runs);
+    return { workspace, store, runs, unsubscribe: store.subscribe(broadcast) };
+  };
+  let current: Open;
+  try { current = await open(workspaces.active()); }
+  catch {
+    // The workspace open last time is gone: start in the default one.
+    await workspaces.activate(workspaces.get('default').id);
+    current = await open(workspaces.active());
+  }
+  let switching: Promise<void> | undefined;
+  const switchTo = async (id: string) => {
+    const workspace = workspaces.get(id);
+    if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'Ya se está cambiando de workspace.');
+    if (sessions.busy()) throw new ApiError(409, 'AGENT_RUNNING', 'Espera a que el agente termine antes de cambiar de workspace.');
+    if (workspace.id === current.workspace.id) { await workspaces.activate(id); return; }
+    let done!: () => void;
+    switching = new Promise<void>((resolve) => { done = resolve; });
+    try {
+      const next = await open(workspace);
+      const previous = current;
+      current = next;
+      previous.unsubscribe();
+      await previous.store.close();
+      await workspaces.activate(id);
+    } finally { switching = undefined; done(); }
+    broadcast({ type: 'workspaces', activeId: current.workspace.id });
+  };
+
   const sessions = new SessionManager({
     adapters: agent.adapters,
     detect: (id) => detectHarness(id, options.harnessDetection ?? {}),
-    validateTarget: async (projectId, sceneId) => { await store.read(projectId, sceneId); },
+    validateTarget: async (projectId, sceneId) => {
+      if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'Paso está cambiando de workspace.');
+      // A loose diagram is one scene: the agent gets that scene, never every loose diagram at once.
+      if (isLooseProject(projectId) && !sceneId) throw new ApiError(400, 'SCENE_REQUIRED', 'Name the loose diagram (its scene) the agent works on.');
+      await current.store.read(projectId, sceneId);
+    },
     board: () => ({
       serviceUrl: `http://127.0.0.1:${port}`, sessionToken,
       mcp: {
@@ -88,16 +148,16 @@ export async function startServer(options: StartServerOptions) {
         ...(agent.mcp?.browserExecutable ? { browserExecutable: agent.mcp.browserExecutable } : {}),
       },
     }),
-    workDir: agent.workDir ?? join(dirname(dataRoot), 'agent-workspace'), dataDir: dataRoot,
+    workDir: agentWorkDir, dataDir: dataRoot,
     sessionsPath: registryPath(options.dataDir, agent.sessionsPath ?? join(dirname(dataRoot), 'agent-sessions.json')),
     hooks: {
       beforeRun: async (context) => {
         await agent.hooks?.beforeRun?.(context);
-        await runs.start(store, context.projectId, { id: context.runId, label: `${context.harness}:${context.sessionId}` });
+        await current.runs.start(current.store, context.projectId, { id: context.runId, label: `${context.harness}:${context.sessionId}` });
       },
       afterRun: async (context, outcome) => {
         try {
-          await runs.finish(store, context.projectId, context.runId);
+          await current.runs.finish(current.store, context.projectId, context.runId);
         } catch (error) {
           if (!(error instanceof ApiError && error.code === 'NOT_FOUND')) throw error;
         } finally {
@@ -134,9 +194,45 @@ export async function startServer(options: StartServerOptions) {
         if (parts.length === 3 && method === 'DELETE') { await harnesses.remove(parts[2]); send(response, 204); return; }
         throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
       }
+      if (parts[0] === 'api' && parts[1] === 'workspaces') {
+        if (parts.length === 2 && method === 'GET') { send(response, 200, await workspaces.list()); return; }
+        if (parts.length === 2 && method === 'POST') {
+          const added = await workspaces.add(await json());
+          broadcast({ type: 'workspaces', activeId: current.workspace.id });
+          send(response, 201, added); return;
+        }
+        if (parts.length === 3 && parts[2] === 'active' && method === 'PUT') {
+          const input = await json() as { id?: unknown } | null;
+          if (typeof input?.id !== 'string') throw new ApiError(400, 'VALIDATION_ERROR', 'Send the id of a workspace.');
+          await switchTo(input.id);
+          send(response, 200, await workspaces.list()); return;
+        }
+        if (parts.length === 3 && method === 'DELETE') {
+          workspaces.get(parts[2]);
+          if (workspaces.isDefault(parts[2])) throw new ApiError(400, 'DEFAULT_WORKSPACE', 'The default workspace cannot be removed.');
+          if (current.workspace.id === parts[2]) await switchTo('default');
+          await workspaces.remove(parts[2]);
+          broadcast({ type: 'workspaces', activeId: current.workspace.id });
+          send(response, 204); return;
+        }
+        if (parts.length === 4 && parts[3] === 'reveal' && method === 'POST') {
+          const { path } = workspaces.get(parts[2]);
+          try { await (options.openFolder ?? openInFileManager)(path); }
+          catch { throw new ApiError(500, 'REVEAL_FAILED', 'Could not open the workspace folder.'); }
+          send(response, 204); return;
+        }
+        throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+      }
+      if (parts[0] === 'api' && parts[1] === 'folders' && parts.length === 2) {
+        if (method === 'GET') { send(response, 200, await listFolders(new URL(request.url ?? '/', 'http://127.0.0.1').searchParams.get('path') ?? undefined)); return; }
+        if (method === 'POST') { send(response, 201, await createFolder(await json())); return; }
+        throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+      }
       const agentReply = await handleAgentRoute(sessions, parts, method, new URL(request.url ?? '/', 'http://127.0.0.1'), json);
       if (agentReply) { send(response, agentReply.status, agentReply.data); return; }
       if (parts[0] !== 'api' || parts[1] !== 'projects') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+      // Every project route works in the open workspace.
+      const { store, runs } = current;
       if (parts.length === 2) {
         if (method === 'GET') { send(response, 200, await store.list()); return; }
         if (method === 'POST') { const result = await store.create(await json()); send(response, 201, result, result.revision); return; }
@@ -152,8 +248,10 @@ export async function startServer(options: StartServerOptions) {
       } else if (parts.length === 4 && parts[3] === 'reveal') {
         // «Abrir carpeta»: the project's own folder, named by its ID under the data directory.
         if (method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+        // The loose diagrams' hidden folder is not a project the person opens.
+        if (isLooseProject(projectId)) throw new ApiError(404, 'NOT_FOUND', 'Project not found.');
         await store.read(projectId);
-        try { await (options.openFolder ?? openInFileManager)(join(await realpath(options.dataDir), projectId)); }
+        try { await (options.openFolder ?? openInFileManager)(join(await realpath(current.workspace.path), projectId)); }
         catch { throw new ApiError(500, 'REVEAL_FAILED', 'Could not open the project folder.'); }
         status = 204;
       } else if (parts[3] === 'runs') {
@@ -202,6 +300,10 @@ export async function startServer(options: StartServerOptions) {
             else if (method === 'PATCH') result = await store.mutate(projectId, 'rename', await json(), revision, sceneId, undefined, actor);
             else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, sceneId, undefined, actor); status = 204; }
             else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+          } else if (parts.length === 6 && parts[5] === 'move') {
+            // A loose diagram into a project: { projectId } names the project, If-Match carries the scene's revision.
+            if (method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
+            result = await store.moveScene(projectId, sceneId, await json(), revision);
           } else if (parts[5] === 'steps') {
             if (parts.length === 6) {
               if (method === 'GET') result = await store.read(projectId, sceneId, undefined, 'steps');
@@ -230,7 +332,6 @@ export async function startServer(options: StartServerOptions) {
   });
   server.requestTimeout = 30_000;
   server.headersTimeout = 10_000;
-  const websocket = new WebSocketServer({ noServer: true, maxPayload: 1024, handleProtocols: (protocols) => protocols.has('paso') ? 'paso' : false });
   server.on('upgrade', (request, socket, head) => {
     try {
       authorize(request, sessionToken, port, allowedOrigins, true);
@@ -246,23 +347,15 @@ export async function startServer(options: StartServerOptions) {
       socket.end(`HTTP/1.1 ${failure.status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
     }
   });
-  const broadcast = (event: unknown) => {
-    const message = JSON.stringify(event);
-    for (const client of websocket.clients) {
-      if (client.bufferedAmount > 1024 * 1024) client.terminate();
-      else if (client.readyState === WebSocket.OPEN) client.send(message);
-    }
-  };
-  const unsubscribeStore = store.subscribe(broadcast);
   // Agent events share the authenticated socket: { type: 'agent', sessionId, runId, seq, at, event }.
   const unsubscribeAgents = sessions.subscribe((entry) => broadcast({ type: 'agent', ...entry }));
-  const unsubscribe = () => { unsubscribeStore(); unsubscribeAgents(); };
+  const unsubscribe = () => { current.unsubscribe(); unsubscribeAgents(); };
   try {
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
       server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
     });
-  } catch (error) { unsubscribe(); websocket.close(); await store.close(); throw error; }
+  } catch (error) { unsubscribe(); websocket.close(); await current.store.close(); throw error; }
   port = (server.address() as { port: number }).port;
   allowedOrigins.add(`http://127.0.0.1:${port}`);
   allowedOrigins.add(`http://localhost:${port}`);
@@ -276,7 +369,8 @@ export async function startServer(options: StartServerOptions) {
       websocket.close();
       const closed = new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
       server.closeAllConnections();
-      await Promise.all([closed, store.close()]);
+      await switching;
+      await Promise.all([closed, current.store.close()]);
     },
   };
 }

@@ -3,3 +3,5 @@
 .step-canvas { width: 100%; height: 100%; min-width: var(--canvas-min-w); font-size: 16px; line-height: normal; }
 /* es-ES has an English flowchart fragment. Keep the whole hint out until upstream translates it. */
 .step-canvas .HintViewer { display: none; }
+/* Presentar takes the library button's corner; the library opens from the main menu. */
+.step-canvas .default-sidebar-trigger { display: none; }

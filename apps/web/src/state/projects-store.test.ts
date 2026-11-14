@@ -118,3 +118,101 @@ describe('ProjectsStore', () => {
     expect(store.getState().reason).toBe('session');
   });
 });
+
+describe('ProjectsStore: loose diagrams', () => {
+  const auth = () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
+  const post = (path: string, body: unknown) => fetch(`${service.url}${path}`, { method: 'POST', headers: auth(), body: JSON.stringify(body) });
+
+  it('keeps them apart from the projects, newest first, and follows changes made elsewhere', async () => {
+    await post('/api/projects', { id: 'p', name: 'Proyecto' });
+    store.start();
+    await until(() => store.getState().phase === 'ready');
+    expect(store.getState().loose).toBeNull();
+    await post('/api/projects/_loose/scenes', { id: 'first', name: 'Primero' });
+    await post('/api/projects/_loose/scenes/first/steps', {});
+    await post('/api/projects/_loose/scenes', { id: 'second', name: 'Segundo' });
+    await until(() => store.getState().loose?.diagrams.length === 2);
+    const { rows, loose } = store.getState();
+    expect(rows.map((row) => row.id)).toEqual(['p']);
+    expect(loose!.diagrams.map((diagram) => [diagram.id, diagram.scene.name, diagram.steps])).toEqual([['second', 'Segundo', 0], ['first', 'Primero', 1]]);
+  });
+
+  it('renames, deletes and moves one into a project', async () => {
+    await post('/api/projects', { id: 'p', name: 'Proyecto' });
+    await post('/api/projects/_loose/scenes', { id: 'd', name: 'Suelto' });
+    await post('/api/projects/_loose/scenes/d/steps', { id: 'd-step' });
+    await post('/api/projects/_loose/scenes', { id: 'gone', name: 'Para borrar' });
+    store.start();
+    await until(() => store.getState().loose?.diagrams.length === 2);
+
+    await store.renameLoose('d', 'Renombrado');
+    expect(store.getState().loose!.diagrams.find((diagram) => diagram.id === 'd')!.scene.name).toBe('Renombrado');
+    await store.removeLoose('gone');
+    expect(store.getState().loose!.diagrams.map((diagram) => diagram.id)).toEqual(['d']);
+
+    await store.moveScene('_loose', 'd', 'p');
+    expect(store.getState().loose!.diagrams).toEqual([]);
+    const row = store.getState().rows.find((candidate) => candidate.id === 'p');
+    expect(row?.kind === 'ok' && [row.project.sceneIds, row.scenes, row.steps]).toEqual([['d'], 1, 1]);
+  });
+
+  it('takes a scene out of a project into the loose diagrams, and moves one between projects', async () => {
+    await post('/api/projects', { id: 'p', name: 'Proyecto' });
+    await post('/api/projects', { id: 'q', name: 'Otro' });
+    await post('/api/projects/p/scenes', { id: 's1', name: 'Primera' });
+    await post('/api/projects/p/scenes', { id: 's2', name: 'Segunda' });
+    await post('/api/projects/p/scenes/s2/steps', { id: 's2-step' });
+    store.start();
+    await until(() => store.getState().rows.length === 2);
+    expect(store.getState().loose).toBeNull();
+
+    await store.moveScene('p', 's2', '_loose');
+    expect(store.getState().loose!.diagrams.map((diagram) => [diagram.id, diagram.scene.name, diagram.steps])).toEqual([['s2', 'Segunda', 1]]);
+    const source = store.getState().rows.find((candidate) => candidate.id === 'p');
+    expect(source?.kind === 'ok' && source.sceneList.map((scene) => scene.id)).toEqual(['s1']);
+
+    await store.moveScene('p', 's1', 'q');
+    const rows = Object.fromEntries(store.getState().rows.map((row) => [row.id, row.kind === 'ok' ? row.sceneList.map((scene) => scene.id) : null]));
+    expect(rows).toEqual({ p: [], q: ['s1'] });
+  });
+
+  it('says why a move failed and keeps the diagram', async () => {
+    await post('/api/projects', { id: 'p', name: 'Proyecto' });
+    await post('/api/projects/p/scenes', { id: 's', name: 'Escena' });
+    await post('/api/projects/p/scenes/s/steps', { id: 'clash' });
+    await post('/api/projects/_loose/scenes', { id: 'd', name: 'Suelto' });
+    await post('/api/projects/_loose/scenes/d/steps', { id: 'clash-too' });
+    store.start();
+    await until(() => store.getState().loose?.diagrams.length === 1);
+    await expect(store.moveScene('_loose', 'd', 'missing')).rejects.toBeInstanceOf(ActionError);
+    // A step ID the project already uses stops the move.
+    await post('/api/projects/_loose/scenes/d/steps', { id: 'clash' });
+    await until(() => store.getState().loose?.diagrams[0].steps === 2);
+    await expect(store.moveScene('_loose', 'd', 'p')).rejects.toThrow('El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
+    expect(store.getState().loose!.diagrams.map((diagram) => diagram.id)).toEqual(['d']);
+  });
+
+  it('shows the loose diagrams of the workspace that is open', async () => {
+    // Its own folders, so the second workspace sits outside the service's data.
+    const root = await mkdtemp(join(tmpdir(), 'paso-store-workspaces-'));
+    store.dispose();
+    await service.close();
+    service = await startServer({
+      dataDir: join(root, 'app', 'projects'), workspacesPath: join(root, 'app', 'workspaces.json'), runsDir: join(root, 'app', 'runs'),
+      harnessRegistryPath: join(root, 'app', 'harnesses.json'), port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100,
+    });
+    store = new ProjectsStore(new ApiClient({ baseUrl: service.url, token }));
+    await mkdir(join(root, 'Clases'));
+    try {
+      await post('/api/projects/_loose/scenes', { id: 'here', name: 'Aquí' });
+      store.start();
+      await until(() => store.getState().loose?.diagrams.length === 1);
+      await store.addWorkspace(join(root, 'Clases'));
+      expect(store.getState().loose).toBeNull();
+      await post('/api/projects/_loose/scenes', { id: 'there', name: 'Allí' });
+      await until(() => store.getState().loose?.diagrams[0]?.id === 'there');
+      await store.switchWorkspace('default');
+      expect(store.getState().loose!.diagrams.map((diagram) => diagram.id)).toEqual(['here']);
+    } finally { store.dispose(); await service.close(); service = await startServer({ dataDir, port: 0, sessionToken: token }); await rm(root, { recursive: true, force: true }); }
+  });
+});

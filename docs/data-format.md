@@ -20,13 +20,44 @@ Use stable IDs for paths. Names and titles are display text. Renames do not move
 files. IDs used in paths contain 1 to 128 ASCII letters, digits, underscores or
 hyphens. Creation helpers generate UUIDs unless an ID is supplied.
 
+## Loose diagrams
+
+A loose diagram is one scene, with its steps, that belongs to no project. Loose
+diagrams are kept in a reserved project, so the model stays project > scenes >
+steps. Each workspace has its own, in a hidden folder at its root:
+
+```text
+<workspace>/
+  <project>/...
+  .loose/
+    project.json        id "_loose", name "Diagramas sueltos"
+    assets/<fileId>.<ext>
+    scenes/<sceneId>/...
+```
+
+The folder name starts with a dot, so Finder and `ls` hide it, and it is not a
+valid project ID, so a scan for projects never finds it by accident. Its documents
+are ordinary version 1 documents: `project.json` has the ID `_loose`, and the
+filesystem adapter maps that ID to the folder `.loose`. A plain `_loose` folder,
+if one exists, is ignored. Each scene is one loose diagram, in creation order in
+`sceneIds`. The app never shows the reserved project as a project: not in the
+list, the search or «Abrir carpeta». `@paso/shared` exports `LOOSE_PROJECT_ID`,
+`LOOSE_PROJECT_FOLDER`, `LOOSE_PROJECT_NAME` and `isLooseProject`.
+
+A scene can move into another project, last or at a chosen place among its scenes: a loose diagram into a project, a
+project's scene out into `.loose`, where it becomes a loose diagram, or from one
+project to another. It keeps the same scene, step and element IDs. While a move
+is under way, the service may leave `<source>/.moves/<sceneId>.json` and
+`<target>/.incoming/<sceneId>/`; neither is part of a project, and both are gone
+once the move finishes or is undone (see the service API).
+
 ## Documents
 
 | File | Required fields | Optional fields |
 | --- | --- | --- |
 | `project.json` | `schemaVersion`, `id`, `name`, `createdAt`, `updatedAt`, `sceneIds` | `icon` |
 | `scene.json` | `schemaVersion`, `id`, `name`, `stepIds` | None |
-| Step JSON | `schemaVersion`, `id`, `elements`, `appState`, `files` | `title`, `speakerNotes` |
+| Step JSON | `schemaVersion`, `id`, `elements`, `appState`, `files` | `title`, `speakerNotes`, `camera` |
 
 `icon` is the name of a [Lucide](https://lucide.dev) icon in kebab case, such as
 `folder` or `chart-scatter`. It is for the project list and needs no format change:
@@ -34,6 +65,13 @@ files without it stay valid at version 1, and the app shows `folder` for them. T
 schema checks only the shape (lowercase letters, digits and single hyphens, at most
 64 characters), not the list of icons, so a newer Lucide release needs no change here.
 An app that does not know a name shows `folder`. Scenes and steps have no icon.
+
+`camera` is the part of the drawing Presentar zooms to on that step:
+`{ "x", "y", "width", "height" }` in canvas units, with x/y at the top-left and a
+positive width and height. A step without it shows the whole scene, framed from the
+union of all its steps. Only the presentation reads it: the editor, thumbnails and
+exports ignore it. It was added without a version change, since files without it
+stay valid, and `duplicateStep` copies it like any other field.
 
 Project timestamps are ISO 8601 strings with a time zone, for example
 `2026-11-07T12:00:00.000Z`. The writer must update `updatedAt` when project

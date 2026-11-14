@@ -1,4 +1,4 @@
-import { parseStep, persistedAppStateSchema, type Step, type ExcalidrawElement } from '@paso/shared';
+import { parseStep, persistedAppStateSchema, type Step, type StepCamera, type ExcalidrawElement } from '@paso/shared';
 import { ApiRequestError } from '../lib/api';
 
 export type Target = { projectId: string; sceneId: string; stepId: string };
@@ -159,6 +159,44 @@ export class StepStore {
     this.persist(session);
     this.emit();
     this.schedule(session);
+  }
+  /** Sets or removes the step's presentation camera. Saved like any other change: debounced, with recovery. */
+  setCamera(session: Session, camera: StepCamera | undefined) {
+    const key = targetKey(session.target);
+    if (this.removed.has(key) || this.sessions.get(key) !== session) return;
+    if (JSON.stringify(session.document.camera) === JSON.stringify(camera)) return;
+    const document: Step = { ...session.document };
+    if (camera) document.camera = camera; else delete document.camera;
+    session.document = document;
+    session.generation++;
+    if (session.status !== 'conflict') session.status = 'dirty';
+    this.persist(session);
+    this.emit();
+    this.schedule(session);
+  }
+  /**
+   * Names a step from outside the Lienzo, such as the Estudio. A step this window has open is named through its own
+   * session, so its unsaved drawing goes with it; any other step is read and written back with only the title changed.
+   * Rejects with words for the person when it could not be saved.
+   */
+  async retitleStep(target: Target, title: string) {
+    const session = this.session(target);
+    if (session && !this.removed.has(targetKey(target))) {
+      this.retitle(session, title);
+      await this.flush(target);
+      if (session.status === 'conflict') throw new Error('El paso cambió fuera de Paso. Ábrelo para resolverlo.');
+      if (session.status === 'failed') throw new Error('No se pudo guardar el título.');
+      return;
+    }
+    try {
+      const { document, revision } = await this.api.getStep(target);
+      const next = title.trim();
+      const named: Step = { ...document };
+      if (next) named.title = next; else delete named.title;
+      await this.api.saveStep(target, revision, named);
+    } catch (error) {
+      throw new Error(error instanceof ApiRequestError && error.status === 404 ? 'El paso ya no existe.' : 'No se pudo guardar el título.');
+    }
   }
   fail(session: Session, message: string) { session.status = 'failed'; session.error = message; this.emit(); }
   private schedule(session: Session) {

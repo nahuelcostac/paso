@@ -1,7 +1,7 @@
 export type PresentAction = 'next' | 'previous' | 'first' | 'last' | 'exit';
 
 const KEYS: Record<string, PresentAction> = {
-  ArrowRight: 'next', ' ': 'next', PageDown: 'next',
+  ArrowRight: 'next', PageDown: 'next',
   ArrowLeft: 'previous', PageUp: 'previous',
   Home: 'first', End: 'last',
   Escape: 'exit',
@@ -12,9 +12,6 @@ export function keyAction(event: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return undefined;
   return KEYS[event.key];
 }
-
-/** A click goes forward on the right half of the screen and back on the left half. */
-export const clickAction = (x: number, width: number): PresentAction => (x < width / 2 ? 'previous' : 'next');
 
 /** The step after an action. It stops at both ends: no wrapping round, and the last step does not end the presentation. */
 export function moveIndex(action: Exclude<PresentAction, 'exit'>, index: number, count: number) {
@@ -29,4 +26,13 @@ export function preparationOrder(index: number, count: number, reach = 2) {
   const order = [index];
   for (let distance = 1; distance <= reach; distance++) order.push(index + distance, index - distance);
   return order.filter((position) => position >= 0 && position < count);
+}
+
+/** Keys that change how the step is seen, not which step: the zoom. They work with Shift, since `+` needs it on some keyboards. */
+export type ViewAction = 'zoomIn' | 'zoomOut' | 'zoomReset';
+const VIEW_KEYS: Record<string, ViewAction> = { '+': 'zoomIn', '=': 'zoomIn', '-': 'zoomOut', _: 'zoomOut', '0': 'zoomReset' };
+export function viewKeyAction(event: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey'>): ViewAction | undefined {
+  // Ctrl or Cmd with + and − is the browser's own zoom: left alone.
+  if (event.altKey || event.ctrlKey || event.metaKey) return undefined;
+  return VIEW_KEYS[event.key];
 }

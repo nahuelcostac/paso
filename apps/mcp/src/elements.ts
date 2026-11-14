@@ -217,6 +217,6 @@ export function describeStep(step: Step, revision: string) {
     if (Number(left.x) < Number(right.x) + Number(right.width) && Number(left.x) + Number(left.width) > Number(right.x) &&
       Number(left.y) < Number(right.y) + Number(right.height) && Number(left.y) + Number(left.height) > Number(right.y)) overlaps.push([left.id, right.id]);
   }
-  return { stepId: step.id, title: step.title, speakerNotes: step.speakerNotes, revision, elements: boxes, overlaps,
+  return { stepId: step.id, title: step.title, speakerNotes: step.speakerNotes, ...(step.camera ? { camera: step.camera } : {}), revision, elements: boxes, overlaps,
     layoutNote: 'Coordinates are canvas pixels, x right, y down, x/y at the top-left. Overlaps are axis-aligned shape bounding-box intersections, not a full visual check. Read the step again after any conflict.' };
 }

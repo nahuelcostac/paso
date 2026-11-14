@@ -54,6 +54,51 @@ The production build contains no token. A desktop host must supply the meta
 tag or adapt the client to its trusted initialization channel. Starting the
 web package alone does not supply a session. Restart root `pnpm dev` to rotate it.
 
+## Workspaces
+
+A workspace is a folder on this computer that holds project folders. The data
+directory (`PASO_DATA_DIR`) is the default workspace, «Mis diagramas». It is
+always listed and cannot be removed. The person can add other folders.
+
+The service has one open workspace at a time. Every project route, the event
+stream, the agents and the MCP tools work in that folder, so a client never
+names a workspace in a project route. Opening another workspace closes the
+current folder's watcher, opens the new one, and sends
+`{ type: "workspaces", activeId }` on the event stream. A client then reads
+its projects again. The service refuses to switch with 409 `AGENT_RUNNING`
+while an agent works.
+
+The list lives in `workspaces.json` next to the data directory (option
+`workspacesPath`, variable `PASO_WORKSPACES_PATH`), never inside a workspace.
+Removing a workspace takes it off the list and deletes nothing. The open
+workspace is restored on the next start when its folder still exists and the
+list was written for the same data directory; otherwise the service starts in
+the default one. A workspace whose folder is gone is listed with
+`available: false`, and opening it fails with 422 `WORKSPACE_UNAVAILABLE`.
+It is never created again silently.
+
+A folder can be added when it exists and is not the home folder, a disk's root,
+another workspace, inside one or containing one, or one of Paso's own folders
+(the app data folder, the restore points and the agents' folder). Restore
+points of added workspaces are kept in `workspaces/<id>/runs` next to the
+default restore points, so Paso writes nothing into the person's folders
+except their projects.
+
+| Method | Route | Input or result |
+| --- | --- | --- |
+| GET | `/workspaces` | `{ activeId, workspaces: [{ id, name, path, default, available }] }` |
+| POST | `/workspaces` | `{ path, name? }`, adds an existing folder, returns 201 with the workspace. It does not open it |
+| PUT | `/workspaces/active` | `{ id }`, opens that workspace, returns the list |
+| DELETE | `/workspaces/:w` | Takes it off the list; the default workspace opens if it was open |
+| POST | `/workspaces/:w/reveal` | Shows the folder in the system's file manager |
+| GET | `/folders?path=` | The folder explorer: `{ path, parent, home, crumbs, folders: [{ name, path }], projects }` |
+| POST | `/folders` | `{ parent, name }`, creates a folder, returns 201 with `{ path }` |
+
+The folder explorer lists folder names only: no files, nothing they contain,
+no hidden folders, and no links. `projects` counts the subfolders that hold a
+`project.json`. Without `path` it starts in the home folder. `crumbs` is the
+way down to the folder, from the home folder when it is inside it.
+
 ## Routes
 
 All routes start with `/api`. Document responses use
@@ -72,6 +117,7 @@ Document bodies never contain revision fields.
 | GET, POST, PUT | `/projects/:p/scenes/:s/steps` | List `{ steps: [...] }`, create a snapshot, or reorder `{ ids }` |
 | GET, PUT, DELETE | `/projects/:p/scenes/:s/steps/:t` | Read, replace a complete versioned step, or delete |
 | POST | `/projects/:p/scenes/:s/steps/:t/duplicate` | `{ id? }`, returns 201 with the copy appended |
+| POST | `/projects/:p/scenes/:s/move` | `{ projectId, index? }` and the scene's `If-Match`: moves the scene into another project, or `_loose`, last or at `index`; returns `{ projectId, document, revision }` |
 | GET, PUT, DELETE | `/projects/:p/assets/:fileId.:ext` | Read binary bytes, upload immutable bytes, or delete an unused asset |
 | GET, POST | `/projects/:p/runs` | List `{ runs: [...] }` or start a run `{ id?, label? }`, returns 201 |
 | GET | `/projects/:p/runs/:r` | Read `{ run }` summary and conflict warnings |
@@ -107,6 +153,45 @@ of identical bytes is safe. Deleting an asset requires its `If-Match` ETag and
 no manifest references, including references in deleted elements or unused
 manifest entries. Binary reads use `application/octet-stream`, `attachment`
 and `nosniff`; the client reconstructs the MIME type from the step manifest.
+
+### Loose diagrams
+
+A loose diagram is a scene of the reserved project `_loose`, stored in the hidden
+folder `.loose` of the open workspace (see the data format). It uses the ordinary
+scene and step routes with `_loose` as the project ID. The project appears with
+its first scene: `POST /projects/_loose/scenes` creates `project.json` when it is
+missing, and until then `GET /projects/_loose` answers 404. `GET /projects` never
+lists it. Renaming or deleting `_loose` itself returns 400 `RESERVED_PROJECT`,
+creating a project with that ID returns 409 `RESERVED_PROJECT`, and
+`POST /projects/_loose/reveal` returns 404. An agent session on `_loose` must name
+its scene (400 `SCENE_REQUIRED` otherwise).
+
+### Moving a scene
+
+`POST /projects/:p/scenes/:s/move` puts the scene in the project named by
+`projectId`: last, or at `index` in its scene list (0 is first; past the end
+returns 400 `INVALID_INDEX`). It keeps the same scene, step and element IDs and the
+same file bytes, so step revisions do not change. It moves a loose diagram into a
+project, a scene out of a project into the loose diagrams (`projectId: "_loose"`,
+which creates `.loose` when it is missing), or a scene between projects. A project
+can be left with no scenes. Images the scene uses are copied unless the target has
+the same bytes under the same file ID. The images only the moved scene used are
+then removed when the source is `_loose`; a project keeps its own, as it does when
+a scene is deleted, since an agent run's restore point may still refer to them. The
+move needs the scene's `If-Match` (428 or 409 otherwise) and fails with 409
+`ID_COLLISION`, `ASSET_CONFLICT` or `AGENT_RUNNING` before writing anything. The
+same project as source and target returns 400 `MOVE_NOT_SUPPORTED`. The app saves
+the open step before it calls the route, and does not move a scene that has work
+it could not save.
+
+Both projects are locked for the move. The service writes a journal,
+`<source>/.moves/<sceneId>.json`, copies the images and the scene's files into
+`<target>/.incoming/<sceneId>`, reads every copy back and compares hashes, renames
+the staged folder to `scenes/<sceneId>`, and then writes the target's `sceneIds`.
+That write is the commit. A failure before it removes the copies and leaves the
+source as it was; after it, the source copy is removed. At start-up, before the
+first scan, every remaining journal in any project is finished or undone the same
+way, so a crash never loses or duplicates the scene.
 
 ## Events and external edits
 
@@ -216,16 +301,27 @@ All routes need the session token. Errors and messages are in Spanish.
 | --- | --- | --- |
 | POST | `/agent/sessions` | `{ harness, projectId, sceneId?, model? }`, returns 201 with the session. The project and scene must exist. |
 | GET | `/agent/sessions` | `{ sessions }`, newest first. `?projectId=` filters. |
-| GET, DELETE | `/agent/sessions/:id` | Read, or cancel and forget (204). |
-| POST | `/agent/sessions/:id/messages` | `{ text }` (1 to 32,000 characters). Returns 202 `{ runId }`; the answer arrives as events. |
+| GET, DELETE | `/agent/sessions/:id` | Read, or delete (204): it stops a running turn, and the conversation's history goes, in Paso and in the harness's own copy (see History). |
+| POST | `/agent/sessions/:id/messages` | `{ text, effort? }` (text of 1 to 32,000 characters). Returns 202 `{ runId }`; the answer arrives as events. `effort` is the reasoning level for this message only (see below); 400 `INVALID_EFFORT` if the harness does not have it. |
 | POST | `/agent/sessions/:id/cancel` | `{ cancelled }`. Stops the run and its whole process tree. Idempotent. |
 | POST | `/agent/sessions/:id/resume` | Reopens a stored session, for example after a restart. 409 if it never reached the harness. Sending resumes it too. |
-| GET | `/agent/sessions/:id/events?after=N` | `{ events, next }`. The last 500 events of the session, without `text_delta` (each `text` repeats them), for reconnecting clients. |
+| GET | `/agent/sessions/:id/events?after=N` | `{ events, next }`. The conversation's history: up to the last 5,000 events, without `text_delta` (each `text` repeats them), kept across restarts. |
 
 A session is `{ id, harness, projectId, sceneId?, model?, state, resumable,
-createdAt, updatedAt }` with `state` of `idle` or `running`. `model` is passed
-to the harness only if the client set it; otherwise the harness uses its own
-default. A message while the session is running returns 409 `SESSION_BUSY`.
+createdAt, updatedAt, title?, turns }` with `state` of `idle` or `running`.
+`title` is the start of the first message (120 characters, spaces collapsed)
+and `turns` the number of messages, for the history. `model` is passed to the
+harness only if the client set it; otherwise the harness uses its own default.
+A message while the session is running returns 409 `SESSION_BUSY`.
+
+**Reasoning effort.** Each message may set `effort`, the harness's own level:
+Claude Code takes `low`, `medium`, `high`, `xhigh` or `max` (passed as
+`--effort`); Codex takes `low`, `medium`, `high` or `xhigh` (the turn's
+`effort`, all listed in Paso's model catalog). Without it Claude Code uses its
+default; Codex would keep a turn's level for the turns after it, so every
+Codex turn states one, and without a choice that is the catalog's default,
+`low`. It is not part of the session: the next message may choose another.
+Antigravity has no levels yet.
 
 A **run** is one message and the agent's whole answer to it. It is the unit
 that restore points attach to (see below).
@@ -248,6 +344,7 @@ output are never forwarded.
 | `event.type` | Fields |
 | --- | --- |
 | `started` | The run was accepted (added by Paso). |
+| `message` | `text`, the person's message (added by Paso right after `started`). |
 | `session` | `resumeToken` (opaque, kept by Paso for resume), `model?`. |
 | `text_delta` | `text`, an increment of the assistant's answer. |
 | `text` | `text`, a complete assistant text block. Repeats the deltas before it. |
@@ -312,17 +409,37 @@ harness and the MCP process, readable by the same user only. Harness
 detection (`/harnesses/detect`) uses the same reduced environment, so
 "signed in" means what a session will see.
 
+### History
+
+Paso keeps each conversation so it can be read again and continued, even after
+a restart. The index (`agent-sessions.json`, mode 0600) holds IDs, project,
+scene, model, resume token, `title` and `turns`. The history of each
+conversation, its events with the person's messages and the agent's text,
+tool names, targets and outcomes, is one file in `agent-transcripts/` next to
+the index (mode 0600 in a 0700 folder, written through a flushed temporary file
+and a rename), never inside a project folder. Tool arguments and results,
+harness output and the service token are never in it. Only conversations that
+reached the harness are kept; the oldest idle ones go when there are more than
+200, with their history.
+
+Deleting a conversation removes it from the index, deletes its history file
+and deletes the harness's own copy of it: Claude Code's transcript
+(`<config>/projects/<working directory>/<token>.jsonl` and the folder of the
+same name, where `<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`) and Codex's
+rollout in Paso's own Codex home (`codex-home/sessions/**/…-<token>.jsonl`).
+Only files named after that resume token, in that folder, are touched. What
+the agent changed on the board stays, with its restore points.
+
 What still reaches a session, by design or because the CLI cannot turn it off:
 the built-in plugins and sub-agent types Claude Code lists at start (they
 cannot act without tools); administrator-managed policy settings, which the CLI
 always applies; and the user's Claude Code **transcripts**. Resume needs them,
 so Claude Code saves each session (prompts, answers and board data the agent
 read) under `~/.claude/projects/<working directory>` as it does for any run.
-Paso does not read them and does not copy messages anywhere: its own index
-(`agent-sessions.json`, mode 0600) holds only IDs, project, scene, model and the
-resume token.
+Paso never reads them; it deletes one when its conversation is deleted (see
+History).
 
-Paso does not log prompts, answers, tokens or harness output.
+Paso does not log prompts, answers, tokens or harness output. Its own copy of a conversation is the history described above.
 
 ### Codex policy and protocol
 
@@ -383,7 +500,7 @@ The controls act together.
 
 The catalog and CLI-owned transcripts live under `codex-home`, outside the
 project directory. The CLI persists prompts, answers and board data there for
-resume. Paso's session index still contains only IDs and resume tokens.
+resume. Paso keeps its own history of each conversation (see History) and deletes the rollout when the conversation is deleted.
 Administrator-managed CLI requirements can still apply. Paso checks the
 reported effective policy and fails closed if it conflicts with this policy.
 

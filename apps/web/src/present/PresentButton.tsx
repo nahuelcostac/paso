@@ -61,8 +61,8 @@ export function PresentButton({ api, store, subscribeEvents, projectId, scene, s
   useEffect(() => () => fullscreen.exit(), [fullscreen]);
 
   return <>
-    {notice && <span className="topbar__error" role="alert"><span className="topbar__error-text" title={notice}>{notice}</span><button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setNotice(undefined)}>×</button></span>}
-    <button ref={button} type="button" className="btn btn--primary" disabled={empty} title={empty ? 'Esta escena no tiene pasos que presentar' : undefined} onClick={() => void start()}>
+    {notice && <span className="present-error" role="alert"><span className="present-error__text" title={notice}>{notice}</span><button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setNotice(undefined)}>×</button></span>}
+    <button ref={button} type="button" className="btn btn--primary" disabled={empty} title={empty ? 'Esta escena no tiene pasos que presentar' : 'Presentar'} onClick={() => void start()}>
       <Play className="i" aria-hidden="true" />Presentar
     </button>
     {presenting && createPortal(<Suspense fallback={<div className="present" />}>

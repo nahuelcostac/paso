@@ -8,6 +8,9 @@ import { useThumbnails } from './use-thumbnails';
 import { useTheme } from './use-theme';
 import './excalidraw-runtime';
 import type { CanvasCamera } from './canvas-camera';
+import { ViewToggle } from '../components/ViewToggle';
+import { CameraControl, CameraDraw, CameraOverlay } from './CameraControls';
+import { createViewStore } from './canvas-view';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
 const messages = { failed: 'No se pudo guardar. Tu trabajo sigue en este navegador.', conflict: 'El paso cambió fuera de Paso. Tu trabajo local se conserva.' };
@@ -27,11 +30,15 @@ function keyboardInCarousel() {
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
-export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates }: {
+export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner }: {
   api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
   scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
   route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
   stepAgentStates?: Record<string, 'working' | 'changed'>;
+  /** The app's failures with no place of their own while the sidebar is folded. */
+  notices?: React.ReactNode;
+  /** Over the canvas's top right corner, where Excalidraw's library button was: Presentar. */
+  corner?: React.ReactNode;
 }) {
   useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [error, setError] = useState<string>();
@@ -46,6 +53,11 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   // Written during render on purpose: the effect below runs after the canvas mounted, and the canvas asks when it loads.
   const routeRef = useRef(route); routeRef.current = route;
   const camera = useRef<CanvasCamera | undefined>(undefined);
+  // What the canvas shows, for «Encuadrar» and for drawing the step's presentation camera over it.
+  const view = useMemo(createViewStore, []);
+  // Marking the step's presentation camera by hand: a layer over the canvas. It ends with the step.
+  const [framing, setFraming] = useState(false);
+  useEffect(() => setFraming(false), [stepId]);
 
   // An address that names a scene or step that is not there lands on the first one.
   useEffect(() => {
@@ -69,13 +81,26 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
     catch (failure) { setError(failure instanceof Error ? failure.message : 'No se pudo completar la acción.'); return undefined; }
     finally { setBusy(false); }
   }, []);
+  // The step is made; only reading the scene again failed. The person is told, and nothing is left unhandled.
   const goTo = async (id: string | undefined) => {
-    await refreshScenes();
+    try { await refreshScenes(); }
+    catch { setError('El paso se creó, pero no se pudo actualizar la escena. Pulsa «Reintentar».'); return; }
     navigate({ ...routeRef.current, sceneId: scene?.id, stepId: id });
   };
   const copy = (make: () => Promise<string>) => async () => { const id = await run(make); if (id) await goTo(id); };
 
+  // ← → on the canvas move through the scene's steps, as in Presentar. They stop at both ends.
+  const stepIdsRef = useRef(stepIds); stepIdsRef.current = stepIds;
+  const stepRef = useRef(stepId); stepRef.current = stepId;
+  const stepKey = useCallback((delta: -1 | 1) => {
+    const ids = stepIdsRef.current;
+    const next = ids[ids.indexOf(stepRef.current ?? '') + delta];
+    if (next) navigate({ ...routeRef.current, stepId: next });
+  }, [navigate]);
+
   return <main className="lienzo" aria-label="Lienzo">
+    {/* The page's main heading, for screen readers: the sidebar already shows the open diagram. */}
+    <h1 className="visually-hidden">{projectName}</h1>
     {error && <div className="editor-notice" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); void refreshScenes(); if (scene && stepId) void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => setError('No se pudo cargar el paso.')); }}>Reintentar</button></div>}
     {session && (session.status === 'failed' || session.status === 'conflict' || session.error) && <div className="editor-notice" role="alert">
       <span>{session.error ?? messages[session.status as 'failed' | 'conflict']}</span>
@@ -87,15 +112,23 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
       }}>Descargar copia y cargar versión del servicio</button>}
     </div>}
     <div className="canvas canvas--editor">
+      <div className="canvas__corner">
+        {corner}
+        <ViewToggle route={route} navigate={navigate} />
+        {session && <CameraControl camera={session.document.camera} drawing={framing} onDraw={() => setFraming((on) => !on)} onClear={() => { setFraming(false); store.setCamera(session, undefined); }} />}
+      </div>
       {session ? <Suspense fallback={<div className="editor-message">Cargando editor…</div>}>
-        <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} keepFocus={keyboardInCarousel} camera={camera} />
-      </Suspense> : <div className="canvas__placeholder"><h1>{projectName}</h1><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena con el selector de arriba para empezar a dibujar.'}</p></div>}
+        <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} />
+      </Suspense> : <div className="canvas__placeholder"><p className="canvas__placeholder-title" aria-hidden="true">{projectName}</p><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena desde la barra lateral para empezar a dibujar.'}</p></div>}
+      {session?.document.camera && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
+      {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
     </div>
+    {notices && <div className="lienzo__notices">{notices}</div>}
     {scene && <StepCarousel
       stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}
       onSelect={(id) => { if (id !== stepId) navigate({ ...route, sceneId: scene.id, stepId: id }); }}
-      onAdd={() => void copy(() => actions.add(projectId, scene.id, stepId))()}
-      onDuplicate={() => { if (stepId) void copy(() => actions.duplicate({ projectId, sceneId: scene.id, stepId }))(); }}
+      onAdd={() => void copy(() => actions.add(projectId, scene.id, stepIds.at(-1)))()}
+      onDuplicate={(id) => void copy(() => actions.duplicate({ projectId, sceneId: scene.id, stepId: id }))()}
       onNudge={async (id, delta) => { const result = await actions.nudge(projectId, scene.id, id, delta).catch((failure: Error) => { setError(failure.message); throw failure; }); await refreshScenes(); return result; }}
       onMove={async (id, index) => { try { await actions.move(projectId, scene.id, id, index); } catch (failure) { setError((failure as Error).message); throw failure; } await refreshScenes(); }}
       onDelete={async (id) => {

@@ -41,7 +41,6 @@ let binDir: string;
 let harnessRegistryPath: string;
 let service: Service;
 let config: ClientConfig;
-let narrowWindow = false;
 let requests: AgentRunRequest[];
 let adapterImpl: (request: AgentRunRequest, signal: AbortSignal) => AsyncIterable<AgentEvent>;
 
@@ -118,7 +117,7 @@ async function send(panel: HTMLElement, user: ReturnType<typeof userEvent.setup>
 
 beforeEach(async () => {
   drawn.calls.length = 0;
-  narrowWindow = false;
+  window.innerWidth = 1024;
   requests = [];
   rootDir = await mkdtemp(join(tmpdir(), 'paso-agent-web-'));
   binDir = join(rootDir, 'bin');
@@ -129,7 +128,7 @@ beforeEach(async () => {
 
   window.history.replaceState(null, '', '#/p/storyboard');
   window.matchMedia = ((query: string) => ({
-    matches: narrowWindow && query.includes('1099px'), media: query, addEventListener() {}, removeEventListener() {},
+    matches: false, media: query, addEventListener() {}, removeEventListener() {},
   })) as unknown as typeof window.matchMedia;
 
   adapterImpl = editsStepOne();
@@ -166,45 +165,61 @@ describe('agent and model picker', () => {
     expect(within(panel).queryByText(/con tu propia sesión y tu cuota/)).not.toBeInTheDocument();
     expect(JSON.parse(await readFile(harnessRegistryPath, 'utf8'))).toEqual(['claude']);
 
-    // The picker is a menu on the body. Codex is available; agy is not installed.
-    await user.click(within(panel).getByRole('button', { name: 'Agente: Claude Code' }));
-    const menu = await screen.findByRole('menu', { name: 'Elegir agente' });
-    expect(panel.contains(menu)).toBe(false);
-    const claude = within(menu).getByRole('menuitemradio', { name: /Claude Code/ });
-    expect(claude).toHaveFocus();
-    expect(claude).toHaveTextContent('2.1.40 · Con tu sesión');
-    const codex = within(menu).getByRole('menuitemradio', { name: /Codex/ });
-    expect(codex).not.toHaveAttribute('aria-disabled', 'true');
-    expect(codex).toHaveTextContent('0.80.0');
-    expect(within(menu).getByRole('menuitemradio', { name: /Antigravity/ })).toHaveTextContent('No instalado');
-    await user.keyboard('{ArrowDown}');
-    expect(codex).toHaveFocus();
-    await user.click(codex);
-    expect(within(panel).getByRole('button', { name: 'Agente: Codex' })).toBeInTheDocument();
+    // One picker for agent, model and reasoning, on the body: agents in a rail, the models of the one in view, the levels.
+    const trigger = () => within(panel).getByRole('button', { name: /^Agente y modelo: / });
+    expect(trigger()).toHaveAccessibleName('Agente y modelo: Claude Code, Predeterminado');
+    await user.click(trigger());
+    let picker = await screen.findByRole('dialog', { name: 'Elegir agente y modelo' });
+    expect(panel.contains(picker)).toBe(false);
+    const agents = within(picker).getByRole('radiogroup', { name: 'Agente' });
+    expect(within(agents).getAllByRole('radio').map((item) => item.getAttribute('aria-label'))).toEqual(['Claude Code', 'Codex', 'Antigravity']);
+    expect(within(agents).getByRole('radio', { name: 'Claude Code' })).toHaveAttribute('aria-checked', 'true');
+    // Models: the account's own, without Fable. The chosen one has the focus.
+    const models = within(picker).getByRole('radiogroup', { name: 'Modelo' });
+    expect(within(models).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Predeterminado', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5']);
+    expect(within(models).getByRole('radio', { name: 'Predeterminado' })).toHaveFocus();
+    expect(picker).not.toHaveTextContent(/Fable/i);
+    // Reasoning: Claude Code's own levels, automatic by default.
+    const reasoning = within(picker).getByRole('radiogroup', { name: 'Razonamiento' });
+    expect(within(reasoning).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Automático', 'Bajo', 'Medio', 'Alto', 'Muy alto', 'Máximo']);
+    expect(within(reasoning).getByRole('radio', { name: 'Automático' })).toHaveAttribute('aria-checked', 'true');
+    // Antigravity is not installed: its column says so instead of listing models.
+    await user.click(within(agents).getByRole('radio', { name: 'Antigravity' }));
+    expect(picker).toHaveTextContent('No se encuentra Antigravity en este equipo.');
+    expect(within(picker).getByRole('button', { name: 'Detectar de nuevo' })).toBeInTheDocument();
+    // Codex is available: picking one of its models makes it the agent, and the panel asks to add it.
+    await user.click(within(agents).getByRole('radio', { name: 'Codex' }));
+    expect(picker).toHaveTextContent('0.80.0');
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Predeterminado' }));
+    expect(trigger()).toHaveAccessibleName('Agente y modelo: Codex, Predeterminado');
     expect(within(panel).getByRole('button', { name: 'Añadir Codex' })).toBeInTheDocument();
-    await user.click(within(panel).getByRole('button', { name: 'Agente: Codex' }));
-    await user.click(within(await screen.findByRole('menu', { name: 'Elegir agente' })).getByRole('menuitemradio', { name: /Claude Code/ }));
-
-    // Models: the account's own, without Fable.
-    await user.click(within(panel).getByRole('button', { name: 'Modelo: Predeterminado' }));
-    const models = await screen.findByRole('menu', { name: 'Elegir modelo' });
-    expect(within(models).getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual(['Predeterminado', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5']);
-    expect(models).not.toHaveTextContent(/Fable/i);
-    await user.click(within(models).getByRole('menuitemradio', { name: 'Haiku 5.5' }));
+    // Back to Claude Code, with Haiku: the popup stays open on the levels, and a level closes it.
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Agente' })).getByRole('radio', { name: 'Claude Code' }));
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Haiku 5.5' }));
+    picker = screen.getByRole('dialog', { name: 'Elegir agente y modelo' });
+    await waitFor(() => expect(within(within(picker).getByRole('radiogroup', { name: 'Razonamiento' })).getByRole('radio', { name: 'Automático' })).toHaveFocus());
+    await user.click(within(within(picker).getByRole('radiogroup', { name: 'Razonamiento' })).getByRole('radio', { name: 'Alto' }));
+    expect(screen.queryByRole('dialog', { name: 'Elegir agente y modelo' })).not.toBeInTheDocument();
+    expect(trigger()).toHaveAccessibleName('Agente y modelo: Claude Code, Haiku 5.5, razonamiento alto');
+    expect(trigger()).toHaveFocus();
+    expect(trigger().querySelector('.effort-bars')).not.toBeNull();   // the level as bars, as in T3 Code
 
     await user.clear(within(panel).getByRole('textbox', { name: 'Mensaje para el agente' }));
     await send(panel, user, 'Hola');
     expect(await within(panel).findByText('Paso 1 actualizado.', {}, patience)).toBeInTheDocument();
-    expect(requests[0].model).toBe('claude-haiku-5-5');
+    expect(requests[0]).toMatchObject({ model: 'claude-haiku-5-5', effort: 'high' });
   });
 
   it('adds Codex and sends a turn through the common panel', async () => {
     await installHarness('codex', 'codex-cli 0.166.0');
     const user = userEvent.setup();
     const panel = await openPanel();
-    await user.click(within(panel).getByRole('button', { name: 'Agente: Claude Code' }));
-    const menu = await screen.findByRole('menu', { name: 'Elegir agente' });
-    await user.click(await within(menu).findByRole('menuitemradio', { name: /Codex/ }, patience));
+    await user.click(within(panel).getByRole('button', { name: /^Agente y modelo: / }));
+    const picker = await screen.findByRole('dialog', { name: 'Elegir agente y modelo' });
+    await waitFor(() => expect(within(picker).getByRole('radio', { name: 'Codex' })).toBeInTheDocument(), patience);
+    await user.click(within(picker).getByRole('radio', { name: 'Codex' }));
+    await user.click(await within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).findByRole('radio', { name: 'Predeterminado' }, patience));
+    await user.keyboard('{Escape}');
     await user.click(await within(panel).findByRole('button', { name: 'Añadir Codex' }, patience));
     await send(panel, user, 'Dibuja con Codex');
     expect(await within(panel).findByText('Paso 1 actualizado.', {}, patience)).toBeInTheDocument();
@@ -246,14 +261,15 @@ describe('a turn as it happens', () => {
     };
     const user = userEvent.setup();
     const panel = await openPanel();
-    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
 
-    // The target: the panel's head says what the agent receives before anything is sent. The log starts empty.
+    // The target is the scene selected in the sidebar; the panel's head names it, and there is nothing to pick there.
+    // The log starts empty.
     expect(within(panel).getByRole('log', { name: 'Conversación con el agente' })).toBeEmptyDOMElement();
-    await user.click(within(panel).getByRole('button', { name: /El agente recibe: Todo el proyecto/ }));
-    const targets = await screen.findByRole('menu', { name: 'Qué recibe el agente' });
-    await user.click(await within(targets).findByRole('menuitemradio', { name: /Partir en dos/ }, patience));
-    expect(within(panel).getByRole('button', { name: 'El agente recibe: Escena 2 · Partir en dos. Cambiar' })).toBeInTheDocument();
+    await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('01El problema'), patience);
+    await user.click(within(screen.getByRole('list', { name: 'Escenas de Búsqueda binaria' })).getByRole('button', { name: 'Escena 2: Partir en dos' }));
+    await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('02Partir en dos'), patience);
+    expect(screen.getByRole('main', { name: 'Estudio' })).toBeInTheDocument();   // selecting keeps the Estudio
+    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);   // which shows that scene
 
     await send(panel, user, 'Amplía la escena 2');
     expect(await within(panel).findByText('Amplía la escena 2')).toBeInTheDocument();
@@ -327,14 +343,17 @@ describe('a turn as it happens', () => {
     // With the panel in view, the top bar says nothing.
     expect(screen.queryByRole('status', { name: 'Agente trabajando' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('radio', { name: 'Lienzo' }));
+    // Folded, the panel leaves it to a small floating status.
+    expect(within(panel).queryByRole('button', { name: 'Cerrar el agente' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ocultar el agente' }));
+    expect(screen.queryByRole('complementary', { name: 'Agente' })).not.toBeInTheDocument();
     const status = await screen.findByRole('status', { name: 'Agente trabajando' }, patience);
     expect(status).toHaveTextContent('Claude Code está cambiando el paso');
     expect(within(status).getByRole('button', { name: 'Ir al paso 1 de la escena 1' })).toHaveTextContent('1');
     await user.click(within(status).getByRole('button', { name: 'Detener' }));
     await waitFor(() => expect(screen.queryByRole('status', { name: 'Agente trabajando' })).not.toBeInTheDocument(), patience);
 
-    await user.click(screen.getByRole('radio', { name: 'Storyboard' }));
+    await user.click(screen.getByRole('button', { name: 'Mostrar el agente' }));
     const after = await screen.findByRole('complementary', { name: 'Agente' }, patience);
     expect(await within(after).findByText(/^Detenida · /, {}, patience)).toBeInTheDocument();
     expect(within(after).getByRole('button', { name: 'Enviar' })).toBeInTheDocument();
@@ -360,7 +379,7 @@ describe('undoing a run', () => {
     const user = userEvent.setup();
     const panel = await openPanel();
     const scene1 = await screen.findByRole('region', { name: 'Escena 1: El problema' }, patience);
-    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
+    await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('01El problema'), patience);
     await send(panel, user, 'Actualiza el paso 1');
     await user.click(await within(panel).findByRole('button', { name: 'Deshacer ejecución' }, patience));
 
@@ -372,8 +391,11 @@ describe('undoing a run', () => {
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(within(panel).getByText(/· Deshecha/)).toBeInTheDocument();
       expect(within(scene1).getByRole('button', { name: 'Paso 1: Inicio' })).toBeInTheDocument();
-      expect(within(scene2).getByRole('button', { name: 'Paso 1: Trabajo de la persona' })).toBeInTheDocument();
     }, patience);
+    // The other scene keeps the person's edit.
+    await user.click(within(screen.getByRole('list', { name: 'Escenas de Búsqueda binaria' })).getByRole('button', { name: 'Escena 2: Partir en dos' }));
+    const scene2 = await screen.findByRole('region', { name: 'Escena 2: Partir en dos' }, patience);
+    await within(scene2).findByRole('button', { name: 'Paso 1: Trabajo de la persona' }, patience);
     expect(humanStep).toBeDefined();
     expect(await call<StepEnvelope>('GET', humanPath)).toEqual(humanStep);
   });
@@ -424,7 +446,7 @@ describe('undoing a run', () => {
     // Another change after the preview: the plan is read again and asked again.
     await personEdits('/projects/p/scenes/s1/steps/step1', (document) => ({ ...document, speakerNotes: 'otra' }));
     await user.click(confirm);
-    expect(await within(dialog).findByText(/El proyecto cambió mientras mirabas el resumen/, {}, patience)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/El diagrama cambió mientras mirabas el resumen/, {}, patience)).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox')).not.toBeChecked();
     expect(within(scene1).getByRole('button', { name: 'Paso 1: Editado por persona' })).toBeInTheDocument();
 
@@ -489,8 +511,8 @@ describe('after a reload', () => {
     expect(await within(panel).findByRole('button', { name: 'Ir al paso 1 de la escena 1' }, patience)).toBeInTheDocument();
     // The step it created is found again from the restore point, since creation events are not replayed.
     await waitFor(() => expect(within(panel).getAllByRole('button', { name: 'Ir al paso 2 de la escena 1' })).toHaveLength(2), patience);
-    // The prompt is not stored by the service, so it is not shown again.
-    expect(within(panel).queryByText('Actualiza el paso 1')).not.toBeInTheDocument();
+    // The service keeps the conversation's history, the person's message included.
+    expect(await within(panel).findByText('Actualiza el paso 1', {}, patience)).toBeInTheDocument();
     expect(await within(panel).findByRole('button', { name: 'Deshacer ejecución' }, patience)).toBeInTheDocument();
 
     // A new conversation still reaches the last run's undo.
@@ -506,22 +528,24 @@ describe('continuing a conversation', () => {
     await call('POST', '/harnesses', { id: 'claude' });
     const user = userEvent.setup();
     let panel = await openPanel();
-    await user.click(within(panel).getByRole('button', { name: 'Modelo: Predeterminado' }));
-    await user.click(within(await screen.findByRole('menu', { name: 'Elegir modelo' })).getByRole('menuitemradio', { name: 'Haiku 5.5' }));
+    await user.click(within(panel).getByRole('button', { name: /^Agente y modelo: / }));
+    await user.click(within(within(await screen.findByRole('dialog', { name: 'Elegir agente y modelo' })).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Haiku 5.5' }));
+    await user.keyboard('{Escape}');
     await send(panel, user, 'Primero');
     await within(panel).findByText(/· 1 cambio/, {}, patience);
 
     cleanup();
     panel = await openPanel();
     await within(panel).findByText('Paso 1 actualizado.', {}, patience);
-    expect(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Agente y modelo: Claude Code, Haiku 5.5' })).toBeInTheDocument();
     await send(panel, user, 'Segundo');
     await waitFor(() => expect(requests).toHaveLength(2), patience);
     expect(requests[1]).toMatchObject({ model: 'claude-haiku-5-5', resumeToken: 'tok' });
     await waitFor(() => expect(within(panel).queryByText(/Trabajando ·/)).not.toBeInTheDocument(), patience);
 
-    await user.click(within(panel).getByRole('button', { name: 'Modelo: Haiku 5.5' }));
-    await user.click(within(await screen.findByRole('menu', { name: 'Elegir modelo' })).getByRole('menuitemradio', { name: 'Predeterminado' }));
+    await user.click(within(panel).getByRole('button', { name: 'Agente y modelo: Claude Code, Haiku 5.5' }));
+    await user.click(within(within(await screen.findByRole('dialog', { name: 'Elegir agente y modelo' })).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Predeterminado' }));
+    await user.keyboard('{Escape}');
     expect(within(panel).queryByText('Paso 1 actualizado.')).not.toBeInTheDocument();
     await send(panel, user, 'Tercero');
     await waitFor(() => expect(requests).toHaveLength(3), patience);
@@ -530,9 +554,61 @@ describe('continuing a conversation', () => {
   });
 });
 
+describe('the history of conversations', () => {
+  it('lists the scene\'s conversations, reopens one to continue it, and deletes one after asking', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    // Each conversation gets its own resume token, so continuing the right one can be told apart.
+    adapterImpl = async function* (request) {
+      yield { type: 'session', resumeToken: request.resumeToken ?? `tok-${requests.length}` };
+      yield { type: 'text', text: `Respuesta a «${request.text}».` };
+      yield { type: 'finished', reason: 'completed' };
+    };
+    const user = userEvent.setup();
+    const panel = await openPanel();
+    await send(panel, user, 'Primero');
+    await within(panel).findByText('Respuesta a «Primero».', {}, patience);
+    await user.click(within(panel).getByRole('button', { name: 'Nueva conversación' }));
+    await send(panel, user, 'Segundo');
+    await within(panel).findByText('Respuesta a «Segundo».', {}, patience);
+
+    // Newest first, each by its first message; the open one is marked.
+    await user.click(within(panel).getByRole('button', { name: 'Historial de conversaciones' }));
+    let history = await screen.findByRole('dialog', { name: 'Historial de conversaciones' });
+    const titles = () => within(history).getAllByRole('button', { name: /^(Primero|Segundo)/ }).map((item) => item.querySelector('.history__title')?.textContent);
+    await waitFor(() => expect(titles()).toEqual(['Segundo', 'Primero']));
+    expect(within(history).getAllByRole('button', { name: /^Segundo/ })[0]).toHaveAttribute('aria-current', 'true');
+    expect(history).toHaveTextContent(/Claude Code · 1 mensaje · hoy, \d\d:\d\d/);
+
+    // Reopening the first shows its messages, and the next message continues it.
+    await user.click(within(history).getAllByRole('button', { name: /^Primero/ })[0]);
+    expect(await within(panel).findByText('Respuesta a «Primero».', {}, patience)).toBeInTheDocument();
+    expect(within(panel).getByText('Primero')).toBeInTheDocument();
+    expect(within(panel).queryByText('Respuesta a «Segundo».')).not.toBeInTheDocument();
+    await send(panel, user, 'Tercero');
+    await within(panel).findByText('Respuesta a «Tercero».', {}, patience);
+    expect(requests.at(-1)).toMatchObject({ text: 'Tercero', resumeToken: 'tok-1' });
+
+    // Deleting asks first; then the conversation and its history are gone from the service too.
+    await user.click(within(panel).getByRole('button', { name: 'Historial de conversaciones' }));
+    history = await screen.findByRole('dialog', { name: 'Historial de conversaciones' });
+    await waitFor(() => expect(titles()).toEqual(['Primero', 'Segundo']));
+    expect(history).toHaveTextContent('2 mensajes');
+    await user.click(within(history).getByRole('button', { name: 'Borrar la conversación «Segundo»' }));
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Borrar esta conversación?' });
+    expect(confirm).toHaveTextContent('la copia que guarda Claude Code');
+    await user.click(within(confirm).getByRole('button', { name: 'Borrar conversación' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    const left = await call<{ sessions: Array<{ title?: string }> }>('GET', '/agent/sessions?projectId=p');
+    expect(left.sessions.map((session) => session.title)).toEqual(['Primero']);
+    await user.click(within(panel).getByRole('button', { name: 'Historial de conversaciones' }));
+    history = await screen.findByRole('dialog', { name: 'Historial de conversaciones' });
+    expect(titles()).toEqual(['Primero']);
+  });
+});
+
 describe('narrow windows', () => {
-  it('opens the panel as a drawer from the top bar, and shows the agent status there while it is closed', async () => {
-    narrowWindow = true;
+  it('opens the panel as a drawer from the tab on its edge, and shows the agent status while it is closed', async () => {
+    window.innerWidth = 900;
     await call('POST', '/harnesses', { id: 'claude' });
     adapterImpl = async function* (_request, signal) {
       yield { type: 'tool_use', id: 'slow', tool: 'update_elements', readOnly: false, target: { projectId: 'p', sceneId: 's1', stepId: 'step1' } };
@@ -541,10 +617,12 @@ describe('narrow windows', () => {
     };
     const user = userEvent.setup();
     render(<App config={config} />);
-    const toggle = await screen.findByRole('button', { name: 'Agente' }, patience);
+    const toggle = await screen.findByRole('button', { name: 'Mostrar el agente' }, patience);
     const panel = screen.getByRole('complementary', { name: 'Agente', hidden: true });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(panel).not.toHaveAttribute('data-open');
+    // A drawer does not dock: there is no edge to drag, only the tab.
+    expect(screen.queryByRole('separator', { name: 'Anchura del chat' })).not.toBeInTheDocument();
 
     await user.click(toggle);
     expect(panel).toHaveAttribute('data-open', 'true');

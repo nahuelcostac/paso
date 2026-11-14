@@ -9,6 +9,16 @@
 export const harnessIds = ['claude', 'codex', 'agy'] as const;
 export type HarnessId = typeof harnessIds[number];
 
+/**
+ * How hard the model thinks, per harness, in the harness's own words. A message may pick one; without it the harness
+ * uses its default. A harness with no levels does not offer the choice.
+ */
+export const effortLevels: Record<HarnessId, readonly string[]> = {
+  claude: ['low', 'medium', 'high', 'xhigh', 'max'],
+  codex: ['low', 'medium', 'high', 'xhigh'],
+  agy: [],
+};
+
 /** Which board step a tool call touches, when the call says so. IDs are service IDs. */
 export type ToolTarget = { projectId?: string; sceneId?: string; stepId?: string };
 
@@ -30,6 +40,8 @@ export type FailureCode =
 export type AgentEvent =
   /** Added by Paso when a run is accepted, before the harness starts. Adapters never emit it. */
   | { type: 'started' }
+  /** The person's message, added by Paso right after `started`, so every window and the history show it. Adapters never emit it. */
+  | { type: 'message'; text: string }
   /** The harness identified its conversation. Store `resumeToken` to continue the session later. */
   | { type: 'session'; resumeToken: string; model?: string }
   /** Incremental assistant text. A later `text` event repeats the complete block. */
@@ -53,6 +65,8 @@ export type AgentRunRequest = {
   resumeToken?: string;
   /** Passed only when set. Otherwise the CLI's own default applies. */
   model?: string;
+  /** One of the harness's `effortLevels`, passed only when set. */
+  effort?: string;
   context: { projectId: string; sceneId?: string };
   board: {
     /** Loopback origin of this service. */
@@ -72,6 +86,11 @@ export interface HarnessAdapter {
    * tree and ends the stream with `finished` (reason `cancelled`).
    */
   run(request: AgentRunRequest, signal: AbortSignal): AsyncIterable<AgentEvent>;
+  /**
+   * Deletes the harness's own copy of a conversation (its transcript), when the person deletes it in Paso. Best
+   * effort: it only ever removes files named after this resume token, in the harness's folder for `workDir`.
+   */
+  forget?(resumeToken: string, workDir: string): Promise<void>;
 }
 
 /** What a run hook sees. Restore points (AG-03, connected by IN-04) attach here. */

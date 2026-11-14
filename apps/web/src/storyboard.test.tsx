@@ -66,8 +66,11 @@ async function seed() {
 const readJson = async (...path: string[]) => JSON.parse(await readFile(join(dataDir, ...path), 'utf8')) as Record<string, unknown>;
 const sceneOrder = async () => (await readJson('p', 'project.json')).sceneIds as string[];
 const stepOrder = async (scene: string) => (await readJson('p', 'scenes', scene, 'scene.json')).stepIds as string[];
-const board = () => screen.getByRole('main', { name: 'Storyboard' });
+const board = () => screen.getByRole('main', { name: 'Estudio' });
 const sceneTitles = () => within(board()).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+/** The scenes as the sidebar lists them. */
+const sidebarScenes = () => within(screen.getByRole('list', { name: /^Escenas de / })).getAllByRole('button', { name: /^Escena \d+: / }).map((button) => button.textContent?.replace(/^Escena \d+: /, ''));
+const selectScene = (user: ReturnType<typeof userEvent.setup>, name: string) => user.click(within(screen.getByRole('list', { name: /^Escenas de / })).getByRole('button', { name: new RegExp(`^Escena \\d+: ${name}$`) }));
 const scene = (name: RegExp | string) => screen.getByRole('region', { name: typeof name === 'string' ? new RegExp(`^Escena \\d+: ${name}$`) : name });
 
 beforeEach(async () => {
@@ -88,18 +91,22 @@ afterEach(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 
-describe('the Storyboard against the real service', () => {
-  it('lays out scenes with number, title and count, and steps with number, optional title and a thumbnail', async () => {
+describe('the Estudio against the real service', () => {
+  it('shows the scene selected in the sidebar, with number, title and count, and steps with number, optional title and a thumbnail', async () => {
+    const user = userEvent.setup();
     await seed();
     render(<App config={config} />);
     await screen.findByRole('heading', { level: 2, name: 'El problema' }, patience);
-    expect(sceneTitles()).toEqual(['El problema', 'Partir en dos', 'Vacía']);
+    // One scene at a time: with none in the address, the first is selected.
+    expect(sceneTitles()).toEqual(['El problema']);
+    await waitFor(() => expect(window.location.hash).toBe('#/p/storyboard/a/a1'));
     expect(board()).toHaveTextContent('3 escenas · 4 pasos');
     const first = scene('El problema');
     expect(first).toHaveTextContent('Escena 1 de 3');
     expect(first).toHaveTextContent('3 pasos');
-    expect(scene('Partir en dos')).toHaveTextContent('1 paso');
-    expect(scene('Vacía')).toHaveTextContent('Sin pasos');
+    // No scene tools here: the sidebar renames, moves and deletes scenes.
+    expect(within(first).queryByRole('button', { name: /^Reordenar la escena/ })).not.toBeInTheDocument();
+    expect(within(first).queryByRole('button', { name: /^Más acciones de la escena/ })).not.toBeInTheDocument();
 
     // The number is always there; the title follows it. Untitled steps show the number alone.
     await within(first).findByRole('button', { name: 'Paso 2: Mira en medio' }, patience);
@@ -111,13 +118,57 @@ describe('the Storyboard against the real service', () => {
     // Thumbnails come from the service, drawn once per scene with the scene's steps, for the current theme.
     await waitFor(() => expect(first.querySelectorAll('.frame img')).toHaveLength(3), patience);
     expect(decodeURIComponent(first.querySelector('.frame img')!.getAttribute('src')!)).toContain('data-dark="false"');
+
+    // Selecting another scene in the sidebar shows it instead, without leaving the Estudio.
+    await selectScene(user, 'Partir en dos');
+    await waitFor(() => expect(sceneTitles()).toEqual(['Partir en dos']), patience);
+    expect(scene('Partir en dos')).toHaveTextContent('Escena 2 de 3');
+    expect(scene('Partir en dos')).toHaveTextContent('1 paso');
+    await selectScene(user, 'Vacía');
+    await waitFor(() => expect(sceneTitles()).toEqual(['Vacía']), patience);
+    expect(scene('Vacía')).toHaveTextContent('Sin pasos');
+    expect(window.location.hash).toBe('#/p/storyboard/c');
+  });
+
+  it('names a step from its title, with a click or F2, while the rest of the card opens it', async () => {
+    const user = userEvent.setup();
+    await seed();
+    render(<App config={config} />);
+    const first = await screen.findByRole('region', { name: 'Escena 1: El problema' }, patience);
+    await within(first).findByRole('button', { name: 'Paso 2: Mira en medio' }, patience);
+    await user.click(within(first).getByRole('button', { name: 'Cambiar el título del paso 1' }));
+    const field = within(first).getByRole('textbox', { name: 'Título del paso 1' });
+    expect(field).toHaveFocus();
+    await user.type(field, 'Antes de buscar{Enter}');
+    await within(first).findByRole('button', { name: 'Paso 1: Antes de buscar' });
+    await waitFor(async () => expect((await readJson('p', 'scenes', 'a', 'steps', 'a1.json')).title).toBe('Antes de buscar'));
+    await waitFor(() => expect(within(first).getByRole('button', { name: 'Paso 1: Antes de buscar' })).toHaveFocus());
+    expect(window.location.hash).toMatch(/storyboard/);   // naming it did not open it
+
+    // F2 on a card; Escape gives up without leaving the Estudio.
+    within(first).getByRole('button', { name: 'Paso 2: Mira en medio' }).focus();
+    await user.keyboard('{F2}');
+    const second = within(first).getByRole('textbox', { name: 'Título del paso 2' });
+    expect(second).toHaveValue('Mira en medio');
+    await user.keyboard('{Escape}');
+    expect(within(first).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(board()).toBeInTheDocument();
+    await waitFor(() => expect(within(first).getByRole('button', { name: 'Paso 2: Mira en medio' })).toHaveFocus());
+    await user.keyboard('{F2}');
+    await user.clear(within(first).getByRole('textbox', { name: 'Título del paso 2' }));
+    await user.type(within(first).getByRole('textbox', { name: 'Título del paso 2' }), 'Partir{Enter}');
+    await within(first).findByRole('button', { name: 'Paso 2: Partir' });
+
+    // The card itself still opens the step.
+    await user.click(within(first).getByRole('button', { name: 'Paso 1: Antes de buscar' }));
+    await screen.findByRole('main', { name: 'Lienzo' }, patience);
   });
 
   it('shows both empty states with the action that fixes each', async () => {
     const user = userEvent.setup();
     await call('POST', '/projects', { id: 'p', name: 'Nuevo' });
     render(<App config={config} />);
-    expect(await screen.findByRole('heading', { level: 2, name: 'Este proyecto aún no tiene escenas' }, patience)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Este diagrama aún no tiene escenas' }, patience)).toBeInTheDocument();
     // Without steps there is nothing to draw, so Excalidraw is not even loaded.
     expect(drawn.loads).toBe(0);
 
@@ -138,91 +189,6 @@ describe('the Storyboard against the real service', () => {
     expect(scene('Introducción')).toHaveTextContent('1 paso');
   });
 
-  it('renames a scene, keeping the old name on Escape', async () => {
-    const user = userEvent.setup();
-    await seed();
-    render(<App config={config} />);
-    await screen.findByRole('heading', { level: 2, name: 'El problema' }, patience);
-    const menu = () => user.click(screen.getByRole('button', { name: /^Más acciones de la escena 1,/ }));
-
-    await menu();
-    await user.click(await screen.findByRole('menuitem', { name: 'Renombrar' }));
-    await user.type(screen.getByLabelText('Nombre de la escena 1'), 'No se guarda{Escape}');
-    expect(screen.getByRole('heading', { level: 2, name: 'El problema' })).toBeInTheDocument();
-    expect((await readJson('p', 'scenes', 'a', 'scene.json')).name).toBe('El problema');
-
-    await menu();
-    await user.click(await screen.findByRole('menuitem', { name: 'Renombrar' }));
-    const field = screen.getByLabelText('Nombre de la escena 1');
-    await user.clear(field);
-    await user.type(field, 'El enunciado{Enter}');
-    await screen.findByRole('heading', { level: 2, name: 'El enunciado' }, patience);
-    expect((await readJson('p', 'scenes', 'a', 'scene.json')).name).toBe('El enunciado');
-  });
-
-  it('asks before deleting a scene, says how many steps go, and removes its folder', async () => {
-    const user = userEvent.setup();
-    await seed();
-    render(<App config={config} />);
-    await screen.findByRole('heading', { level: 2, name: 'El problema' }, patience);
-
-    await user.click(screen.getByRole('button', { name: /^Más acciones de la escena 1,/ }));
-    await user.click(await screen.findByRole('menuitem', { name: /Eliminar/ }));
-    const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar la escena «El problema»?' });
-    expect(dialog).toHaveTextContent('Se borrarán 3 pasos. No se puede deshacer.');
-    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
-    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-    expect(await sceneOrder()).toEqual(['a', 'b', 'c']);
-
-    await user.click(screen.getByRole('button', { name: /^Más acciones de la escena 1,/ }));
-    await user.click(await screen.findByRole('menuitem', { name: /Eliminar/ }));
-    await user.click(await screen.findByRole('button', { name: 'Eliminar escena' }));
-    await waitFor(() => expect(sceneTitles()).toEqual(['Partir en dos', 'Vacía']), patience);
-    expect(await sceneOrder()).toEqual(['b', 'c']);
-    await expect(readFile(join(dataDir, 'p', 'scenes', 'a', 'scene.json'))).rejects.toThrow();
-    // Numbers follow the new order.
-    expect(scene('Partir en dos')).toHaveTextContent('Escena 1 de 2');
-  });
-
-  it('reorders scenes by keyboard: pick up, move, drop; Escape puts the scene back', async () => {
-    const user = userEvent.setup();
-    await seed();
-    render(<App config={config} />);
-    await screen.findByRole('heading', { level: 2, name: 'El problema' }, patience);
-    const grip = (n: number) => screen.getByRole('button', { name: new RegExp(`^Reordenar la escena ${n},`) });
-
-    grip(3).focus();
-    await user.keyboard('{Enter}');
-    expect(grip(3)).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('status', { name: '' })).toHaveTextContent(/agarrada/);
-    await user.keyboard('{ArrowUp}{ArrowUp}');
-    // It moves on screen at once, but nothing is written until it is dropped.
-    expect(sceneTitles()).toEqual(['Vacía', 'El problema', 'Partir en dos']);
-    expect(await sceneOrder()).toEqual(['a', 'b', 'c']);
-    await user.keyboard('{Enter}');
-    await waitFor(async () => expect(await sceneOrder()).toEqual(['c', 'a', 'b']), patience);
-    expect(sceneTitles()).toEqual(['Vacía', 'El problema', 'Partir en dos']);
-    expect(scene('Vacía')).toHaveTextContent('Escena 1 de 3');
-
-    grip(1).focus();
-    await user.keyboard('{Enter}{ArrowDown}{Escape}');
-    expect(sceneTitles()).toEqual(['Vacía', 'El problema', 'Partir en dos']);
-    expect(await sceneOrder()).toEqual(['c', 'a', 'b']);
-  });
-
-  it('moves a scene up or down from its menu, with the ends disabled', async () => {
-    const user = userEvent.setup();
-    await seed();
-    render(<App config={config} />);
-    await screen.findByRole('heading', { level: 2, name: 'El problema' }, patience);
-
-    await user.click(screen.getByRole('button', { name: /^Más acciones de la escena 1,/ }));
-    expect(await screen.findByRole('menuitem', { name: 'Mover arriba' })).toBeDisabled();
-    await user.click(screen.getByRole('menuitem', { name: 'Mover abajo' }));
-    await waitFor(async () => expect(await sceneOrder()).toEqual(['b', 'a', 'c']), patience);
-    expect(sceneTitles()).toEqual(['Partir en dos', 'El problema', 'Vacía']);
-  });
-
   it('opens a step in the Lienzo by click and by keyboard, and marks the current step', async () => {
     const user = userEvent.setup();
     await seed();
@@ -232,8 +198,8 @@ describe('the Storyboard against the real service', () => {
     expect(window.location.hash).toBe('#/p/lienzo/a/a2');
     expect(await screen.findByRole('main', { name: 'Lienzo' })).toBeInTheDocument();
 
-    // Back in the Storyboard the step open in the Lienzo is the current one.
-    await user.click(screen.getByRole('radio', { name: 'Storyboard' }));
+    // Back in the overview, from the step strip, the step open in the Lienzo is the current one.
+    await user.click(await screen.findByRole('button', { name: 'Estudio' }, patience));
     const again = await screen.findByRole('region', { name: /^Escena 1: El problema/ }, patience);
     expect(await within(again).findByRole('button', { name: 'Paso 2: Mira en medio' }, patience)).toHaveAttribute('aria-current', 'step');
     expect(within(again).getByRole('button', { name: 'Paso 1' })).not.toHaveAttribute('aria-current');
@@ -257,15 +223,17 @@ describe('the Storyboard against the real service', () => {
     await waitFor(() => expect(first.querySelectorAll('.frame img')).toHaveLength(3), patience);
     const thumbnailOf = (n: number) => decodeURIComponent(within(scene('El problema')).getByRole('button', { name: new RegExp(`^Paso ${n}`) }).querySelector('img')!.getAttribute('src')!);
 
-    // A scene by another client, renamed, then moved to the front.
+    // A scene by another client, renamed, then moved to the front: the sidebar follows, and the Estudio keeps its scene.
     await call('POST', '/projects/p/scenes', { id: 'ext', name: 'Externa' });
-    await screen.findByRole('heading', { level: 2, name: 'Externa' }, patience);
+    await waitFor(() => expect(sidebarScenes()).toContain('Externa'), patience);
     const ext = await call<Doc<unknown>>('GET', '/projects/p/scenes/ext');
     await call('PATCH', '/projects/p/scenes/ext', { name: 'Externa renombrada' }, ext.revision);
-    await screen.findByRole('heading', { level: 2, name: 'Externa renombrada' }, patience);
+    await waitFor(() => expect(sidebarScenes()).toContain('Externa renombrada'), patience);
     const project = await call<Doc<unknown>>('GET', '/projects/p');
     await call('PUT', '/projects/p/scenes', { ids: ['ext', 'a', 'b', 'c'] }, project.revision);
-    await waitFor(() => expect(sceneTitles()[0]).toBe('Externa renombrada'), patience);
+    await waitFor(() => expect(sidebarScenes()[0]).toBe('Externa renombrada'), patience);
+    expect(sceneTitles()).toEqual(['El problema']);
+    await waitFor(() => expect(scene('El problema')).toHaveTextContent('Escena 2 de 4'), patience);
 
     // A new step arrives with its title, and its scene is drawn again.
     await call('POST', '/projects/p/scenes/a/steps', { id: 'a4', title: 'Nuevo', elements: [rect('a4-r', 9)] });
@@ -289,7 +257,7 @@ describe('the Storyboard against the real service', () => {
     await waitFor(() => expect(scene('El problema')).toHaveTextContent('3 pasos'), patience);
     const b = await call<Doc<unknown>>('GET', '/projects/p/scenes/b');
     await call('DELETE', '/projects/p/scenes/b', undefined, b.revision);
-    await waitFor(() => expect(sceneTitles()).not.toContain('Partir en dos'), patience);
+    await waitFor(() => expect(sidebarScenes()).not.toContain('Partir en dos'), patience);
   });
 
   it('redraws thumbnails only when a revision or the theme changes', async () => {
@@ -297,7 +265,6 @@ describe('the Storyboard against the real service', () => {
     render(<App config={config} />);
     const first = await screen.findByRole('region', { name: /^Escena 1: El problema/ }, patience);
     await waitFor(() => expect(first.querySelectorAll('.frame img')).toHaveLength(3), patience);
-    await waitFor(() => expect(scene('Partir en dos').querySelectorAll('.frame img')).toHaveLength(1), patience);
     const drawnOnce = drawn.calls.length;
     // A renamed scene changes no step revision: nothing is drawn again.
     const a = await call<Doc<unknown>>('GET', '/projects/p/scenes/a');
@@ -325,17 +292,16 @@ describe('lazy thumbnails', () => {
     await seed();
     render(<App config={config} />);
     await screen.findByRole('region', { name: /^Escena 1: El problema/ }, patience);
-    // Every scene is watched and none is near yet: the frames wait as quiet placeholders and nothing is drawn.
-    await waitFor(() => expect(watching.length).toBeGreaterThanOrEqual(3), patience);
+    // The scene is watched and not near yet: its frames wait as quiet placeholders and nothing is drawn.
+    await waitFor(() => expect(watching.some((entry) => entry.target.getAttribute('aria-label')?.startsWith('Escena 1'))).toBe(true), patience);
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(drawn.loads).toBe(0);
-    expect(document.querySelectorAll('.frame__paper[data-state="loading"]').length).toBe(4);
+    expect(document.querySelectorAll('.board .frame__paper[data-state="loading"]').length).toBe(3);
 
-    const second = watching.find((entry) => entry.target.getAttribute('aria-label')?.startsWith('Escena 2'))!;
-    second.callback([{ isIntersecting: true, target: second.target } as IntersectionObserverEntry], {} as IntersectionObserver);
-    await waitFor(() => expect(scene('Partir en dos').querySelectorAll('.frame img')).toHaveLength(1), patience);
-    expect(document.querySelectorAll('.frame img')).toHaveLength(1);
-    expect(drawn.calls.every((ids) => ids.includes('b1'))).toBe(true);
+    const first = [...watching].reverse().find((entry) => entry.target.getAttribute('aria-label')?.startsWith('Escena 1'))!;
+    first.callback([{ isIntersecting: true, target: first.target } as IntersectionObserverEntry], {} as IntersectionObserver);
+    await waitFor(() => expect(scene('El problema').querySelectorAll('.frame img')).toHaveLength(3), patience);
+    expect(drawn.calls).toEqual(['+a1-r', '+a2-r', '+a3-r']);   // only the scene on show
   });
 });
 

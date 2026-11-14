@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
 import { Brand } from '../components/Brand';
 import { pad } from '../components/StepFrame';
 import { ApiRequestError } from '../lib/api';
 import type { ServiceEvent } from '../state/projects-store';
 import { useTheme } from '../editor/use-theme';
-import { anchorRect, presentationFrame, type Viewport } from './framing';
+import { anchorRect, cameraZoom, NO_ZOOM, presentationFrame, type Viewport, type Zoom } from './framing';
+import { VIEW_ZOOM_STEP, zoomViewAt } from './camera-gestures';
+import { useCameraGestures } from './use-camera-gestures';
 import type { PresentFullscreen } from './fullscreen';
-import { clickAction, keyAction, moveIndex, preparationOrder, type PresentAction } from './navigation';
+import { keyAction, moveIndex, preparationOrder, viewKeyAction, type PresentAction, type ViewAction } from './navigation';
+import { Laser, LASER_FADE_MS, laserCursor } from './Laser';
 import { loadDeck, pageKey, renderPage, type Deck, type Page } from './pages';
 import { PageQueue, type QueueResult } from './page-queue';
 
@@ -28,15 +31,27 @@ function useIdleCursor(delay: number) {
   useEffect(() => {
     let timer = setTimeout(() => setIdle(true), delay);
     let last: { x: number; y: number } | undefined;
-    const move = (event: MouseEvent) => {
-      if (last?.x === event.clientX && last.y === event.clientY) return;
-      last = { x: event.clientX, y: event.clientY };
+    const wake = () => {
       setIdle(false);
       clearTimeout(timer);
       timer = setTimeout(() => setIdle(true), delay);
     };
+    const move = (event: MouseEvent) => {
+      if (last?.x === event.clientX && last.y === event.clientY) return;
+      last = { x: event.clientX, y: event.clientY };
+      wake();
+    };
     window.addEventListener('mousemove', move);
-    return () => { clearTimeout(timer); window.removeEventListener('mousemove', move); };
+    window.addEventListener('wheel', wake, { passive: true });
+    window.addEventListener('pointerdown', wake);
+    window.addEventListener('keydown', wake);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('wheel', wake);
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('keydown', wake);
+    };
   }, [delay]);
   return idle;
 }
@@ -62,6 +77,14 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const [shown, setShown] = useState<Shown>();
   const [progress, setProgress] = useState(0);
   const idle = useIdleCursor(CURSOR_IDLE_MS);
+  // Manual camera changes stay between steps without a saved camera.
+  const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
+  const pointer = useRef<{ x: number; y: number }>(undefined);
+  useEffect(() => {
+    const move = (event: PointerEvent) => { pointer.current = { x: event.clientX, y: event.clientY }; };
+    window.addEventListener('pointermove', move);
+    return () => window.removeEventListener('pointermove', move);
+  }, []);
 
   const queue = useMemo(() => new PageQueue<Page>(() => setProgress((value) => value + 1), (page) => URL.revokeObjectURL(page.url)), []);
   useEffect(() => () => queue.dispose(), [queue]);
@@ -152,10 +175,68 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
     if (!deck) return;
     setCurrentId(deck.steps[moveIndex(action, index, deck.steps.length)].id);
   }, [deck, index, exit]);
+  // A step with a camera zooms to it, gliding from wherever the previous step was. Leaving one goes back to the whole
+  // scene. Between steps without a camera, a zoom made with the keys stays. The first view starts in place.
+  const frame = useMemo(() => presentationFrame(deck?.content ?? null, viewport), [deck?.content, viewport]);
+  const stepCamera = step?.document.camera;
+  const cameraSignature = stepCamera ? JSON.stringify(stepCamera) : '';
+  const [motion, setMotion] = useState<'none' | 'zoom' | 'camera'>('none');
+  const directMotion = useCallback(() => setMotion('none'), []);
+  const { panReady, panning } = useCameraGestures(root, zoom, setZoom, directMotion);
+  // The laser draws while the pointer is held down on the drawing, as the Lienzo's laser tool does, and fades after the
+  // release. A press never changes the step: the pager's arrows and the keys do. Space + drag and the middle button pan
+  // instead. Each press is its own trail, so one still fading stays while the next one draws.
+  const [lasers, setLasers] = useState<Array<{ pointerId: number; press: number; held: boolean }>>([]);
+  const presses = useRef(0);
+  const lasersNow = useRef(lasers);
+  lasersNow.current = lasers;
+  const release = useCallback((pointerId?: number) => {
+    const done = lasersNow.current.filter((laser) => laser.held && (pointerId === undefined || laser.pointerId === pointerId)).map((laser) => laser.press);
+    if (done.length === 0) return;
+    setLasers((current) => current.map((laser) => done.includes(laser.press) ? { ...laser, held: false } : laser));
+    setTimeout(() => setLasers((current) => current.filter((laser) => !done.includes(laser.press))), LASER_FADE_MS);
+  }, []);
+  const holdLaser = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || event.isPrimary === false || panReady || (event.target instanceof Element && event.target.closest('button, .indicator, .present__bar'))) return;
+    pointer.current = { x: event.clientX, y: event.clientY };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* it still follows the pointer over the page */ }
+    const press = ++presses.current;
+    setLasers((current) => [...current, { pointerId: event.pointerId, press, held: true }]);
+  };
+  const dropLaser = (event: React.PointerEvent<HTMLDivElement>) => release(event.pointerId);
+  const holding = lasers.some((laser) => laser.held);
+  useEffect(() => {
+    if (!holding) return;
+    const off = () => release();
+    window.addEventListener('blur', off);
+    return () => window.removeEventListener('blur', off);
+  }, [holding, release]);
+  const home = useRef<Zoom>(NO_ZOOM);
+  const last = useRef<{ stepId?: string; camera: string; frame?: typeof frame }>({ camera: '' });
+  useEffect(() => {
+    if (!stepId) return;
+    const before = last.current;
+    last.current = { stepId, camera: cameraSignature, frame };
+    home.current = stepCamera ? cameraZoom(stepCamera, frame, viewport) : NO_ZOOM;
+    const resized = before.frame !== undefined && before.frame !== frame;
+    if (!stepCamera && !before.camera && !resized) return;
+    setMotion(before.stepId === undefined || (resized && before.stepId === stepId) ? 'none' : 'camera');
+    setZoom(home.current);
+    // stepCamera is read through its signature, so a new object with the same box does not move the view.
+  }, [stepId, cameraSignature, frame, viewport]);
+  const view = useCallback((action: ViewAction) => {
+    if (action === 'zoomReset') { setMotion('zoom'); setZoom(home.current); return; }
+    const size = viewportNow();
+    const around = pointer.current ?? { x: size.width / 2, y: size.height / 2 };
+    setMotion('zoom');
+    setZoom((current) => zoomViewAt(current, current.scale + (action === 'zoomIn' ? VIEW_ZOOM_STEP : -VIEW_ZOOM_STEP), around));
+  }, []);
   useEffect(() => {
     const press = (event: KeyboardEvent) => {
       // Nothing here takes focus, and it must not wander to the app underneath.
       if (event.key === 'Tab') { event.preventDefault(); return; }
+      const looking = viewKeyAction(event);
+      if (looking) { event.preventDefault(); event.stopPropagation(); view(looking); return; }
       const action = keyAction(event);
       if (!action) return;
       event.preventDefault();
@@ -164,7 +245,7 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
     };
     window.addEventListener('keydown', press, true);
     return () => window.removeEventListener('keydown', press, true);
-  }, [act]);
+  }, [act, view]);
 
   // Current on top, then the one it fades over, then the neighbours waiting underneath, already painted.
   const current = shown?.result.page;
@@ -178,29 +259,43 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
 
   const frameOf = (page: Page) => anchorRect(page.anchor, presentationFrame(page.content, viewport));
   const count = deck?.steps.length ?? 0;
+  const control = (action: PresentAction) => () => act(action);
+  const zoomed = zoom.scale !== 1 || zoom.x !== 0 || zoom.y !== 0;
   return <div
-    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle}
-    onClick={(event) => act(clickAction(event.clientX, window.innerWidth))}
+    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={holding || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
+    style={{ '--laser-cursor': laserCursor(theme) } as React.CSSProperties}
+    onPointerDown={holdLaser} onPointerUp={dropLaser} onPointerCancel={dropLaser} onLostPointerCapture={dropLaser}
   >
-    {[...pages.values()].map(({ page, state }) => <div key={page.key} className="present__page" data-state={state} data-step-id={page.stepId}>
-      <div className="present__paper" style={{ background: page.paper }} />
-      <img src={page.url} alt="" draggable={false} style={frameOf(page)} />
-    </div>)}
-    {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">No se pudo dibujar este paso.</p></div>}
+    <div className="present__paper" style={{ background: current?.paper }} />
+    {/* The zoom magnifies the pages only: the frame and the pager stay as they are. */}
+    <div className="present__stage" data-zoomed={zoomed || undefined} data-motion={motion} style={zoomed ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}>
+      {[...pages.values()].map(({ page, state }) => <div key={page.key} className="present__page" data-state={state} data-step-id={page.stepId}>
+        <div className="present__paper" style={{ background: page.paper }} />
+        <img src={page.url} alt="" draggable={false} style={frameOf(page)} />
+      </div>)}
+      {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">No se pudo dibujar este paso.</p></div>}
+    </div>
+    {lasers.map((laser) => <Laser key={laser.press} start={pointer.current} held={laser.held} />)}
     {/* A minimal frame: the mark and the way out on top, the step and where you are below. It fades with the pointer. */}
     <div className="present__bar present__bar--top">
       <Brand />
-      <button type="button" className="present__exit" tabIndex={-1} onClick={(event) => { event.stopPropagation(); exit(); }}>
+      <button type="button" className="present__exit" tabIndex={-1} onClick={() => exit()}>
         <X className="i" aria-hidden="true" />Salir<kbd>Esc</kbd>
       </button>
     </div>
     <div className="present__bar present__bar--bottom">
       <p className="present__title">{step?.document.title}</p>
-      <p className="present__hint" aria-hidden="true">← → para navegar</p>
+      <p className="present__hint" aria-hidden="true" title="Pellizca o usa Ctrl/Cmd + rueda para zoom. Desplaza con dos dedos, la rueda o Espacio + arrastrar.">← → pasos · mantén pulsado: láser · + − zoom{zoomed && zoom !== home.current ? ` · ${Math.round(zoom.scale * 100)}%, 0 vuelve` : ''}</p>
     </div>
-    {count > 0 && <div className="indicator" role="status" aria-label={`Paso ${index + 1} de ${count}`}>
-      {count <= MAX_TICKS && <span className="indicator__ticks" aria-hidden="true">{deck!.steps.map((item, position) => <i key={item.id} className={position === index ? 'on' : undefined} />)}</span>}
-      <span aria-hidden="true">{pad(index + 1)} / {pad(count)}</span>
+    {count > 0 && <div className="indicator">
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Primer paso" title="Primer paso (Inicio)" disabled={index === 0} onClick={control('first')}><ChevronFirst className="i" aria-hidden="true" /></button>
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Paso anterior" title="Paso anterior (←)" disabled={index === 0} onClick={control('previous')}><ChevronLeft className="i" aria-hidden="true" /></button>
+      <span className="indicator__where" role="status" aria-label={`Paso ${index + 1} de ${count}`}>
+        {count <= MAX_TICKS && <span className="indicator__ticks" aria-hidden="true">{deck!.steps.map((item, position) => <i key={item.id} className={position === index ? 'on' : undefined} />)}</span>}
+        <span aria-hidden="true">{pad(index + 1)} / {pad(count)}</span>
+      </span>
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Paso siguiente" title="Paso siguiente (→)" disabled={index === count - 1} onClick={control('next')}><ChevronRight className="i" aria-hidden="true" /></button>
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Último paso" title="Último paso (Fin)" disabled={index === count - 1} onClick={control('last')}><ChevronLast className="i" aria-hidden="true" /></button>
     </div>}
   </div>;
 }

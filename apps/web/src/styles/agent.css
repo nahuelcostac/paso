@@ -29,46 +29,18 @@
   height: 12px;
 }
 
-/* Agent panel on the Storyboard: a floating cream card, as before IN-05. No rule under its head: space separates. */
+/* Agent panel on the Estudio: a column flush with the window's edges, like the sidebar, on the chrome's grey and edged
+   with a thin line. No rule under its head: space separates. As a drawer it floats, with rounded corners. */
 .agent {
-  grid-column: -2 / -1;
-  grid-row: 2;
+  grid-column: 3;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin: var(--space-2) var(--space-2) var(--space-2) 0;
   position: relative;
-  border-radius: var(--radius-panel);
   background: var(--surface);
-  box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
+  border-left: var(--border);
 }
-/* The left edge can be dragged to change the chat's width. A thin ink line shows where, on hover and while dragging (the focus colour with the keyboard). */
-.resizer {
-  position: absolute;
-  z-index: 2;
-  top: var(--radius-panel);
-  bottom: var(--radius-panel);
-  left: -6px;
-  width: 9px;
-  cursor: col-resize;
-  touch-action: none;
-}
-.resizer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 3px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity var(--motion-fast);
-}
-.resizer:hover::after, .resizer[data-dragging]::after { opacity: 1; }
-/* Focus shows as the same line in the focus colour: a ring around a full-height strip would read as a border. */
-.resizer:focus-visible { box-shadow: none !important; }
-.resizer:focus-visible::after { opacity: 1; background: var(--focus); }
 :root[data-resizing] { cursor: col-resize; user-select: none; -webkit-user-select: none; }
 :root[data-resizing] iframe, :root[data-resizing] canvas { pointer-events: none; }
 .agent__head {
@@ -90,11 +62,9 @@
   padding: 0 var(--space-2);
   border-radius: var(--radius-md);
   text-align: left;
+  font-size: var(--text-13);
   font-weight: var(--weight-semibold);
   color: var(--ink);
-}
-.agent__target:hover:not(:disabled) {
-  background: var(--surface-sunken);
 }
 .agent__target svg.i {
   width: 14px;
@@ -326,18 +296,79 @@ button.chip:hover {
 .undo__confirm input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
 
 /* Under 1100px the Storyboard keeps no column for the panel: it opens over the board, from the top bar. */
+/* Shows or hides the agent. With the panel in view it is a selected option, a grey fill: ink stays for Presentar. */
 .agent-toggle { height: 38px; padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
-.agent-toggle[aria-expanded='true'] { background: var(--ink); color: var(--on-ink); box-shadow: none; }
-.agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--ink); box-shadow: none; }
+.agent-toggle[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--surface-hover); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .agent[data-narrow] {
   display: none;
   position: fixed;
-  top: calc(var(--topbar-h) + 1px + var(--space-2));
+  top: var(--space-2);
   right: var(--space-2);
   bottom: var(--space-2);
   width: min(var(--panel-agent), calc(100vw - var(--space-2) * 2));
   margin: 0;
   z-index: 6;
+  border-left: 0;
+  border-radius: var(--radius-panel);
   box-shadow: 0 0 0 1px var(--line), var(--shadow-lg);
 }
 .agent[data-narrow][data-open='true'] { display: flex; }
+
+/* Each agent's own mark, in its own colours: Claude's orange, OpenAI's ink, Antigravity's gradient. */
+.provider-icon { display: block; flex: none; }
+.provider-icon--claude { fill: #d97757; }
+.provider-icon--codex { fill: var(--ink); }
+
+/* Agent, model and reasoning in one control, as in T3 Code: the mark, the model, the reasoning as bars. */
+.agent-picker__trigger { gap: 6px; min-width: 0; max-width: 220px; }
+.agent-picker__model { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-picker__effort { color: var(--ink-3); white-space: nowrap; }
+.effort-bars { flex: none; fill: currentColor; color: var(--ink-3); }
+.agent-picker__trigger:hover .effort-bars, .agent-picker__trigger[aria-expanded='true'] .effort-bars { color: var(--ink); }
+
+/* The popup: the agents in a rail, the models of the one in view, the levels on a sunken column at the right. */
+.agent-picker { padding: 0; overflow: hidden; width: min(404px, calc(100vw - 16px)); }
+.agent-picker__columns { display: flex; height: 268px; }
+.agent-picker__rail { display: flex; flex-direction: column; gap: 4px; flex: none; width: 48px; padding: 8px 6px; border-right: var(--border); }
+.agent-picker__harness { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: var(--radius-md); background: transparent; cursor: pointer; opacity: 0.55; }
+.agent-picker__harness:hover { background: var(--surface-sunken); opacity: 1; }
+.agent-picker__harness[aria-checked='true'] { background: var(--accent-soft); opacity: 1; }
+.agent-picker__harness:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.agent-picker__models { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.agent-picker__efforts { display: flex; flex-direction: column; flex: none; width: 164px; border-left: var(--border); background: var(--surface-sunken); }
+.agent-picker__head { display: flex; align-items: center; gap: var(--space-2); height: 36px; margin: 0 10px; border-bottom: var(--border); color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); }
+.agent-picker__head > :first-child { color: var(--ink-2); }
+.agent-picker__note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-regular); }
+.agent-picker__list { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; overflow-y: auto; }
+.agent-picker .agent-picker__row { display: flex; align-items: center; gap: var(--space-2); width: 100%; height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: inherit; font-size: var(--text-13); text-align: left; cursor: pointer; }
+.agent-picker .agent-picker__row:hover { background: var(--surface-hover); }
+.agent-picker .agent-picker__row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
+.agent-picker .agent-picker__row[aria-checked='true'] { font-weight: var(--weight-medium); }
+.agent-picker__models .agent-picker__row:hover { background: var(--surface-sunken); }
+.agent-picker__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-picker__row .i { width: 14px; height: 14px; color: var(--ink); }
+.agent-picker__status { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: 12px 10px; color: var(--ink-3); font-size: var(--text-12); }
+.agent-picker__status p { margin: 0; }
+.agent-picker__hint, .agent-picker__empty { margin: auto 10px 10px; color: var(--ink-3); font-size: var(--text-12); }
+.agent-picker__empty { margin: 10px; }
+@media (max-width: 479px) {
+  .agent-picker__columns { flex-wrap: wrap; height: auto; }
+  .agent-picker__efforts { width: 100%; border-left: 0; border-top: var(--border); }
+}
+
+/* The scene's earlier conversations: a list of first messages, with who answered and when, and a bin for each. */
+.history { width: min(340px, calc(100vw - 16px)); padding: var(--space-1); }
+.history__head { margin: 0; padding: 8px 10px 6px; color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); }
+.history__list { margin: 0; padding: 0; list-style: none; max-height: min(420px, 60vh); overflow-y: auto; }
+.history__item { display: flex; align-items: center; gap: 2px; border-radius: var(--radius-sm); }
+.history__item:hover, .history__item:focus-within { background: var(--surface-sunken); }
+.history__item[data-current] { background: var(--accent-soft); }
+.menu.history .history__open { display: flex; flex: 1; flex-direction: column; align-items: stretch; gap: 2px; width: auto; height: auto; min-width: 0; padding: 7px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.history__open:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.history__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-13); font-weight: var(--weight-medium); }
+.history__meta { display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-3); font-size: var(--text-12); }
+.menu.history .history__delete { flex: none; justify-content: center; width: 30px; height: 30px; padding: 0; margin-right: 2px; opacity: 0; }
+.menu.history .history__item:hover .history__open, .menu.history .history__open:focus-visible { background: transparent; }
+.menu.history .history__item:hover .history__delete, .menu.history .history__item:focus-within .history__delete { opacity: 1; }
+@media (hover: none) { .menu.history .history__delete { opacity: 1; } }

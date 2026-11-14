@@ -1,5 +1,5 @@
 /* Carousel: a white bar in normal flow below the canvas, under a thin line. It never overlaps Excalidraw's controls. */
-/* The strip stays white, as the canvas above it: it is part of the drawing's paper, not of the warm chrome. */
+/* The strip stays white, as the canvas above it: it is part of the drawing's paper, not of the grey chrome. */
 .carousel { --surface: var(--paper); --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus); flex: none; height: var(--carousel-h); display: flex; align-items: center; gap: var(--space-4); padding: 0 var(--space-4); background: var(--surface); border-top: var(--border); min-width: 0; }
 /* The strip scrolls. Its padding keeps the 2px edge and the focus ring from being clipped; the margin cancels it. */
 .carousel__frames { position: relative; display: flex; gap: var(--space-3); flex: 1; min-width: 0; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding: 6px 6px 9px; margin: -6px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; scroll-padding: 0 16px; }
@@ -9,16 +9,17 @@
 .carousel__item[data-drop]::after { content: ''; position: absolute; top: 0; bottom: 22px; width: 3px; border-radius: 2px; background: var(--accent); }
 .carousel__item[data-drop='before']::after { left: -8px; }
 .carousel__item[data-drop='after']::after { right: -8px; }
-.carousel__delete { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-sm); color: var(--ink-2); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); opacity: 0; transition: opacity var(--motion-fast); }
-.carousel__delete svg.i { width: 13px; height: 13px; }
+.carousel__item-actions { position: absolute; top: 4px; right: 4px; display: flex; gap: 3px; opacity: 0; transition: opacity var(--motion-fast); }
+.carousel__item-actions button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-sm); color: var(--ink-2); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.carousel__item-actions svg.i { width: 13px; height: 13px; }
+.carousel__duplicate:hover:not(:disabled) { color: var(--ink); background: var(--surface-sunken); }
 .carousel__delete:hover { color: var(--danger-ink); }
-.carousel__item:hover .carousel__delete, .carousel__item:focus-within .carousel__delete { opacity: 1; }
-@media (hover: none) { .carousel__delete { opacity: 1; } }
+.carousel__item:hover .carousel__item-actions, .carousel__item:focus-within .carousel__item-actions { opacity: 1; }
+@media (hover: none) { .carousel__item-actions { opacity: 1; } }
 .carousel__empty { align-self: center; padding-left: var(--space-1); color: var(--ink-3); }
 /* The reference's pager: «01 / 04» on a grey pill. */
-.carousel__pager { flex: none; display: inline-flex; align-items: center; height: 34px; padding: 0 var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--text-12); white-space: nowrap; }
+.carousel__pager { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: 34px; padding: 0 var(--space-3); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--text-12); white-space: nowrap; }
 .carousel__pager-now { margin-right: 3px; color: var(--accent-ink); font-weight: var(--weight-bold); }
-/* Add and duplicate stay pinned to the right: the strip scrolls, they do not. */
-.carousel__actions { flex: none; display: flex; flex-direction: column; gap: 6px; }
-.carousel__actions .btn { justify-content: flex-start; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
-.carousel__actions .btn:hover:not(:disabled) { background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--line-strong); }
+/* The plus follows the last thumbnail and scrolls with the steps. Its height matches the drawing above the number. */
+.carousel__add { flex: none; display: grid; place-items: center; width: 40px; height: 65px; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); color: var(--ink-3); background: transparent; }
+.carousel__add:hover:not(:disabled) { color: var(--ink); background: var(--surface-sunken); border-color: var(--ink-3); }

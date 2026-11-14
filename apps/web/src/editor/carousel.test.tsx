@@ -8,7 +8,7 @@ import { StepCarousel } from './StepCarousel';
 afterEach(cleanup);
 const ids = ['a', 'b', 'c', 'd'];
 const handlers = () => ({
-  onSelect: vi.fn<(stepId: string) => void>(), onAdd: vi.fn<() => void>(), onDuplicate: vi.fn<() => void>(),
+  onSelect: vi.fn<(stepId: string) => void>(), onAdd: vi.fn<() => void>(), onDuplicate: vi.fn<(stepId: string) => void>(),
   onNudge: vi.fn<(stepId: string, delta: -1 | 1) => Promise<{ index: number; count: number }>>(async (_id, delta) => ({ index: 1 + delta, count: 4 })),
   onMove: vi.fn<(stepId: string, index: number) => Promise<void>>(async () => {}),
   onDelete: vi.fn<(stepId: string) => Promise<void>>(async () => {}),
@@ -113,16 +113,23 @@ describe('step carousel', () => {
     await user.click(screen.getByRole('button', { name: 'Eliminar el paso 1' }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent('quedará vacía');
   });
-  it('has Añadir and Duplicar pinned beside the strip, and waits while an action runs', async () => {
+  it('adds after the last thumbnail and duplicates the chosen item without selecting it first', async () => {
     const { props, redraw } = setup(); const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Añadir paso' })); await user.click(screen.getByRole('button', { name: 'Duplicar paso' }));
+    const add = screen.getByRole('button', { name: 'Añadir paso' });
+    expect(add.parentElement).toBe(document.querySelector('.carousel__frames'));
+    expect(add.previousElementSibling).toBe(frame(4).parentElement);
+    const duplicate = screen.getByRole('button', { name: 'Duplicar el paso 3' });
+    expect(duplicate.parentElement).toBe(screen.getByRole('button', { name: 'Eliminar el paso 3' }).parentElement);
+    await user.click(add); await user.click(duplicate);
     expect(props.onAdd).toHaveBeenCalledTimes(1); expect(props.onDuplicate).toHaveBeenCalledTimes(1);
-    const actions = document.querySelector('.carousel__actions')!;
-    expect(actions.parentElement).toBe(document.querySelector('.carousel')); expect(actions.contains(document.querySelector('.carousel__frames'))).toBe(false);
+    expect(props.onDuplicate).toHaveBeenCalledWith('c');
+    expect(props.onSelect).not.toHaveBeenCalled();
+    expect(document.querySelector('.carousel__actions')).toBeNull();
     redraw({ busy: true });
-    expect(screen.getByRole('button', { name: 'Añadir paso' })).toBeDisabled(); expect(screen.getByRole('button', { name: 'Duplicar paso' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Añadir paso' })).toBeDisabled();
+    for (const button of screen.getAllByRole('button', { name: /^Duplicar el paso/ })) expect(button).toBeDisabled();
     redraw({ stepIds: [], currentId: undefined });
-    expect(screen.getByRole('button', { name: 'Duplicar paso' })).toBeDisabled(); expect(screen.getByRole('button', { name: 'Añadir paso' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /^Duplicar el paso/ })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Añadir paso' })).toBeEnabled();
     expect(screen.getByText('Sin pasos')).toBeInTheDocument();
   });
   it('does not pre-empt keys that carry a modifier', () => {

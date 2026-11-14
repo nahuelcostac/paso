@@ -246,3 +246,43 @@ describe('removing a step', () => {
     store.stopTimers();
   });
 });
+
+describe('naming a step from the Estudio', () => {
+  it('names an open step through its session, unsaved drawing and all, and any other step on the service alone', async () => {
+    const { store, api, documents } = setup();
+    await store.select(a); const sa = mount(store); draw(store, sa, 'unsaved');
+    await store.retitleStep(a, '  Antes de buscar ');
+    expect(documents.get('a')!.document).toMatchObject({ title: 'Antes de buscar' });
+    expect(documents.get('a')!.document.elements.map((e) => e.id)).toEqual(['unsaved']);
+    expect(sa.status).toBe('saved');
+    // Step b was never opened: it is read, named and written back, and no session is made for it.
+    await store.retitleStep(b, 'Mitad');
+    expect(documents.get('b')!.document.title).toBe('Mitad');
+    expect(store.session(b)).toBeUndefined();
+    // An empty title removes it.
+    await store.retitleStep(b, ' ');
+    expect(documents.get('b')!.document).not.toHaveProperty('title');
+    vi.mocked(api.saveStep).mockRejectedValueOnce(new ApiRequestError(500, 'X', 'boom'));
+    await expect(store.retitleStep(b, 'Otra')).rejects.toThrow('No se pudo guardar el título.');
+    store.stopTimers();
+  });
+});
+
+describe('the presentation camera of a step', () => {
+  it('is saved with the step, kept by later drawing, and removed', async () => {
+    const { store, documents } = setup();
+    await store.select(a); const sa = mount(store);
+    store.setCamera(sa, { x: 1, y: 2, width: 30, height: 40 });
+    expect(sa.status).toBe('dirty');
+    draw(store, sa, 'after');
+    await store.flushAll();
+    expect(documents.get('a')!.document).toMatchObject({ camera: { x: 1, y: 2, width: 30, height: 40 } });
+    expect(documents.get('a')!.document.elements.map((e) => e.id)).toEqual(['after']);
+    store.setCamera(sa, { x: 1, y: 2, width: 30, height: 40 });
+    expect(sa.status).toBe('saved');   // the same box is no change
+    store.setCamera(sa, undefined);
+    await store.flushAll();
+    expect(documents.get('a')!.document).not.toHaveProperty('camera');
+    store.stopTimers();
+  });
+});

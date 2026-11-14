@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, ChevronDown, Eye, FilePlus, LoaderCircle, Pencil, RefreshCw, Square, SquarePen, TriangleAlert, Undo2, X } from 'lucide-react';
+import { ArrowUp, Eye, FilePlus, History, LoaderCircle, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { Scene } from '@paso/shared';
-import { ApiRequestError, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
+import { ApiRequestError, UnavailableError, type AgentSessionInfo, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
 import { formatSteps } from '../lib/format';
 import {
-  HARNESS_MODELS, HARNESS_NAMES, conversationKey, countRunChanges, undoErrorMessage, undoableRun, useAgent,
-  type AgentStore, type AgentTurn, type HarnessInfo, type ToolItem,
+  HARNESS_EFFORTS, HARNESS_MODELS, HARNESS_NAMES, conversationKey, countRunChanges, undoErrorMessage, undoableRun, useAgent,
+  type AgentStore, type AgentTurn, type ToolItem,
 } from '../state/agent-store';
+import { AgentPicker } from './AgentPicker';
+import { ProviderIcon } from './ProviderIcon';
 import { Dialog } from './Dialog';
-import { Popover, useMenuKeys } from './Popover';
+import { Popover } from './Popover';
 import { pad } from './StepFrame';
 import '../styles/agent.css';
 
@@ -24,8 +26,11 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onOpenStep: (sceneId: string, stepId: string) => void;
+  /** Selects a scene, so the chat follows it: the scene the agent works on is the one selected in the sidebar. */
+  onOpenScene: (sceneId: string) => void;
+  /** False while the diagram's scenes are still loading: until then it is not known which scene the agent gets. */
+  scenesReady: boolean;
   /** The handle on the panel's left edge that changes its width. */
-  resizer?: React.ReactNode;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -45,15 +50,15 @@ function locateStep(scenes: Scene[], stepId: string | undefined) {
 }
 
 const TOOL_WORDS: Record<string, [running: string, done: string]> = {
-  list_projects: ['Leyendo los proyectos', 'Leyó los proyectos'],
-  read_project: ['Leyendo el proyecto', 'Leyó el proyecto'],
+  list_projects: ['Leyendo los diagramas', 'Leyó los diagramas'],
+  read_project: ['Leyendo el diagrama', 'Leyó el diagrama'],
   read_scene: ['Leyendo la escena', 'Leyó la escena'],
   read_step: ['Leyendo el paso', 'Leyó el paso'],
   get_step_image: ['Mirando el paso', 'Miró el paso'],
   create_scene: ['Creando una escena', 'Creó una escena'],
   create_step: ['Creando el paso', 'Creó el paso'],
   duplicate_step: ['Duplicando un paso', 'Duplicó un paso en'],
-  update_step: ['Cambiando el título o las notas del paso', 'Cambió el título o las notas del paso'],
+  update_step: ['Cambiando los detalles del paso', 'Cambió los detalles del paso'],
   delete_step: ['Borrando el paso', 'Borró el paso'],
   add_elements: ['Cambiando el paso', 'Cambió el paso'],
   update_elements: ['Cambiando el paso', 'Cambió el paso'],
@@ -164,20 +169,12 @@ function UndoDialog({ state, scenes, onCancel, onConfirm }: {
   );
 }
 
-function harnessSubtitle(info: HarnessInfo | undefined) {
-  if (!info) return 'Comprobando…';
-  if (!info.found) return 'No instalado';
-  const version = info.version ? `${info.version.replace(/\s*\(.*\)$/, '')} · ` : '';
-  if (!info.supported) return `${version}Todavía no disponible en Paso`;
-  if (info.session === 'signed_out') return `${version}Sin sesión iniciada`;
-  return info.added ? `${version}Con tu sesión` : `${version}Añadir a Paso`;
-}
-
 /** The agent panel: a conversation with the person's own harness about this project, and what the agent does in it. */
-export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, resizer }: Props) {
+export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady }: Props) {
   const state = useAgent(store);
   const [input, setInput] = useState('');
-  const [menu, setMenu] = useState<{ kind: 'target' | 'harness' | 'model'; anchor: HTMLButtonElement } | null>(null);
+  const [menu, setMenu] = useState<{ kind: 'history'; anchor: HTMLButtonElement } | null>(null);
+  const [deleting, setDeleting] = useState<{ session: AgentSessionInfo; busy: boolean; error?: string } | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string>();
@@ -189,14 +186,9 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
   // Opening the drawer puts the person in the composer.
   useEffect(() => { if (narrow && open) textarea.current?.focus(); }, [narrow, open]);
 
-  // The scene the agent receives: the person's pick; else the latest open conversation of the project, so the
-  // panel does not jump when the Lienzo puts a scene in the address; else the scene in the address; else all of it.
-  const picked = state.targetScene[projectId];
-  const latest = useMemo(() => Object.values(state.sessions)
-    .filter((candidate) => candidate.projectId === projectId && state.conversation[conversationKey(projectId, candidate.sceneId)] === candidate.id)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0], [state.sessions, state.conversation, projectId]);
-  const preferred = picked !== undefined ? picked : latest ? latest.sceneId ?? null : routeSceneId ?? null;
-  const targetSceneId = preferred !== null && scenes.some((scene) => scene.id === preferred) ? preferred : null;
+  // The scene the agent works on is the one selected in the sidebar: the scene in the address, or else the first one.
+  // A diagram with no scenes yet is given to it whole.
+  const targetSceneId = scenes.some((scene) => scene.id === routeSceneId) ? routeSceneId! : scenes[0]?.id ?? null;
   const targetIndex = scenes.findIndex((scene) => scene.id === targetSceneId);
   const targetScene = targetIndex >= 0 ? scenes[targetIndex] : undefined;
   const sessionId = state.conversation[conversationKey(projectId, targetSceneId)];
@@ -213,8 +205,12 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
   const harness: HarnessId = session?.harness ?? state.harness;
   const models = HARNESS_MODELS[harness];
   const model = models.find((option) => option.id === (session ? session.model ?? '' : state.model)) ?? models[0];
+  // The reasoning effort is the window's choice for the next message, whatever conversation is open.
+  const efforts = HARNESS_EFFORTS[harness];
+  const effort = efforts.find((option) => option.id === state.effort) ?? efforts[0];
+  const history = store.conversations(projectId, targetSceneId);
   const info = state.harnesses.list.find((candidate) => candidate.id === harness);
-  const usable = Boolean(info?.supported && info.found && info.added && info.session !== 'signed_out');
+  const usable = Boolean(scenesReady && info?.supported && info.found && info.added && info.session !== 'signed_out');
 
   // The latest turn stays in view. A closed drawer cannot scroll, so it scrolls again when it opens.
   useEffect(() => {
@@ -226,8 +222,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
     if (!usable || running || !input.trim()) return;
     const text = input;
     setInput('');
-    // The conversation keeps its scene from now on, whatever the address says.
-    if (picked === undefined) store.setTargetScene(projectId, targetSceneId);
     if (!(await store.send(projectId, targetSceneId, text))) setInput(text);
   };
   const onComposerKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -258,7 +252,7 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
         // The project changed after the preview: show what undoing does now, and ask again.
         try {
           const fresh = await store.previewUndo(projectId, runId);
-          setUndo({ runId, plan: fresh, busy: false, error: 'El proyecto cambió mientras mirabas el resumen. Revísalo de nuevo.' });
+          setUndo({ runId, plan: fresh, busy: false, error: 'El diagrama cambió mientras mirabas el resumen. Revísalo de nuevo.' });
         } catch (again) { setUndo({ runId, plan, busy: false, error: undoErrorMessage(again) }); }
       } else {
         setUndo({ runId, plan, busy: false, error: undoErrorMessage(error) });
@@ -283,7 +277,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
     return parts.join(' · ');
   };
 
-  const targetName = targetScene ? `Escena ${targetIndex + 1} · ${targetScene.name}` : 'Todo el proyecto';
 
   let harnessNotice: { text: string; action?: { label: string; run: () => void } } | undefined;
   if (state.harnesses.status === 'failed') {
@@ -304,25 +297,26 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
       id="agent-panel" className="agent" aria-label="Agente" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
     >
-      {resizer}
       <div className="agent__head">
+        {/* What the agent works on: the scene selected in the sidebar. There is nothing to pick here. */}
+        <h2 className="agent__target" title={`${projectName} · ${targetScene ? targetScene.name : 'Todo el diagrama'}`}>
+          {targetScene && <span className="agent__scene-num">{pad(targetIndex + 1)}</span>}
+          <span className="agent__title">{targetScene ? targetScene.name : 'Todo el diagrama'}</span>
+        </h2>
         <button
-          type="button" className="agent__target" aria-haspopup="menu" aria-expanded={menu?.kind === 'target'}
-          aria-label={`El agente recibe: ${targetName}. Cambiar`} title={`${projectName} · ${targetName}`}
-          onClick={(event) => setMenu(menu?.kind === 'target' ? null : { kind: 'target', anchor: event.currentTarget })}
+          type="button" className="icon-btn" aria-label="Historial de conversaciones" title="Historial de conversaciones"
+          aria-haspopup="dialog" aria-expanded={menu?.kind === 'history'}
+          onClick={(event) => setMenu(menu?.kind === 'history' ? null : { kind: 'history', anchor: event.currentTarget })}
         >
-          {targetScene && <span className="agent__scene-num" aria-hidden="true">{pad(targetIndex + 1)}</span>}
-          <span className="agent__title">{targetScene ? targetScene.name : 'Todo el proyecto'}</span>
-          <ChevronDown className="i" aria-hidden="true" />
+          <History className="i" aria-hidden="true" />
         </button>
         <button type="button" className="icon-btn" aria-label="Nueva conversación" title="Nueva conversación" disabled={!sessionId} onClick={() => store.newConversation(projectId, targetSceneId)}>
           <SquarePen className="i" aria-hidden="true" />
         </button>
-        {narrow && (
-          <button type="button" className="icon-btn" aria-label="Ocultar agente" title="Ocultar agente" onClick={onClose}>
-            <X className="i" aria-hidden="true" />
-          </button>
-        )}
+        {/* As a drawer it closes here; docked, the tab on its edge folds it. */}
+        {narrow && <button type="button" className="icon-btn" aria-label="Cerrar el agente" title="Cerrar el agente" onClick={onClose}>
+          <X className="i" aria-hidden="true" />
+        </button>}
       </div>
 
       <div ref={log} className="agent__log" role="log" aria-label="Conversación con el agente">
@@ -389,8 +383,8 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
           <div className="notice" role="status">
             <LoaderCircle className="i i--spin" aria-hidden="true" />
             <div className="notice__body">
-              <span>{HARNESS_NAMES[runningElsewhere.harness]} está trabajando en {runningElsewhere.sceneId ? `la escena ${scenes.findIndex((scene) => scene.id === runningElsewhere.sceneId) + 1}` : 'todo el proyecto'}.</span>
-              <button type="button" className="notice__action" onClick={() => store.setTargetScene(projectId, runningElsewhere.sceneId ?? null)}>Ver la conversación</button>
+              <span>{HARNESS_NAMES[runningElsewhere.harness]} está trabajando en {runningElsewhere.sceneId ? `la escena ${scenes.findIndex((scene) => scene.id === runningElsewhere.sceneId) + 1}` : 'todo el diagrama'}.</span>
+              <button type="button" className="notice__action" onClick={() => { if (runningElsewhere.sceneId) onOpenScene(runningElsewhere.sceneId); }}>Ver la conversación</button>
             </div>
           </div>
         )}
@@ -423,20 +417,13 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
           value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={onComposerKey}
         />
         <div className="composer__foot">
-          <button
-            type="button" className="composer__control" aria-haspopup="menu" aria-expanded={menu?.kind === 'harness'}
-            aria-label={`Agente: ${HARNESS_NAMES[harness]}`}
-            onClick={(event) => setMenu(menu?.kind === 'harness' ? null : { kind: 'harness', anchor: event.currentTarget })}
-          >
-            {HARNESS_NAMES[harness]}<ChevronDown className="i" aria-hidden="true" />
-          </button>
-          <button
-            type="button" className="composer__control" aria-haspopup="menu" aria-expanded={menu?.kind === 'model'}
-            aria-label={`Modelo: ${model.label}`}
-            onClick={(event) => setMenu(menu?.kind === 'model' ? null : { kind: 'model', anchor: event.currentTarget })}
-          >
-            {model.label}<ChevronDown className="i" aria-hidden="true" />
-          </button>
+          <AgentPicker
+            harnesses={state.harnesses.list} loading={state.harnesses.status === 'loading'}
+            harness={harness} model={model.id} effort={effort?.id ?? ''}
+            onPick={(choice) => store.choose(projectId, targetSceneId, choice)}
+            onPickEffort={(id) => store.chooseEffort(id)}
+            onRefresh={() => void store.loadHarnesses(true)}
+          />
           <span className="spacer" />
           {running ? (
             <button type="button" className="composer__send" aria-label="Detener" title="Detener" onClick={() => void store.stop(projectId)}>
@@ -450,109 +437,90 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
         </div>
       </div>
 
-      {menu?.kind === 'target' && (
-        <TargetMenu
-          anchor={menu.anchor} scenes={scenes} current={targetSceneId} onClose={() => setMenu(null)}
-          onPick={(id) => { setMenu(null); menu.anchor.focus(); store.setTargetScene(projectId, id); }}
+      {menu?.kind === 'history' && (
+        <HistoryPopover
+          anchor={menu.anchor} conversations={history} current={sessionId} onClose={() => setMenu(null)}
+          onOpen={(id) => { setMenu(null); menu.anchor.focus(); void store.openConversation(projectId, targetSceneId, id); }}
+          onDelete={(picked) => { setMenu(null); setDeleting({ session: picked, busy: false }); }}
         />
       )}
-      {menu?.kind === 'harness' && (
-        <HarnessMenu
-          anchor={menu.anchor} list={state.harnesses.list} loading={state.harnesses.status === 'loading'} current={harness} onClose={() => setMenu(null)}
-          onRefresh={() => void store.loadHarnesses(true)}
-          onPick={(picked) => {
-            setMenu(null); menu.anchor.focus();
-            // Adding is separate: the panel says what it means before the person agrees to it.
-            store.choose(projectId, targetSceneId, { harness: picked.id });
-          }}
-        />
-      )}
-      {menu?.kind === 'model' && (
-        <ModelMenu
-          anchor={menu.anchor} models={models} current={model.id} onClose={() => setMenu(null)}
-          onPick={(id) => { setMenu(null); menu.anchor.focus(); store.choose(projectId, targetSceneId, { model: id }); }}
-        />
+      {deleting && (
+        <Dialog title="¿Borrar esta conversación?" onClose={() => { if (!deleting.busy) setDeleting(null); }}>
+          <p className="dialog__text">
+            Se borran sus mensajes de Paso y la copia que guarda {HARNESS_NAMES[deleting.session.harness]} en este equipo. No se puede deshacer.
+            Lo que el agente cambió en el diagrama se queda, y se puede seguir deshaciendo.
+          </p>
+          {deleting.error && <p className="dialog__error" role="alert">{deleting.error}</p>}
+          <div className="dialog__actions">
+            <button type="button" className="btn btn--soft" data-autofocus onClick={() => setDeleting(null)}>Cancelar</button>
+            <button
+              type="button" className="btn btn--danger" disabled={deleting.busy}
+              onClick={async () => {
+                setDeleting({ ...deleting, busy: true, error: undefined });
+                try { await store.deleteConversation(deleting.session.id); setDeleting(null); }
+                catch (error) {
+                  setDeleting({ ...deleting, busy: false, error: error instanceof UnavailableError ? 'No hay conexión con el servicio local.' : error instanceof ApiRequestError ? error.message : 'No se pudo borrar la conversación.' });
+                }
+              }}
+            >Borrar conversación</button>
+          </div>
+        </Dialog>
       )}
       {undo?.plan && <UndoDialog state={{ ...undo, plan: undo.plan }} scenes={scenes} onCancel={() => setUndo(null)} onConfirm={(force) => void confirmUndo(force)} />}
     </aside>
   );
 }
 
-function TargetMenu({ anchor, scenes, current, onClose, onPick }: {
-  anchor: HTMLElement; scenes: Scene[]; current: string | null; onClose: () => void; onPick: (id: string | null) => void;
-}) {
-  const list = useRef<HTMLDivElement>(null);
-  const keys = useMenuKeys(list);
-  return (
-    <Popover anchor={anchor} onClose={onClose} role="menu" label="Qué recibe el agente" className="menu menu--scenes" onKeyDown={keys}>
-      <div ref={list}>
-        <button type="button" role="menuitemradio" aria-checked={current === null} onClick={() => onPick(null)}>
-          <span className="menu__num" aria-hidden="true" />
-          <span className="menu__label">Todo el proyecto</span>
-          {current === null && <Check className="i" aria-hidden="true" />}
-        </button>
-        {scenes.length > 0 && <hr />}
-        {scenes.map((scene, index) => (
-          <button key={scene.id} type="button" role="menuitemradio" aria-checked={scene.id === current} onClick={() => onPick(scene.id)}>
-            <span className="menu__num">{index + 1}</span>
-            <span className="menu__label">{scene.name}</span>
-            {scene.id === current && <Check className="i" aria-hidden="true" />}
-          </button>
-        ))}
-      </div>
-    </Popover>
-  );
-}
+const whenLabel = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const today = new Date();
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  if (date.toDateString() === today.toDateString()) return `hoy, ${time}`;
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return `ayer, ${time}`;
+  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
+};
 
-function HarnessMenu({ anchor, list: harnesses, loading, current, onClose, onPick, onRefresh }: {
-  anchor: HTMLElement; list: HarnessInfo[]; loading: boolean; current: HarnessId; onClose: () => void;
-  onPick: (harness: HarnessInfo) => void; onRefresh: () => void;
+/**
+ * The scene's earlier conversations, newest first: each one by its first message, with who answered and when. A click
+ * opens it, so the next message continues it; the bin deletes it after asking.
+ */
+function HistoryPopover({ anchor, conversations, current, onClose, onOpen, onDelete }: {
+  anchor: HTMLElement; conversations: AgentSessionInfo[]; current: string | undefined; onClose: () => void;
+  onOpen: (id: string) => void; onDelete: (session: AgentSessionInfo) => void;
 }) {
-  const list = useRef<HTMLDivElement>(null);
-  const keys = useMenuKeys(list);
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => { first.current?.focus(); }, []);
   return (
-    <Popover anchor={anchor} onClose={onClose} role="menu" label="Elegir agente" className="menu menu--agent" onKeyDown={keys}>
-      <div ref={list}>
-        {harnesses.map((harness) => {
-          const available = harness.supported && harness.found;
-          return (
-            <button
-              key={harness.id} type="button" role="menuitemradio" aria-checked={harness.id === current} aria-disabled={!available || undefined}
-              className="menu__item--two-lines" onClick={() => { if (available) onPick(harness); }}
-            >
-              <span className="menu__text">
-                <span className="menu__label">{HARNESS_NAMES[harness.id]}</span>
-                <span className="menu__sub">{harnessSubtitle(harness)}</span>
-              </span>
-              {harness.id === current && <Check className="i" aria-hidden="true" />}
-            </button>
-          );
-        })}
-        {harnesses.length === 0 && <p className="menu__empty">{loading ? 'Buscando asistentes…' : 'No se pudo comprobar qué asistentes hay.'}</p>}
-        <hr />
-        <button type="button" role="menuitem" disabled={loading} onClick={onRefresh}>
-          <RefreshCw className={`i${loading ? ' i--spin' : ''}`} aria-hidden="true" /><span className="menu__label">Detectar de nuevo</span>
-        </button>
-      </div>
-    </Popover>
-  );
-}
-
-function ModelMenu({ anchor, models, current, onClose, onPick }: {
-  anchor: HTMLElement; models: { id: string; label: string }[]; current: string; onClose: () => void; onPick: (id: string) => void;
-}) {
-  const list = useRef<HTMLDivElement>(null);
-  const keys = useMenuKeys(list);
-  return (
-    <Popover anchor={anchor} onClose={onClose} role="menu" label="Elegir modelo" className="menu menu--scenes" onKeyDown={keys}>
-      <div ref={list}>
-        {models.map((option) => (
-          <button key={option.id || 'default'} type="button" role="menuitemradio" aria-checked={option.id === current} onClick={() => onPick(option.id)}>
-            <span className="menu__label">{option.label}</span>
-            {option.id === current && <Check className="i" aria-hidden="true" />}
-          </button>
-        ))}
-      </div>
+    <Popover anchor={anchor} align="end" onClose={onClose} role="dialog" label="Historial de conversaciones" className="menu history">
+      <p className="history__head">Conversaciones de esta escena</p>
+      {conversations.length === 0 ? <p className="menu__empty">Aún no hay conversaciones en esta escena.</p> : (
+        <ul className="history__list">
+          {conversations.map((conversation, index) => {
+            const modelLabel = HARNESS_MODELS[conversation.harness].find((option) => option.id === (conversation.model ?? ''))?.label ?? conversation.model;
+            const title = conversation.title || 'Conversación sin título';
+            const running = conversation.state === 'running';
+            return (
+              <li key={conversation.id} className="history__item" data-current={conversation.id === current || undefined}>
+                <button ref={index === 0 ? first : undefined} type="button" className="history__open" aria-current={conversation.id === current ? 'true' : undefined} onClick={() => onOpen(conversation.id)}>
+                  <span className="history__title">{title}</span>
+                  <span className="history__meta">
+                    <ProviderIcon id={conversation.harness} size={12} />
+                    {running ? 'Trabajando… · ' : ''}{HARNESS_NAMES[conversation.harness]}{modelLabel && modelLabel !== 'Predeterminado' ? ` · ${modelLabel}` : ''} · {plural(conversation.turns, 'mensaje', 'mensajes')} · {whenLabel(conversation.updatedAt)}
+                  </span>
+                </button>
+                <button
+                  type="button" className="icon-btn history__delete" aria-label={`Borrar la conversación «${title}»`} title={running ? 'Detén al agente para poder borrarla' : 'Borrar conversación'}
+                  disabled={running} onClick={() => onDelete(conversation)}
+                >
+                  <Trash2 className="i" aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </Popover>
   );
 }

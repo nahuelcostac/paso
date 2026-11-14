@@ -68,11 +68,23 @@ export const filesManifestSchema = z.record(idSchema, fileManifestEntrySchema)
     }
   });
 
+/**
+ * The part of the drawing Presentar zooms to on this step, in canvas units: x/y is the top-left. Without it the step
+ * shows the whole scene. Only the presentation reads it; editing and thumbnails ignore it.
+ */
+export const stepCameraSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+  width: z.number().finite().positive(),
+  height: z.number().finite().positive(),
+}).strict();
+
 export const stepSchema = z.object({
   schemaVersion: schemaVersionSchema,
   id: idSchema,
   title: z.string().optional(),
   speakerNotes: z.string().optional(),
+  camera: stepCameraSchema.optional(),
   elements: z.array(excalidrawElementSchema),
   appState: persistedAppStateSchema,
   files: filesManifestSchema,
@@ -81,6 +93,7 @@ export const stepSchema = z.object({
 export type Project = z.infer<typeof projectSchema>;
 export type Scene = z.infer<typeof sceneSchema>;
 export type Step = z.infer<typeof stepSchema>;
+export type StepCamera = z.infer<typeof stepCameraSchema>;
 export type ExcalidrawElement = z.infer<typeof excalidrawElementSchema>;
 export type PersistedAppState = z.infer<typeof persistedAppStateSchema>;
 export type FileManifestEntry = z.infer<typeof fileManifestEntrySchema>;

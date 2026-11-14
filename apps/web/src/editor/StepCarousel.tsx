@@ -15,7 +15,7 @@ type Props = {
   busy: boolean;
   onSelect: (stepId: string) => void;
   onAdd: () => void;
-  onDuplicate: () => void;
+  onDuplicate: (stepId: string) => void;
   /** Move one place. The caller reads the position when it runs, so a held key keeps working. */
   onNudge: (stepId: string, delta: -1 | 1) => Promise<{ index: number; count: number } | void>;
   /** Move to this position (0-based, in the order after the move). */
@@ -132,20 +132,23 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
             aria-describedby="carousel-hint" aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Delete"
             onClick={() => onSelect(id)} onKeyDown={(event) => onKeyDown(event, id, index)}
           />
-          <button type="button" className="carousel__delete" tabIndex={-1} aria-label={`Eliminar el paso ${index + 1}`} title="Eliminar paso"
-            onClick={() => { setDeleteError(undefined); setConfirming(id); }}><Trash2 className="i" aria-hidden="true" /></button>
+          <div className="carousel__item-actions">
+            <button type="button" className="carousel__duplicate" disabled={busy} aria-label={`Duplicar el paso ${index + 1}`} title="Duplicar paso"
+              onClick={() => onDuplicate(id)}><Copy className="i" aria-hidden="true" /></button>
+            <button type="button" className="carousel__delete" disabled={busy} tabIndex={-1} aria-label={`Eliminar el paso ${index + 1}`} title="Eliminar paso"
+              onClick={() => { setDeleteError(undefined); setConfirming(id); }}><Trash2 className="i" aria-hidden="true" /></button>
+          </div>
         </div>
       ))}
       {stepIds.length === 0 && <p className="carousel__empty">Sin pasos</p>}
+      <button type="button" className="carousel__add" disabled={busy} onClick={onAdd} aria-label="Añadir paso" title="Añadir un paso al final, a partir del último dibujo">
+        <Plus className="i" aria-hidden="true" />
+      </button>
     </div>
     {/* Where you are, at a glance. Screen readers get it from the current frame's aria-current. */}
     {stepIds.length > 0 && <p className="carousel__pager" aria-hidden="true">
       <span className="carousel__pager-now">{currentAt >= 0 ? pad(currentAt + 1) : '–'}</span> / {pad(stepIds.length)}
     </p>}
-    <div className="carousel__actions">
-      <button type="button" className="btn" disabled={busy} onClick={onAdd} title="Un paso nuevo después del actual, que parte de su dibujo"><Plus className="i" aria-hidden="true" />Añadir paso</button>
-      <button type="button" className="btn" disabled={busy || !currentId} onClick={onDuplicate} title="Una copia exacta del paso actual, justo después de él"><Copy className="i" aria-hidden="true" />Duplicar paso</button>
-    </div>
     {confirming && <Dialog title={`¿Eliminar el paso ${confirmingAt + 1}?`} onClose={() => { if (!deleteBusy) setConfirming(undefined); }}>
       <p className="dialog__text">Se borra su dibujo y no se puede deshacer.{stepIds.length === 1 ? ' Es el último paso de la escena: quedará vacía.' : ''}</p>
       {deleteError && <p className="dialog__error" role="alert">{deleteError}</p>}

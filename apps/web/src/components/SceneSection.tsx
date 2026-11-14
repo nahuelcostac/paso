@@ -41,6 +41,10 @@ type Props = {
   onGripPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
   onGripPointerMove: (event: PointerEvent<HTMLButtonElement>) => void;
   onGripPointerEnd: (event: PointerEvent<HTMLButtonElement>) => void;
+  /** False in the Estudio, which shows one scene: the sidebar renames, moves and deletes scenes. */
+  manage?: boolean;
+  /** Names a step: a click on a card's title, or F2 on the card, opens the field. Resolves when saved. */
+  onRenameStep?: (stepId: string, title: string) => Promise<void>;
   registerGrip: (element: HTMLButtonElement | null) => void;
 };
 
@@ -54,6 +58,9 @@ export function SceneSection(props: Props) {
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState(0);
   const [adding, setAdding] = useState(false);
+  const [renamingStep, setRenamingStep] = useState<string | null>(null);
+  // Focus goes back to the card whose title was being edited.
+  const endStepRename = (at: number) => { setRenamingStep(null); requestAnimationFrame(() => items.current[at]?.focus()); };
 
   const near = useNear(section, root);
   useEffect(() => { if (near) store.ensureSteps(scene.id); }, [near, store, scene.id]);
@@ -111,7 +118,7 @@ export function SceneSection(props: Props) {
           ) : <h2 className="scene__title">{name}</h2>}
         </div>
         <span className="scene__meta">{formatSteps(count)}</span>
-        {!renaming && (
+        {!renaming && props.manage !== false && (
           <span className="scene__tools">
             <button
               ref={props.registerGrip}
@@ -137,20 +144,50 @@ export function SceneSection(props: Props) {
       </div>
 
       <div ref={grid} className="scene__steps" role="group" aria-label={`Pasos de ${name}`} onKeyDown={move}>
-        {scene.stepIds.map((id, at) => (
-          <StepFrame
-            key={id}
-            ref={(element) => { items.current[at] = element; }}
-            number={at + 1}
-            title={state.steps[id]?.title}
-            current={id === currentStepId}
-            agentState={stepAgentStates?.[id]}
-            svg={thumbnails?.[id]?.svg}
-            tabIndex={last === at ? 0 : -1}
-            onFocus={() => setActive(at)}
-            onClick={() => props.onOpenStep(id)}
-          />
-        ))}
+        {scene.stepIds.map((id, at) => {
+          const title = state.steps[id]?.title;
+          const frame = (
+            <StepFrame
+              key={id}
+              ref={(element) => { items.current[at] = element; }}
+              number={at + 1}
+              title={title}
+              framed={state.steps[id]?.framed}
+              current={id === currentStepId}
+              agentState={stepAgentStates?.[id]}
+              svg={thumbnails?.[id]?.svg}
+              tabIndex={last === at ? 0 : -1}
+              aria-keyshortcuts={props.onRenameStep ? 'F2' : undefined}
+              onFocus={() => setActive(at)}
+              onClick={() => props.onOpenStep(id)}
+              onKeyDown={props.onRenameStep ? (event) => { if (event.key === 'F2') { event.preventDefault(); setRenamingStep(id); } } : undefined}
+            />
+          );
+          if (!props.onRenameStep) return frame;
+          const rename = props.onRenameStep;
+          // The card opens the step; its title, on top of the card's label, names it.
+          return (
+            <div key={id} className="step-card" data-renaming={renamingStep === id || undefined}>
+              {frame}
+              {renamingStep === id ? (
+                <div className="step-card__rename">
+                  <NameField
+                    initial={title ?? ''}
+                    placeholder="Sin título"
+                    label={`Título del paso ${at + 1}`}
+                    onSave={async (next) => { await rename(id, next); endStepRename(at); }}
+                    onCancel={() => endStepRename(at)}
+                    onAbandon={(message) => { endStepRename(at); props.onRenameAbandon(message); }}
+                  />
+                </div>
+              ) : (
+                <button type="button" className="step-card__title" tabIndex={-1} title="Cambiar el título" aria-label={`Cambiar el título del paso ${at + 1}`} onClick={() => setRenamingStep(id)}>
+                  <Pencil className="i" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          );
+        })}
         <button
           ref={(element) => { items.current[count] = element; }}
           type="button"

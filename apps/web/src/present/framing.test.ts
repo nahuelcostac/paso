@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { unionBounds, type Bounds } from '../editor/thumbnail-bounds';
-import { anchorRect, BLEED, MARGIN_MIN, MIN_EXTENT, presentationAnchor, presentationFrame, type Viewport } from './framing';
+import { anchorRect, BLEED, MARGIN_MIN, MIN_EXTENT, presentationAnchor, presentationFrame, type Viewport, NO_ZOOM, ZOOM_MAX, zoomAt, cameraZoom } from './framing';
 
 const screens: Viewport[] = [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }, { width: 500, height: 1000 }, { width: 3840, height: 1080 }, { width: 320, height: 480 }];
 const onScreen = (point: readonly [number, number], viewport: Viewport, content: Bounds | null) => {
@@ -78,5 +78,38 @@ describe('the framing of a presentation', () => {
       expect(rect.left + x * frame.scale).toBeCloseTo(onScreen([100, 100], viewport, content)[0]);
       expect(rect.top + y * frame.scale).toBeCloseTo(onScreen([100, 100], viewport, content)[1]);
     }
+  });
+});
+
+describe('zooming in a presentation', () => {
+  const screen = { width: 1000, height: 600 };
+  it('keeps the point under the pointer still', () => {
+    const zoom = zoomAt(NO_ZOOM, 2, { x: 300, y: 200 }, screen);
+    expect(zoom).toEqual({ scale: 2, x: -300, y: -200 });
+    expect((300 - zoom.x) / zoom.scale).toBe(300);   // what was at 300 is still at 300
+  });
+  it('keeps the screen covered near an edge, and never goes past the framing or the maximum', () => {
+    // Zooming out from the right edge around the top-left corner would uncover the right of the screen: held at the edge.
+    expect(zoomAt({ scale: 2, x: -1000, y: 0 }, 0.75, { x: 0, y: 0 }, screen)).toEqual({ scale: 1.5, x: -500, y: 0 });
+    expect(zoomAt({ scale: 2, x: -300, y: -200 }, 1 / 4, { x: 10, y: 10 }, screen)).toEqual(NO_ZOOM);
+    expect(zoomAt(NO_ZOOM, 100, { x: 500, y: 300 }, screen).scale).toBe(ZOOM_MAX);
+  });
+});
+
+describe('a step camera in a presentation', () => {
+  const screen = { width: 1000, height: 600 };
+  const frame = { scale: 1, offsetX: 0, offsetY: 0 };
+  it('fills the screen inside the margins with the camera box, centred', () => {
+    const zoom = cameraZoom({ x: 400, y: 200, width: 200, height: 100 }, frame, screen);
+    // Available: 900×480 (margins 50 and 60); the box scales by min(900/200, 480/100) = 4.5, under the maximum of 6.
+    expect(zoom.scale).toBe(4.5);
+    expect(500 * zoom.scale + zoom.x).toBeCloseTo(500);   // the box's centre lands on the screen's centre
+    expect(250 * zoom.scale + zoom.y).toBeCloseTo(300);
+  });
+  it('never zooms out past the framing, never past the maximum, and keeps the screen covered', () => {
+    expect(cameraZoom({ x: -1000, y: -1000, width: 5000, height: 5000 }, frame, screen)).toEqual({ scale: 1, x: 0, y: 0 });
+    expect(cameraZoom({ x: 500, y: 300, width: 1, height: 1 }, frame, screen).scale).toBe(ZOOM_MAX);
+    const corner = cameraZoom({ x: 0, y: 0, width: 100, height: 100 }, frame, screen);
+    expect(corner.x).toBe(0); expect(corner.y).toBe(0);
   });
 });

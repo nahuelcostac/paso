@@ -1,6 +1,8 @@
 import { idSchema } from '@paso/shared';
+import { describeTarget } from './where.js';
 import { connectCodexBoard, codexBoardTools, codexReadOnlyTools } from './codex-board.js';
-import { classifyCodexFailure, codexFailureMessage, codexVersion, prepareCodex } from './codex-policy.js';
+import { classifyCodexFailure, codexDefaultEffort, codexFailureMessage, codexVersion, prepareCodex } from './codex-policy.js';
+import { forgetCodex } from './forget.js';
 import { startProcess, type ManagedProcess } from './process.js';
 import type { AgentEvent, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
 
@@ -17,6 +19,7 @@ function targetOf(input: Record<string, unknown>) {
 
 export const codexAdapter: HarnessAdapter = {
   id: 'codex',
+  forget: (token, workDir) => forgetCodex(token, workDir),
   async *run(request, signal) {
     let board: Awaited<ReturnType<typeof connectCodexBoard>> | undefined;
     let proc: ManagedProcess | undefined;
@@ -39,7 +42,7 @@ export const codexAdapter: HarnessAdapter = {
       if (signal.aborted) { yield { type: 'finished', reason: 'cancelled' }; return; }
       board = await connectCodexBoard(request, signal);
       const rpc = (id: number, method: string, params: unknown) => proc?.write(JSON.stringify({ id, method, params }));
-      const where = `proyecto «${request.context.projectId}»` + (request.context.sceneId ? `, escena «${request.context.sceneId}»` : '');
+      const where = describeTarget(request.context);
       const onLine = (line: string) => {
         if (terminal || signal.aborted) return;
         let msg: unknown;
@@ -78,6 +81,9 @@ export const codexAdapter: HarnessAdapter = {
           // before inference. No turn is submitted with the restored environment.
           rpc(3, 'turn/start', { threadId, environments: [], approvalPolicy: 'never',
             sandboxPolicy: { type: 'readOnly', networkAccess: false },
+            // Codex keeps a turn's effort for the turns after it, so every turn states its own: the chosen level, or
+            // the catalog's default, which is what "automatic" means for Codex in Paso.
+            effort: request.effort ?? codexDefaultEffort,
             input: [{ type: 'text', text: request.text }] });
           turnStarted = true;
           return;
