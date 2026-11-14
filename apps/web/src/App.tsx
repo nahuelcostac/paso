@@ -14,7 +14,7 @@ import { ThumbnailCache } from './editor/thumbnails';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { SceneList } from './components/SceneList';
 import { LeftRail, RightRail } from './components/Rails';
-import { AGENT_WIDTH, BOARD_MIN, PanelResizer, chatRoom, useAgentWidth } from './components/PanelResizer';
+import { AGENT_WIDTH, BOARD_MIN, RAIL, Splitter, chatRoom, useAgentWidth, useProjectsWidth } from './components/Splitter';
 import { PresentButton } from './present/PresentButton';
 import { useScenes } from './state/scenes';
 import { ActionError, ProjectsStore, useProjects, type ProjectRow } from './state/projects-store';
@@ -94,12 +94,15 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // otherwise it folds into its rail and opens as a drawer. The board has the whole width to itself.
   const boardMin = BOARD_MIN.storyboard;
   const overview = route.view === 'storyboard';
-  const narrow = chatRoom(useWindowWidth(), panelOpen && !leftNarrow, boardMin) < AGENT_WIDTH.min;
+  // The sidebar's width, which the person drags. Folded, or over the content on a narrow window, it leaves its rail.
+  const projectsWidth = useProjectsWidth(boardMin);
+  const left = panelOpen && !leftNarrow ? projectsWidth.width : RAIL;
+  const narrow = chatRoom(useWindowWidth(), left, boardMin) < AGENT_WIDTH.min;
   // The agent panel: a drawer on a narrow window, otherwise a column the person can hide.
   const [agentOpen, setAgentOpen] = useState(false);
   const [agentDocked, setAgentDocked] = useState(true);
   const agentShown = narrow ? agentOpen : agentDocked;
-  const agentWidth = useAgentWidth(panelOpen && !leftNarrow, narrow, boardMin);
+  const agentWidth = useAgentWidth(left, narrow, boardMin);
 
   const routeRef = useRef(route);
   routeRef.current = route;
@@ -316,9 +319,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const rightRail = Boolean(openProject && overview && (narrow || !agentDocked));
   const hideAgent = () => {
     if (narrow) setAgentOpen(false); else setAgentDocked(false);
-    // On a narrow window the rail is already there; a folded column appears with the next frame.
-    const toggle = document.querySelector<HTMLElement>('.rail--right .agent-toggle');
-    if (toggle) toggle.focus(); else requestAnimationFrame(() => document.querySelector<HTMLElement>('.rail--right .agent-toggle')?.focus());
+    // Focus goes back to the tab that opened it, on the panel's edge.
+    document.querySelector<HTMLElement>('.splitter--right .splitter__tab')?.focus();
   };
 
   // Presentar, in the top right corner of both views, above the Lienzo | Estudio switch. Leaving it keeps the view.
@@ -331,11 +333,19 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   return (
     <div
       className={`app${panelOpen ? '' : ' app--panel-closed'}${openProject && overview && agentDocked && !narrow ? ' app--agent' : ''}${rightRail ? ' app--agent-rail' : ''}`}
-      style={{ '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
+      style={{ '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
-      {(!panelOpen || leftNarrow) && <LeftRail onShow={() => setPanelOpen(true)} onCreate={startCreating} />}
+      {(!panelOpen || leftNarrow) && <LeftRail onCreate={startCreating} />}
+      {/* Each side's inner edge: a tab folds and unfolds it, and a drag changes its width. Over the content, only the tab. */}
+      <Splitter
+        side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Ocultar diagramas" show="Mostrar diagramas"
+        controls="projects-panel" label="Anchura de los diagramas" resize={leftNarrow ? undefined : projectsWidth}
+      />
+      {openProject && overview && <Splitter
+        side="right" open={agentShown} onToggle={() => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(!agentDocked)}
+        hide="Ocultar el agente" show="Mostrar el agente" controls="agent-panel" label="Anchura del chat" resize={narrow ? undefined : agentWidth}
+      />}
       {rightRail && openProject && <RightRail
-        onShow={() => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(true)} open={narrow && agentOpen}
         working={statusShown && working ? {
           sentence: `${HARNESS_NAMES[working.turn.harness]} está ${workingAt ? 'cambiando el paso' : 'trabajando'}`,
           step: workingAt ? {
@@ -354,7 +364,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           api={api}
           store={store}
           onSwitchWorkspace={switchWorkspace}
-          onHide={() => setPanelOpen(false)}
+          onHide={leftNarrow ? () => setPanelOpen(false) : undefined}
           saveState={saveState}
           notices={notices}
           // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
@@ -416,7 +426,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'lienzo', sceneId: id, stepId })}
           scenesReady={scenes !== undefined}
           onOpenScene={(id) => navigate({ projectId: row.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
-          resizer={<PanelResizer width={agentWidth.width} min={agentWidth.min} max={agentWidth.max} onChange={agentWidth.choose} controls="agent-panel" />}
         />}
       </> : <MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} />}
     </div>

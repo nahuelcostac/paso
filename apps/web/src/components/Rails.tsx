@@ -1,4 +1,4 @@
-import { PanelLeft, Sparkles, Square, SquarePen } from 'lucide-react';
+import { Sparkles, Square, SquarePen } from 'lucide-react';
 
 /** Paso's mark alone: the step glyph on its ink tile. */
 function Mark() {
@@ -9,14 +9,11 @@ function Mark() {
   );
 }
 
-/** The sidebar, folded: a narrow column with the mark, the way to open it and «Nuevo proyecto». */
-export function LeftRail({ onShow, onCreate }: { onShow: () => void; onCreate: () => void }) {
+/** The sidebar, folded: a narrow column with the mark and «Nuevo proyecto». The tab on its edge opens it. */
+export function LeftRail({ onCreate }: { onCreate: () => void }) {
   return (
     <nav className="rail rail--left" aria-label="Diagramas">
       <Mark />
-      <button type="button" className="icon-btn" aria-label="Mostrar diagramas" title="Mostrar diagramas" aria-expanded={false} onClick={onShow}>
-        <PanelLeft className="i" aria-hidden="true" />
-      </button>
       <button type="button" className="icon-btn" aria-label="Nuevo proyecto" title="Nuevo proyecto" onClick={onCreate}>
         <SquarePen className="i" aria-hidden="true" />
       </button>
@@ -32,13 +29,14 @@ type Working = {
   onStop: () => void;
 };
 
-/** The agent, folded: a narrow column with the way to open it and, while it works, which step and «Detener». */
-export function RightRail({ onShow, open = false, working }: { onShow: () => void; open?: boolean; working?: Working }) {
+/**
+ * The agent, folded: a narrow column with its mark and, while it works, which step and «Detener». The tab on its edge
+ * opens it.
+ */
+export function RightRail({ working }: { working?: Working }) {
   return (
     <div className="rail rail--right">
-      <button type="button" className="icon-btn agent-toggle" aria-label="Mostrar el agente" title="Mostrar el agente" aria-expanded={open} aria-controls="agent-panel" onClick={onShow}>
-        <Sparkles className="i" aria-hidden="true" />
-      </button>
+      <span className="rail__agent" aria-hidden="true"><Sparkles className="i" /></span>
       {working && (
         <div className="rail__status" role="status" aria-label="Agente trabajando" title={working.sentence}>
           <span className="visually-hidden">{working.sentence}</span>

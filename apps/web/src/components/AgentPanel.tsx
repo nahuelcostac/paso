@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Eye, FilePlus, History, LoaderCircle, PanelRight, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
+import { ArrowUp, Eye, FilePlus, History, LoaderCircle, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { Scene } from '@paso/shared';
 import { ApiRequestError, UnavailableError, type AgentSessionInfo, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
 import { formatSteps } from '../lib/format';
@@ -31,7 +31,6 @@ type Props = {
   /** False while the diagram's scenes are still loading: until then it is not known which scene the agent gets. */
   scenesReady: boolean;
   /** The handle on the panel's left edge that changes its width. */
-  resizer?: React.ReactNode;
 };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -171,7 +170,7 @@ function UndoDialog({ state, scenes, onCancel, onConfirm }: {
 }
 
 /** The agent panel: a conversation with the person's own harness about this project, and what the agent does in it. */
-export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady, resizer }: Props) {
+export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady }: Props) {
   const state = useAgent(store);
   const [input, setInput] = useState('');
   const [menu, setMenu] = useState<{ kind: 'history'; anchor: HTMLButtonElement } | null>(null);
@@ -298,7 +297,6 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
       id="agent-panel" className="agent" aria-label="Agente" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
     >
-      {resizer}
       <div className="agent__head">
         {/* What the agent works on: the scene selected in the sidebar. There is nothing to pick here. */}
         <h2 className="agent__target" title={`${projectName} · ${targetScene ? targetScene.name : 'Todo el diagrama'}`}>
@@ -315,10 +313,10 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
         <button type="button" className="icon-btn" aria-label="Nueva conversación" title="Nueva conversación" disabled={!sessionId} onClick={() => store.newConversation(projectId, targetSceneId)}>
           <SquarePen className="i" aria-hidden="true" />
         </button>
-        {/* Folds the panel away, as the sidebar's own button does on the left. */}
-        <button type="button" className="icon-btn" aria-label="Ocultar el agente" title="Ocultar el agente" onClick={onClose}>
-          {narrow ? <X className="i" aria-hidden="true" /> : <PanelRight className="i" aria-hidden="true" />}
-        </button>
+        {/* As a drawer it closes here; docked, the tab on its edge folds it. */}
+        {narrow && <button type="button" className="icon-btn" aria-label="Cerrar el agente" title="Cerrar el agente" onClick={onClose}>
+          <X className="i" aria-hidden="true" />
+        </button>}
       </div>
 
       <div ref={log} className="agent__log" role="log" aria-label="Conversación con el agente">

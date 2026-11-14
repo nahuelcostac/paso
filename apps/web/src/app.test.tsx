@@ -437,14 +437,18 @@ describe('the board and its overview', () => {
     expect((await readProject('one')).sceneIds).toEqual(['s1']);
   });
 
-  it('has no header: the sidebar folds into a rail that opens it again or starts a diagram', async () => {
+  it('has no header: the tab on the sidebar\'s edge folds it into a rail, which starts a diagram, and opens it again', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     render(<App config={config} />);
     await screen.findByRole('main', { name: 'Lienzo' }, patience);
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Ocultar diagramas' }));
+    expect(screen.getByRole('separator', { name: 'Anchura de los diagramas' })).toHaveAttribute('aria-valuenow', '240');
+    const tab = screen.getByRole('button', { name: 'Ocultar diagramas' });
+    expect(tab).toHaveAttribute('aria-controls', 'projects-panel');
+    await user.click(tab);
     expect(screen.queryByRole('complementary', { name: 'Diagramas' })).not.toBeInTheDocument();
+    expect(tab).toHaveAccessibleName('Mostrar diagramas');
     const rail = screen.getByRole('navigation', { name: 'Diagramas' });
     await user.click(within(rail).getByRole('button', { name: 'Nuevo proyecto' }));
     expect(await screen.findByLabelText('Nombre del diagrama nuevo')).toHaveFocus();

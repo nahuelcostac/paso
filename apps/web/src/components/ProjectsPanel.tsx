@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isLooseProject, LOOSE_PROJECT_ID, type Scene } from '@paso/shared';
-import { ChevronsUpDown, CloudOff, Folder, Layers, PanelLeft, Search, ServerOff, Shapes, SquarePen, SquarePlus, TriangleAlert, X } from 'lucide-react';
+import { ChevronsUpDown, CloudOff, Folder, Layers, Search, ServerOff, Shapes, SquarePen, SquarePlus, TriangleAlert, X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
 import { describeContents, fold, groupByRecency } from '../lib/format';
 import { ActionError, workspaceErrorText, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
@@ -31,7 +31,8 @@ type Props = {
   onDeleted: (id: string) => void;
   /** Opens another workspace. The app saves the open step first. */
   onSwitchWorkspace: (open: () => Promise<void>) => Promise<void>;
-  onHide: () => void;
+  /** Over the content on a narrow window, a close button in the head; otherwise the tab on the edge folds it. */
+  onHide?: () => void;
   /** A project's scenes, shown under its row while it is expanded. `transfer` lets each be moved elsewhere. */
   sceneList?: (row: Extract<Row, { kind: 'ok' }>, transfer: SceneTransfer) => ReactNode;
   /** The open step's save state, said in the footer. */
@@ -301,12 +302,12 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   );
 
   return (
-    <aside className="projects" aria-label="Diagramas" aria-busy={switching || undefined} data-dragging={drag ? 'true' : undefined}>
+    <aside id="projects-panel" className="projects" aria-label="Diagramas" aria-busy={switching || undefined} data-dragging={drag ? 'true' : undefined}>
       <div className="projects__head">
         <Brand />
-        <button type="button" className="icon-btn" aria-label="Ocultar diagramas" title="Ocultar diagramas" aria-expanded="true" onClick={onHide}>
-          <PanelLeft className="i" aria-hidden="true" />
-        </button>
+        {onHide && <button type="button" className="icon-btn" aria-label="Cerrar diagramas" title="Cerrar diagramas" onClick={onHide}>
+          <X className="i" aria-hidden="true" />
+        </button>}
       </div>
 
       <div className="projects__nav">
