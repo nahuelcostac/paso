@@ -57,6 +57,7 @@ export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | '
         env: {
           PASO_SERVICE_URL: '${PASO_SERVICE_URL}', PASO_SESSION_TOKEN: '${PASO_SESSION_TOKEN}',
           ...(request.board.mcp.browserExecutable ? { PASO_MCP_BROWSER_EXECUTABLE: '${PASO_MCP_BROWSER_EXECUTABLE}' } : {}),
+          ...(request.board.mcp.electronRunAsNode ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
         },
       },
     },

@@ -24,6 +24,7 @@ class BoardTransport implements Transport {
       input: '', keepStdinOpen: true,
       env: harnessEnvironment({
         PASO_SERVICE_URL: request.board.serviceUrl, PASO_SESSION_TOKEN: request.board.sessionToken,
+        ...(request.board.mcp.electronRunAsNode ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
         ...(request.board.mcp.browserExecutable ? { PASO_MCP_BROWSER_EXECUTABLE: request.board.mcp.browserExecutable } : {}),
       }),
     }, {

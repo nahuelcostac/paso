@@ -74,7 +74,7 @@ export type AgentRunRequest = {
     /** The service token. Adapters must hand it over through the environment, never argv or files. */
     sessionToken: string;
     /** How to start the Paso MCP server. */
-    mcp: { command: string; args: string[]; browserExecutable?: string };
+    mcp: { command: string; args: string[]; browserExecutable?: string; electronRunAsNode?: boolean };
   };
   limits: { idleTimeoutMs: number; maxRunMs: number };
 };
