@@ -89,6 +89,12 @@ afterEach(async () => {
 });
 
 describe('Claude Code session: arguments, environment and isolation', () => {
+  it('enables Electron Node mode only for the desktop MCP', () => {
+    const board = { serviceUrl: 'http://127.0.0.1:1', sessionToken: 'x'.repeat(40), mcp: { command: '/Paso', args: ['/cli.mjs'], electronRunAsNode: true } };
+    const args = claudeArguments({ context: { projectId: 'p' }, board });
+    const config = JSON.parse(args[args.indexOf('--mcp-config') + 1]);
+    expect(config.mcpServers.paso.env.ELECTRON_RUN_AS_NODE).toBe('1');
+  });
   it('passes exactly the board-only arguments, keeps text and token out of argv and cleans the environment', async () => {
     const p = await project();
     const id = await session(p, { sceneId: 's1' });

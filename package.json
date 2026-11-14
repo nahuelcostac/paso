@@ -11,7 +11,8 @@
     "build": "pnpm -r build",
     "lint": "eslint .",
     "typecheck": "pnpm --filter \"@paso/server...\" build && pnpm -r typecheck",
-    "test": "pnpm --filter \"@paso/mcp...\" build && vitest run"
+    "test": "pnpm --filter \"@paso/mcp...\" build && vitest run",
+    "dev:desktop": "node scripts/dev-desktop.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -19,6 +20,7 @@
     "concurrently": "^9.2.1",
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
+    "esbuild": "0.25.12",
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
     "jsdom": "^26.1.0",

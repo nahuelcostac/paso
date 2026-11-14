@@ -25,7 +25,7 @@ export type AgentOptions = {
   /** Where session IDs and resume tokens are kept. Must be outside `dataDir`. Default: next to the projects directory. */
   sessionsPath?: string;
   /** How to start the Paso MCP server. Default: this repository's compiled `apps/mcp/dist/cli.js` run with this Node. */
-  mcp?: { command?: string; entry?: string; args?: string[]; browserExecutable?: string };
+  mcp?: { command?: string; entry?: string; args?: string[]; browserExecutable?: string; electronRunAsNode?: boolean };
   /** Called where a run starts and ends. Restore points attach here. */
   hooks?: AgentRunHooks;
   /** Concurrent runs allowed per project (default 1) and in total (default 4). */
@@ -146,6 +146,7 @@ export async function startServer(options: StartServerOptions) {
       mcp: {
         command: agent.mcp?.command ?? process.execPath, args: agent.mcp?.args ?? [mcpEntry],
         ...(agent.mcp?.browserExecutable ? { browserExecutable: agent.mcp.browserExecutable } : {}),
+        ...(agent.mcp?.electronRunAsNode ? { electronRunAsNode: true } : {}),
       },
     }),
     workDir: agentWorkDir, dataDir: dataRoot,

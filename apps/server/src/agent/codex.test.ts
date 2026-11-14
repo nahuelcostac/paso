@@ -37,6 +37,13 @@ beforeEach(async () => {
 afterEach(async () => { await server?.close(); await rm(root, { recursive: true, force: true }); });
 
 describe('Codex app-server adapter with a simulated harness and real board MCP', () => {
+  it('passes Electron Node mode to the MCP child', async () => {
+    const executable = join(root, 'electron-node');
+    await writeFile(executable, `#!/bin/sh\n[ "$ELECTRON_RUN_AS_NODE" = 1 ] || exit 1\nexec '${process.execPath}' "$@"\n`);
+    await chmod(executable, 0o755);
+    const board = { ...request.board, mcp: { ...request.board.mcp, command: executable, electronRunAsNode: true } };
+    expect((await collect('ok', { board })).at(-1)).toEqual({ type: 'finished', reason: 'completed' });
+  });
   it('streams text, targets and successful/failed tool results without exposing arguments', async () => {
     const events = await collect();
     expect(events).toContainEqual({ type: 'text_delta', text: 'Ho' });
