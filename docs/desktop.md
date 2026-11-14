@@ -15,3 +15,9 @@ The existing harness detector searches PATH, common installation locations and t
 ## Before a release
 
 Add a product icon, reduce the package size, support and test Intel or universal builds, and use a reproducible Node runtime for each target architecture. Add signing, hardened runtime, notarization and a distribution format. Decide on update delivery and migration. Test upgrades, multiple instances, crash recovery, accessibility, external links and offline behavior in a release environment. Windows and Linux need their own packaging, data paths, process handling and verification. Review the desktop security boundary and bundled dependency licenses. The agent's optional image tool needs a packaged compatible renderer or a desktop rendering bridge.
+
+## Desktop development
+
+Run `pnpm dev:desktop` to start the Electron window with Vite hot reload. It uses the same default data directory as `pnpm dev`. Set `PASO_DATA_DIR` to override it. For an isolated run use, for example, `PASO_DATA_DIR=/tmp/paso-desktop-check/projects pnpm dev:desktop`. This also puts Electron's profile in the temporary parent directory. The service and Vite use separate free loopback ports, leaving 3001 and 5173 available. Server source changes rebuild the service and restart the window. Closing the window stops Vite and the service, including agent processes.
+
+The development window retains the sandbox, preload token bridge, permission denial, external link handling and network request restrictions of the packaged app. Vite serves the page and proxies API traffic to the embedded service. Its local WebSocket and development scripts are allowed for HMR, and Vite's development content does not have the packaged app's strict content security policy. The token is not injected into the development HTML. These exceptions apply only to the development entry point.
