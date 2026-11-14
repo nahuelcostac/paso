@@ -316,6 +316,8 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
   position: relative; overflow: hidden auto; min-width: 0; padding: 44px 56px var(--space-7);
   /* A thin thumb with no track: a grey track would sit as a stripe against the chat's card. */
   scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
+  /* The chat's tab reaches 8px into the board: a clear border of that width keeps the scrollbar out from under it. */
+  border-right: 8px solid transparent;
 }
 .board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: 180px; }
 /* In the Estudio the corner scrolls with the page, and the title keeps clear of it. */
