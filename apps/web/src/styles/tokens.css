@@ -226,6 +226,9 @@
   --color-selection: #585858;
 }
 
+/* Its help dialog opens with links to Excalidraw's site (docs, blog, issues, YouTube): Paso keeps only the shortcuts. */
+.excalidraw .HelpDialog__header { display: none; }
+
 /* Its corner buttons are flat by default: give them the same card as the islands. */
 .excalidraw.excalidraw .zoom-actions,
 .excalidraw.excalidraw .undo-redo-buttons,

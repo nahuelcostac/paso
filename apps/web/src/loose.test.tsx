@@ -196,7 +196,6 @@ describe('loose diagrams in the sidebar', () => {
     const step = JSON.parse(await readFile(join(dataDir, 'p', 'scenes', 'd', 'steps', 'd-step-0.json'), 'utf8')) as { elements: Array<{ id: string }> };
     expect(step.elements.map((element) => element.id)).toEqual(['drawn-0']);
     await waitFor(() => expect(screen.getByTestId('elements')).toHaveTextContent('drawn-0'), patience);
-    expect(screen.getByRole('complementary', { name: 'Diagramas' }).querySelector('.projects__foot')).toHaveTextContent('Guardado en este equipo');
   });
 
   it('moves one when it is dragged onto a project, highlights the target, and Escape cancels', async () => {

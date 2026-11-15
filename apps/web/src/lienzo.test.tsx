@@ -76,7 +76,6 @@ const hash = () => window.location.hash.replace(/^#\//, '').split('/');
 const current = () => hash()[3];
 const order = async (projectId: string, sceneId: string) => (await api.getScene(projectId, sceneId)).document.stepIds;
 /** The save state in the sidebar's footer. The carousel has its own, unrelated live region. */
-const saveState = () => document.querySelector('.projects__foot[data-save-state]');
 const sceneList = () => screen.getByRole('list', { name: /^Escenas de / });
 const frames = () => screen.getAllByRole('button', { name: /^Paso \d+/ });
 async function open(sizes: number[]) {
@@ -273,12 +272,10 @@ describe('what the person is told about unsaved work', () => {
     const message = /El paso cambió fuera de Paso/;
     await screen.findByText(message, {}, patience);
     expect(screen.getAllByText(message)).toHaveLength(1);                       // the banner alone
-    expect(saveState()).toHaveAttribute('data-save-state', 'conflict');         // never "Guardado" beside a conflict
     expect(screen.queryByRole('button', { name: 'Revisar paso sin guardar' })).not.toBeInTheDocument();
     // On another step the top bar points back at it, and the step on screen is saved.
     await user.click(frames()[1]);
     await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', scenes[0].steps[1]));
-    await waitFor(() => expect(saveState()).toHaveTextContent('Guardado'));
     const review = await screen.findByRole('button', { name: 'Revisar paso sin guardar' });
     expect(screen.queryByText(message)).not.toBeInTheDocument();
     await user.click(review);

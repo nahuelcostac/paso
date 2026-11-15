@@ -37,7 +37,6 @@ type Props = {
   /** A project's scenes, shown under its row while it is expanded. `transfer` lets each be moved elsewhere. */
   sceneList?: (row: Extract<Row, { kind: 'ok' }>, transfer: SceneTransfer) => ReactNode;
   /** The open step's save state, said in the footer. */
-  saveState?: 'saved' | 'dirty' | 'saving' | 'failed' | 'conflict';
   /** Failures of the app that have no other place, such as a step elsewhere that could not be saved. */
   notices?: ReactNode;
   /** The loose diagram on screen, if one is. */
@@ -57,7 +56,6 @@ type Props = {
   onDeleteLoose: (id: string) => Promise<void>;
 };
 
-const SAVE_LABELS = { saved: 'Guardado en este equipo', dirty: 'Cambios pendientes', saving: 'Guardando…', failed: 'Sin guardar', conflict: 'Sin guardar' } as const;
 
 const EXPANDED_KEY = 'paso.expanded-projects';
 const readExpanded = () => {
@@ -78,7 +76,7 @@ const reasonText = (error: unknown) => error instanceof ActionError ? error.mess
  * The sidebar, laid out like tldraw's: the mark, the workspace switcher, search and «Nuevo proyecto», then the projects
  * grouped by when they last changed. Each workspace is a folder on this computer.
  */
-export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, saveState, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
+export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [picker, setPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null);
@@ -478,7 +476,6 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           )}
         </div>
       )}
-      <p className="projects__foot" data-save-state={saveState ?? 'saved'} role="status">{SAVE_LABELS[saveState ?? 'saved']}</p>
 
       {workspaceMenu && listing && workspaceButton.current && (
         <WorkspaceMenu

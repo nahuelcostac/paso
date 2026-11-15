@@ -121,7 +121,6 @@ describe('the Presentar button', () => {
     const { projectId, sceneId, steps } = await open([[box('a')], [box('b')]]);
     await screen.findByTestId('canvas');
     await user.click(screen.getByRole('button', { name: 'Dibujar' }));
-    expect(document.querySelector('.projects__foot[data-save-state]')).toHaveTextContent('Cambios pendientes');
     await user.click(await presentar());
     await stage();
     expect((await api.getStep({ projectId, sceneId, stepId: steps[0] })).document.elements.map((e) => e.id)).toEqual(['a', 'drawn-1']);

@@ -201,11 +201,6 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .project--skeleton .project__tile { background: var(--surface-sunken); }
 .skeleton { display: block; border-radius: 4px; background: var(--surface-sunken); }
 .skeleton--name { height: 12px; width: 60%; }
-.projects__foot { flex: none; display: flex; align-items: center; gap: var(--space-2); margin: 0 var(--space-2); padding: var(--space-3) var(--space-2); border-top: var(--border); color: var(--ink-3); font-size: var(--text-12); }
-.projects__foot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex: none; }
-.projects__foot[data-save-state='dirty']::before, .projects__foot[data-save-state='saving']::before { background: var(--muted); }
-.projects__foot[data-save-state='failed'], .projects__foot[data-save-state='conflict'] { color: var(--danger-ink); }
-.projects__foot[data-save-state='failed']::before, .projects__foot[data-save-state='conflict']::before { background: var(--danger-ink); }
 
 /* The open diagram's scenes, like pages under its row: a number, the name, and a menu on hover. */
 .scene-list { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 var(--space-1) 17px; padding-left: var(--space-2); border-left: var(--border); }

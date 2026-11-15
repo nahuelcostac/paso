@@ -251,8 +251,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // Local work that is not on the service: a failed save or a conflict. The step on screen has its own notice in the Lienzo.
   const showing = lienzo && route.sceneId && route.stepId ? targetKey({ projectId: route.projectId!, sceneId: route.sceneId, stepId: route.stepId }) : undefined;
   const failedStep = steps.unresolved().find((session) => targetKey(session.target) !== showing);
-  const here = steps.current();
-  const saveState = lienzo && here && targetKey(here.target) === showing ? here.status : undefined;
 
   // No project in the address: open the first one that can be opened.
   useEffect(() => {
@@ -364,7 +362,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           store={store}
           onSwitchWorkspace={switchWorkspace}
           onHide={leftNarrow ? () => setPanelOpen(false) : undefined}
-          saveState={saveState}
           notices={notices}
           // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
           sceneList={(projectRow, transfer) => {
