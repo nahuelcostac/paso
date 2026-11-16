@@ -280,6 +280,27 @@ describe('the Estudio against the real service', () => {
   });
 });
 
+describe('the camera badge in the Estudio', () => {
+  it('reads each step\'s camera from the service: a box of its own, or the previous step\'s, kept', async () => {
+    await seed();
+    const setCamera = async (id: string, camera: unknown) => {
+      const path = `/projects/p/scenes/a/steps/${id}`;
+      const { document, revision } = await call<Doc<Record<string, unknown>>>('GET', path);
+      await call('PUT', path, { ...document, camera }, revision);
+    };
+    await setCamera('a2', { x: 0, y: 0, width: 100, height: 80 });
+    await setCamera('a3', 'previous');
+    render(<App config={config} />);
+    await screen.findByRole('heading', { level: 2, name: 'El problema' }, patience);
+    const first = scene('El problema');
+    await within(first).findByRole('button', { name: 'Paso 3, mantiene el encuadre anterior' }, patience);
+    expect(within(first).getByRole('button', { name: 'Paso 2: Mira en medio, con encuadre' })).toBeInTheDocument();
+    expect(within(first).getByRole('button', { name: 'Paso 1' })).toBeInTheDocument();
+    expect(first.querySelectorAll('.frame__framed')).toHaveLength(2);
+    expect(first.querySelectorAll('.frame__framed--kept')).toHaveLength(1);
+  }, 15_000);
+});
+
 describe('lazy thumbnails', () => {
   it('draws a scene only once it nears the screen', async () => {
     const watching: Array<{ target: Element; callback: IntersectionObserverCallback }> = [];
@@ -321,6 +342,18 @@ describe('StepFrame', () => {
     expect(document.querySelector('.frame__paper')).toHaveAttribute('data-state', 'loading');
     rerender(<StepFrame number={12} svg="<svg/>" />);
     expect(document.querySelector('.frame__paper img')).not.toBeNull();
+  });
+  it('badges an own camera and a kept one apart, on the storyboard only', () => {
+    const { rerender } = render(<StepFrame number={2} framed="own" />);
+    expect(screen.getByRole('button')).toHaveAccessibleName('Paso 2, con encuadre');
+    expect(document.querySelector('.frame__framed')).not.toHaveClass('frame__framed--kept');
+    rerender(<StepFrame number={2} framed="previous" />);
+    expect(screen.getByRole('button')).toHaveAccessibleName('Paso 2, mantiene el encuadre anterior');
+    expect(document.querySelector('.frame__framed--kept')).toHaveAttribute('title', expect.stringContaining('Mantiene el encuadre del paso anterior'));
+    rerender(<StepFrame number={2} framed="previous" size="carousel" />);
+    expect(document.querySelector('.frame__framed')).toBeNull();
+    rerender(<StepFrame number={2} />);
+    expect(screen.getByRole('button')).toHaveAccessibleName('Paso 2');
   });
 });
 

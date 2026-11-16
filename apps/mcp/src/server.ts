@@ -1,13 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { idSchema, type Scene, type Project, type Step } from '@paso/shared';
+import { idSchema, PREVIOUS_CAMERA, resolveStepCamera, type Scene, type Project, type Step } from '@paso/shared';
 import { BoardApi, scenePath, stepPath, type Configuration, type Envelope } from './api.js';
 import { addElements, updateElements, deleteElements, describeStep } from './elements.js';
 import { elementInput, elementPatch, revisionSchema, targetShape, type Target } from './input.js';
 import { renderStep } from './image.js';
 
 const textResult = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
-const conventions = 'Canvas units are pixels. x increases right, y down. x/y is the top-left, not the center. Width/height are positive minimum sizes. Labels use the bundled Excalifont font and grow containers to fit without wrapping; use \\n for line breaks. IDs are stable and unique within a step. Straight arrows bind shape IDs and follow moved shapes. New shapes and arrows use artist roughness. Use update_step to fix titles or notes, or to set the presentation camera that zooms Presentar to one area of a step, and delete_step to remove unwanted steps. No raw Excalidraw properties are accepted.';
+const conventions = 'Canvas units are pixels. x increases right, y down. x/y is the top-left, not the center. Width/height are positive minimum sizes. Labels use the bundled Excalifont font and grow containers to fit without wrapping; use \\n for line breaks. IDs are stable and unique within a step. Straight arrows bind shape IDs and follow moved shapes. New shapes and arrows use artist roughness. Use update_step to fix titles or notes, or to set the presentation camera that zooms Presentar to one area of a step or keeps the previous step’s, and delete_step to remove unwanted steps. No raw Excalidraw properties are accepted.';
 const stale = 'Pass the exact unquoted revision returned by read_step. On REVISION_CONFLICT read again and reconsider edits. Writes are atomic per step and never automatically retried.';
 
 export function createBoardMcp(config: Configuration) {
@@ -29,16 +29,23 @@ export function createBoardMcp(config: Configuration) {
   tool('read_scene', 'Read a scene and its ordered steps, titles, element counts and step revisions. Use read_step before editing a step.', { projectId: idSchema, sceneId: idSchema }, true, async ({ projectId, sceneId }) => {
     const scene = await api.request<Envelope<Scene>>(scenePath(projectId, sceneId));
     const { steps } = await api.request<{ steps: Envelope<Step>[] }>(`${scenePath(projectId, sceneId)}/steps`);
-    return { ...scene, steps: steps.map(({ document, revision }) => ({ stepId: document.id, title: document.title, revision, elementCount: document.elements.filter((element) => !element.isDeleted).length })) };
+    return { ...scene, steps: steps.map(({ document, revision }) => ({ stepId: document.id, title: document.title, revision, elementCount: document.elements.filter((element) => !element.isDeleted).length, ...(document.camera ? { camera: document.camera } : {}) })) };
   });
-  tool('read_step', `Read a step’s current revision and simple layout with positions, sizes, labels, connections and potential overlaps. ${conventions}`, targetShape, true, async (target) => {
-    const { document, revision } = await api.readStep(target); return describeStep(document, revision);
+  tool('read_step', `Read a step’s current revision and simple layout with positions, sizes, labels, connections and potential overlaps. camera is the step's presentation camera when set; for camera "previous", keptCamera says what it shows: {fromStepId, x, y, width, height}, or null for the whole scene. ${conventions}`, targetShape, true, async (target) => {
+    const { document, revision } = await api.readStep(target);
+    const layout = describeStep(document, revision);
+    if (document.camera !== PREVIOUS_CAMERA) return layout;
+    // What the kept camera shows depends on the steps before this one, read now.
+    const { steps } = await api.request<{ steps: Envelope<Step>[] }>(`${scenePath(target.projectId, target.sceneId)}/steps`);
+    const ordered = steps.map((step) => step.document);
+    const found = resolveStepCamera(ordered, ordered.findIndex((step) => step.id === document.id));
+    return { ...layout, keptCamera: found ? { fromStepId: ordered[found.stepIndex].id, ...found.camera } : null };
   });
   tool('create_scene', 'Append an empty scene to an existing project. Optional id is project-wide unique. The service appends safely under its project lock. On uncertain transport failure, read_project before retrying.', { projectId: idSchema, name: z.string().min(1).max(500), id: idSchema.optional() }, false, ({ projectId, ...input }) => api.request(scenePath(projectId), 'POST', input));
   tool('create_step', 'Append an empty full-snapshot step to a scene. Optional id is project-wide unique. Use duplicate_step instead to build on a previous drawing. On uncertain transport failure, read_scene before retrying.', { projectId: idSchema, sceneId: idSchema, id: idSchema.optional(), title: z.string().max(500).optional(), speakerNotes: z.string().max(20_000).optional() }, false, ({ projectId, sceneId, ...input }) => api.request(`${scenePath(projectId, sceneId)}/steps`, 'POST', input));
   tool('duplicate_step', `Append a full copy to the same scene. Keep all element IDs, unknown properties and assets. Optional id is the NEW step ID, not an element ID. Optional title replaces the copied title. ${stale}`, { ...targetShape, revision: revisionSchema, id: idSchema.optional(), title: z.string().max(500).optional() }, false, ({ revision, id, title, ...target }) => api.request(`${stepPath(target)}/duplicate`, 'POST', { ...(id !== undefined ? { id } : {}), ...(title !== undefined ? { title } : {}) }, revision));
   const camera = z.object({ x: z.number().finite(), y: z.number().finite(), width: z.number().finite().positive(), height: z.number().finite().positive() }).strict();
-  tool('update_step', `Change a step's title, speaker notes or presentation camera. Omitted fields stay unchanged. camera is the part of the drawing Presentar zooms to on this step, as {x, y, width, height} in canvas units with x/y at the top-left: use it to focus the audience on one area, for example a detail that changes between two steps; the zoom animates smoothly from the previous step. Leave some margin around the area. camera: null removes it, and the step shows the whole scene again. It changes no element and is not visible while editing. ${stale}`, { ...targetShape, revision: revisionSchema, title: z.string().max(500).optional(), speakerNotes: z.string().max(20_000).optional(), camera: camera.nullable().optional() }, false, async ({ revision, title, speakerNotes, camera: framing, ...target }) => {
+  tool('update_step', `Change a step's title, speaker notes or presentation camera. Omitted fields stay unchanged. camera is the part of the drawing Presentar zooms to on this step, as {x, y, width, height} in canvas units with x/y at the top-left: use it to focus the audience on one area, for example a detail that changes between two steps; the zoom animates smoothly from the previous step. Leave some margin around the area. camera: "previous" keeps the previous step's camera instead, live: Presentar does not move on reaching this step, and follows if that camera changes later. Use it for a run of steps that build up one area. It walks back through earlier steps that keep it too; a first step, or a previous step showing the whole scene, means the whole scene. A box and "previous" replace each other. camera: null removes either, and the step shows the whole scene again. It changes no element and is not visible while editing. ${stale}`, { ...targetShape, revision: revisionSchema, title: z.string().max(500).optional(), speakerNotes: z.string().max(20_000).optional(), camera: z.union([camera, z.literal(PREVIOUS_CAMERA)]).nullable().optional() }, false, async ({ revision, title, speakerNotes, camera: framing, ...target }) => {
     if (title === undefined && speakerNotes === undefined && framing === undefined) throw new Error('INVALID_INPUT. Supply title, speakerNotes or camera.');
     const current = await api.readStep(target);
     if (current.revision !== revision) throw new Error('REVISION_CONFLICT. The step changed. Call read_step again. No change was written.');

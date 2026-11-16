@@ -1,27 +1,76 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
-import { Scan, X } from 'lucide-react';
-import type { StepCamera } from '@paso/shared';
+import { Link2, Scan, X } from 'lucide-react';
+import { PREVIOUS_CAMERA, type StepCamera, type StepCameraSetting } from '@paso/shared';
+import { pad } from '../components/StepFrame';
 import { cameraOnScreen, MIN_CAMERA_PX, reshapeCamera, screenToCamera, viewCamera, type CameraHandle, type ViewStore } from './canvas-view';
 
 /**
- * «Encuadrar»: marks the part of the drawing Presentar zooms to on this step. It opens the drawing mode; with a camera
- * set it reads «Reencuadrar», and the cross beside it removes the camera.
+ * What a step that keeps the previous camera shows: the box of the step it comes from (its number, from 1), or the
+ * whole scene, because the steps before it show the whole scene or there are none.
  */
-export function CameraControl({ camera, drawing, onDraw, onClear }: { camera: StepCamera | undefined; drawing: boolean; onDraw: () => void; onClear: () => void }) {
+export type KeptCamera = { camera: StepCamera; number: number } | { camera?: undefined; reason: 'first' | 'scene' };
+
+/**
+ * «Encuadrar»: marks the part of the drawing Presentar zooms to on this step. It opens the drawing mode; with a camera
+ * set it reads «Reencuadrar», and the cross beside it removes the camera. The chain at the end keeps the previous
+ * step's camera instead: Presentar does not move on reaching this step. Each replaces the other. While the step keeps
+ * the previous camera and that shows the whole scene, a note under the island says so, as there is no box to draw.
+ */
+export function CameraControl({ camera, kept, drawing, onDraw, onClear, onKeep }: {
+  camera: StepCameraSetting | undefined;
+  /** Known only while the step keeps the previous camera and the scene's steps have been read. */
+  kept?: KeptCamera;
+  drawing: boolean; onDraw: () => void; onClear: () => void; onKeep: (keep: boolean) => void;
+}) {
+  const own = typeof camera === 'object';
+  const keeps = camera === PREVIOUS_CAMERA;
   return (
-    <div className="camera-control" data-set={camera ? true : undefined}>
-      <button
-        type="button" className="camera-control__take" aria-pressed={drawing}
-        title="Marca la zona a la que se acercará la presentación en este paso: arrastra sobre el lienzo, o pulsa Intro para usar lo que ves"
-        onClick={onDraw}
-      >
-        <Scan className="i" aria-hidden="true" /><span className="camera-control__label">{camera ? 'Reencuadrar' : 'Encuadrar'}</span>
-      </button>
-      {camera && (
-        <button type="button" className="camera-control__clear" aria-label="Quitar encuadre" title="Quitar encuadre: el paso vuelve a mostrar toda la escena" onClick={onClear}>
-          <X className="i" aria-hidden="true" />
+    <>
+      <div className="camera-control" data-set={own || undefined} data-kept={keeps || undefined}>
+        <button
+          type="button" className="camera-control__take" aria-pressed={drawing}
+          title="Marca la zona a la que se acercará la presentación en este paso: arrastra sobre el lienzo, o pulsa Intro para usar lo que ves"
+          onClick={onDraw}
+        >
+          <Scan className="i" aria-hidden="true" /><span className="camera-control__label">{own ? 'Reencuadrar' : 'Encuadrar'}</span>
         </button>
+        {own && (
+          <button type="button" className="camera-control__clear" aria-label="Quitar encuadre" title="Quitar encuadre: el paso vuelve a mostrar toda la escena" onClick={onClear}>
+            <X className="i" aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button" className="camera-control__keep" aria-pressed={keeps} aria-label="Mantener el encuadre del paso anterior"
+          title={keeps
+            ? 'Mantiene el encuadre del paso anterior. Pulsa para dejar de mantenerlo: el paso vuelve a mostrar toda la escena'
+            : `Mantener el encuadre del paso anterior: Presentar no se mueve al llegar a este paso${own ? '. Sustituye el encuadre propio' : ''}`}
+          onClick={() => onKeep(!keeps)}
+        >
+          <Link2 className="i" aria-hidden="true" />
+        </button>
+      </div>
+      {keeps && kept && !kept.camera && (
+        <p className="camera-control__note" role="status">
+          {kept.reason === 'first' ? 'Es el primer paso: no hay encuadre que mantener y se verá toda la escena.' : 'El paso anterior muestra toda la escena, y este también.'}
+        </p>
       )}
+    </>
+  );
+}
+
+/**
+ * The camera a step keeps from an earlier one, over the canvas: a dotted box that cannot be moved or resized here,
+ * with an outlined tag that names the step it comes from. The tag opens that step, where the box can be changed.
+ */
+export function KeptCameraOverlay({ camera, number, view, onOpen }: { camera: StepCamera; number: number; view: ViewStore; onOpen: () => void }) {
+  const now = useSyncExternalStore(view.subscribe, view.get);
+  if (!now) return null;
+  const box = cameraOnScreen(camera, now);
+  return (
+    <div className="camera-overlay camera-overlay--kept" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
+      <button type="button" className="camera-overlay__tag camera-overlay__tag--kept" title={`Este paso mantiene el encuadre del paso ${pad(number)}. Pulsa para ir a ese paso y cambiarlo`} onClick={onOpen}>
+        <Link2 className="i" aria-hidden="true" />Encuadre del paso {pad(number)}
+      </button>
     </div>
   );
 }

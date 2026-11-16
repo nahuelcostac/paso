@@ -16,6 +16,8 @@
 /* A step with a presentation camera: a small badge on the drawing's top-right corner. */
 .frame__framed { position: absolute; top: 10px; right: 10px; display: inline-grid; place-items: center; width: 22px; height: 20px; border-radius: var(--radius-sm); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-3); }
 .frame__framed .i { width: 13px; height: 13px; }
+/* Keeping the previous step's camera: the same badge, with a dashed edge and a chain. */
+.frame__framed--kept { box-shadow: none; outline: 1px dashed var(--line-strong); outline-offset: -1px; }
 /* An untitled step says so on the card, in CSS, so the button's text stays its number alone. */
 .frame__title--empty { color: var(--ink-3); font-weight: var(--weight-regular); }
 .frame__title--empty::before { content: 'Sin título'; }
