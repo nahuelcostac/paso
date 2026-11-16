@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
 import { ArrowUp, Eye, FilePlus, History, LoaderCircle, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { Scene } from '@paso/shared';
 import { ApiRequestError, UnavailableError, type AgentSessionInfo, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
@@ -16,6 +16,8 @@ import '../styles/agent.css';
 
 type Props = {
   store: AgentStore;
+  input: string;
+  setInput: Dispatch<SetStateAction<string>>;
   projectId: string;
   projectName: string;
   scenes: Scene[];
@@ -170,9 +172,8 @@ function UndoDialog({ state, scenes, onCancel, onConfirm }: {
 }
 
 /** The agent panel: a conversation with the person's own harness about this project, and what the agent does in it. */
-export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady }: Props) {
+export function AgentPanel({ store, input, setInput, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady }: Props) {
   const state = useAgent(store);
-  const [input, setInput] = useState('');
   const [menu, setMenu] = useState<{ kind: 'history'; anchor: HTMLButtonElement } | null>(null);
   const [deleting, setDeleting] = useState<{ session: AgentSessionInfo; busy: boolean; error?: string } | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
@@ -222,7 +223,7 @@ export function AgentPanel({ store, projectId, projectName, scenes, routeSceneId
     if (!usable || running || !input.trim()) return;
     const text = input;
     setInput('');
-    if (!(await store.send(projectId, targetSceneId, text))) setInput(text);
+    if (!(await store.send(projectId, targetSceneId, text))) setInput((current) => current || text);
   };
   const onComposerKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); }
