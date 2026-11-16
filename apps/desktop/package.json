@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@paso/mcp": "workspace:*",
-    "@paso/server": "workspace:*"
+    "@paso/server": "workspace:*",
+    "@paso/shared": "workspace:*"
   }
 }

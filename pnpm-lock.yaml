@@ -53,6 +53,9 @@ importers:
       '@paso/server':
         specifier: workspace:*
         version: link:../server
+      '@paso/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
 
   apps/mcp:
     dependencies:

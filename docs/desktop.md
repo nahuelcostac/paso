@@ -23,7 +23,19 @@ The main process stays small: `main.mjs` wires the pieces in `apps/desktop/lib/`
 - **Folder dialog** (`lib/folder-bridge.mjs`). «Nuevo workspace…» opens the system folder dialog as a sheet on the window, instead of the in-app explorer, which the browser version keeps. The preload exposes only `chooseFolder(near?)`. The main process answers only the app's own page, in the main frame of its window. It accepts only an absolute path or nothing as the starting folder, keeps one dialog open at a time, and returns a path only after the person picks one. The service still validates the folder when it is added, exactly as with the explorer.
 - **«Abrir carpeta»** goes through the service's `openFolder` hook, which the desktop app sets to `shell.openPath`, so Finder opens the folder.
 - **Full screen.** Presentar asks the page for full screen, and the window enters real macOS full screen (`isFullScreen()`, not simple full screen) and covers the whole display. Before this change the permission handler refused that request, so Presentar only filled the window.
-- **Icon.** `apps/desktop/icon/paso.svg` is the source: the brand mark, a rising step on an ink tile, on Apple's 1024 grid. `node apps/desktop/icon/build.mjs` rebuilds `Paso.icns` with `sips` and `iconutil`, and packaging uses it.
+- **Icon.** The Dock, Finder and ⌘Tab icon is the sidebar mark, with nothing redrawn. See [The icon](#the-icon).
+
+## The icon
+
+Paso's mark, a rising step on an ink tile, is defined once, in `brandMark` in `packages/shared/src/brand.ts`. That object holds the tile size and corner radius, the step path, its box, the stroke and the two colours. Everything else is drawn from it:
+
+- **Sidebar logo.** `apps/web/src/components/Brand.tsx` renders `brandMarkLayout()` as inline SVG. Its colours are `--ink` and `--on-ink`, so the tile inverts in the dark theme. A test checks that their light theme values are `brandMark.ink` and `brandMark.onInk`.
+- **Browser tab icon.** The `paso-favicon` plugin in `apps/web/vite.config.ts` injects `brandFaviconHref()`, the mark as an SVG data URL, in development and in the build. `index.html` has no icon of its own.
+- **Desktop icon.** `apps/desktop/icon/build.mjs` writes `paso.svg`, a 1024 `paso.png` and `Paso.icns` to `apps/desktop/dist/icon/`, using `sips` and `iconutil` from macOS. None of them is committed. `pnpm --filter @paso/desktop package` builds them before electron-builder runs, and `pnpm dev:desktop` builds them before it opens the window, then sets the PNG with `app.dock.setIcon`, so development shows the same icon instead of Electron's. To build them by hand, run `pnpm --filter @paso/shared build && node apps/desktop/icon/build.mjs [outDir]`.
+
+The desktop icon keeps every proportion of the sidebar mark. The only macOS-specific step is the size: the tile is 824 px wide on a 1024 canvas, leaving Apple's usual 100 px margin, so it is the same size as the system's own icons in the Dock and Finder. It adds no gradient, border or shadow. macOS 26 and later apply their own rounded mask, light edge and depth to every app icon, so in the Dock it looks slightly glossier than the flat source, as Notes or Calendar do.
+
+Change the mark only in `brand.ts`. The web picks the change up on reload, and the app on its next `package` or `dev:desktop`. `apps/desktop/test/icon.test.mjs` builds a real `.icns`, reads the pixels back and checks the margin, the corners, the ink and the step against `brandMark`.
 
 ## Checking that it stays offline
 
@@ -43,6 +55,6 @@ Support and test Intel or universal builds. Add signing, hardened runtime, notar
 
 ## Desktop development
 
-Run `pnpm dev:desktop` to start the Electron window with Vite hot reload. It uses the same default data directory as `pnpm dev`. Set `PASO_DATA_DIR` to override it. For an isolated run use, for example, `PASO_DATA_DIR=/tmp/paso-desktop-check/projects pnpm dev:desktop`. This also puts Electron's profile in the temporary parent directory. The service and Vite use separate free loopback ports, leaving 3001 and 5173 available. Server source changes rebuild the service and restart the window. Closing the window stops Vite and the service, including agent processes.
+Run `pnpm dev:desktop` to start the Electron window with Vite hot reload. On macOS it first draws the app icon and shows it in the Dock. It uses the same default data directory as `pnpm dev`. Set `PASO_DATA_DIR` to override it. For an isolated run use, for example, `PASO_DATA_DIR=/tmp/paso-desktop-check/projects pnpm dev:desktop`. This also puts Electron's profile in the temporary parent directory. The service and Vite use separate free loopback ports, leaving 3001 and 5173 available. Server source changes rebuild the service and restart the window. Closing the window stops Vite and the service, including agent processes.
 
 The development window retains the sandbox, preload token bridge, permission denial, external link handling and network request restrictions of the packaged app. It handles the shared preload's native folder picker with the same main-frame and origin checks as the packaged app. Vite serves the page and proxies API traffic to the embedded service. Its local WebSocket and development scripts are allowed for HMR, and Vite's development content does not have the packaged app's strict content security policy. The token is not injected into the development HTML. These exceptions apply only to the development entry point.

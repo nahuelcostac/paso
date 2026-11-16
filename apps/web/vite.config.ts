@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { cp, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { brandFaviconHref } from '@paso/shared';
 
 const require = createRequire(import.meta.url);
 const webPort = Number(process.env.PASO_WEB_PORT ?? 5173);
@@ -50,6 +51,12 @@ export default defineConfig(({ command }) => ({
           response.setHeader('Content-Type', 'font/woff2'); response.end(bytes);
         }).catch(() => { response.statusCode = 404; response.end(); });
       });
+    },
+  }, {
+    // The tab icon is the sidebar mark, drawn from brandMark in @paso/shared.
+    name: 'paso-favicon',
+    transformIndexHtml() {
+      return [{ tag: 'link', attrs: { rel: 'icon', type: 'image/svg+xml', href: brandFaviconHref() }, injectTo: 'head' }];
     },
   }, {
     name: 'paso-dev-session',
