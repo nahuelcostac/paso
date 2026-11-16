@@ -57,7 +57,7 @@ once the move finishes or is undone (see the service API).
 | --- | --- | --- |
 | `project.json` | `schemaVersion`, `id`, `name`, `createdAt`, `updatedAt`, `sceneIds` | `icon` |
 | `scene.json` | `schemaVersion`, `id`, `name`, `stepIds` | None |
-| Step JSON | `schemaVersion`, `id`, `elements`, `appState`, `files` | `title`, `speakerNotes`, `camera` |
+| Step JSON | `schemaVersion`, `id`, `elements`, `appState`, `files` | `title`, `speakerNotes`, `camera` (a box, or `"previous"`) |
 
 `icon` is the name of a [Lucide](https://lucide.dev) icon in kebab case, such as
 `folder` or `chart-scatter`. It is for the project list and needs no format change:
@@ -72,6 +72,26 @@ positive width and height. A step without it shows the whole scene, framed from 
 union of all its steps. Only the presentation reads it: the editor, thumbnails and
 exports ignore it. It was added without a version change, since files without it
 stay valid, and `duplicateStep` copies it like any other field.
+
+`camera` can instead be the string `"previous"`: the step keeps the previous step's
+camera, and Presentar does not move on reaching it. One field holds both forms, so a
+step never has a box of its own and keeps the previous camera at the same time.
+`resolveStepCamera` in `packages/shared` works out what such a step shows:
+
+- It walks back through the steps before it, by their order in `stepIds`, past every
+  step that also keeps the previous camera. The first step that does not decides:
+  its box, or the whole scene if it has none. So a step that keeps the previous camera
+  always shows what the step before it shows.
+- The link is read anew every time, never copied: when the box it comes from
+  changes, the step follows.
+- On the first step of a scene there is nothing to keep, and it shows the whole scene.
+  The value is still valid there, and takes effect if the step is moved later.
+- Reordering changes what it keeps, since the link is by position. Deleting the step
+  it comes from makes it walk further back. A duplicate keeps `"previous"` too, and
+  sits right after the original, so it shows the same.
+
+Old files have no `"previous"` and keep their meaning, so this was also added without
+a version change. A version of Paso from before it rejects a step that uses it.
 
 Project timestamps are ISO 8601 strings with a time zone, for example
 `2026-11-07T12:00:00.000Z`. The writer must update `updatedAt` when project

@@ -325,6 +325,44 @@ describe('moving through the presentation', () => {
     await waitFor(() => expect(stagePlate.style.transform).toBe(''));
     expect(stagePlate).toHaveAttribute('data-motion', 'camera');
   });
+  it('holds the frame across a step that keeps the previous camera, follows that camera live, and lets go when the option is removed', async () => {
+    const user = userEvent.setup();
+    const { document: project } = await api.createProject({ name: 'Diagrama' });
+    const sceneId = (await api.createScene(project.id, 'Escena')).document.id;
+    const camera = { x: 0, y: 0, width: 100, height: 100 };
+    const ids: string[] = [];
+    for (const [index, setting] of [camera, 'previous', 'previous', undefined].entries()) ids.push((await api.createStep(project.id, sceneId, { elements: [box(`b${index}`), box(`c${index}`, 900)], ...(setting ? { camera: setting as typeof camera | 'previous' } : {}) })).document.id);
+    window.location.hash = `#/${project.id}/lienzo/${sceneId}/${ids[0]}`;
+    render(<App config={config} recovery={recovery} />);
+    await start(user);
+    await expectShown(ids[0]);
+    const stagePlate = document.querySelector<HTMLElement>('.present__stage')!;
+    await waitFor(() => expect(stagePlate.style.transform).toMatch(/scale\(/));
+    const framedView = stagePlate.style.transform;
+    // Two steps that keep it: the view does not move, not even a manual zoom made on the first one.
+    await user.keyboard('{ArrowRight}'); await expectShown(ids[1]);
+    expect(stagePlate.style.transform).toBe(framedView);
+    await user.keyboard('-');
+    const manual = stagePlate.style.transform;
+    expect(manual).not.toBe(framedView);
+    await user.keyboard('{ArrowRight}'); await expectShown(ids[2]);
+    expect(stagePlate.style.transform).toBe(manual);
+    // 0 goes back to the camera it keeps.
+    await user.keyboard('0');
+    expect(stagePlate.style.transform).toBe(framedView);
+    // The link is live: moving the first step's camera moves this one, three steps on.
+    const first = await api.getStep({ projectId: project.id, sceneId, stepId: ids[0] });
+    await api.saveStep({ projectId: project.id, sceneId, stepId: ids[0] }, first.revision, { ...first.document, camera: { x: 900, y: 0, width: 100, height: 100 } });
+    await waitFor(() => expect(stagePlate.style.transform).not.toBe(framedView));
+    expect(stagePlate.style.transform).toMatch(/scale\(/);
+    expect(stagePlate).toHaveAttribute('data-motion', 'camera');
+    // Without the option, the step shows the whole scene again.
+    const kept = await api.getStep({ projectId: project.id, sceneId, stepId: ids[2] });
+    const plain = { ...kept.document };
+    delete plain.camera;
+    await api.saveStep({ projectId: project.id, sceneId, stepId: ids[2] }, kept.revision, plain);
+    await waitFor(() => expect(stagePlate.style.transform).toBe(''));
+  });
   it('shows a scene of one step, and an empty step within a scene', async () => {
     const user = userEvent.setup();
     const { steps } = await open([[box('a')], [], [box('c')]]);

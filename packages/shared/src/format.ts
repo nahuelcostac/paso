@@ -79,12 +79,21 @@ export const stepCameraSchema = z.object({
   height: z.number().finite().positive(),
 }).strict();
 
+/** A step's `camera` set to this keeps the presentation camera of the step before it, instead of a box of its own. */
+export const PREVIOUS_CAMERA = 'previous';
+
+/**
+ * What a step says about the presentation camera: its own box, or `"previous"` to keep what the step before it shows.
+ * One field holds both, so a step can never have its own camera and keep the previous one at the same time.
+ */
+export const stepCameraSettingSchema = z.union([stepCameraSchema, z.literal(PREVIOUS_CAMERA)]);
+
 export const stepSchema = z.object({
   schemaVersion: schemaVersionSchema,
   id: idSchema,
   title: z.string().optional(),
   speakerNotes: z.string().optional(),
-  camera: stepCameraSchema.optional(),
+  camera: stepCameraSettingSchema.optional(),
   elements: z.array(excalidrawElementSchema),
   appState: persistedAppStateSchema,
   files: filesManifestSchema,
@@ -94,6 +103,7 @@ export type Project = z.infer<typeof projectSchema>;
 export type Scene = z.infer<typeof sceneSchema>;
 export type Step = z.infer<typeof stepSchema>;
 export type StepCamera = z.infer<typeof stepCameraSchema>;
+export type StepCameraSetting = z.infer<typeof stepCameraSettingSchema>;
 export type ExcalidrawElement = z.infer<typeof excalidrawElementSchema>;
 export type PersistedAppState = z.infer<typeof persistedAppStateSchema>;
 export type FileManifestEntry = z.infer<typeof fileManifestEntrySchema>;

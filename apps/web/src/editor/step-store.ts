@@ -1,4 +1,4 @@
-import { parseStep, persistedAppStateSchema, type Step, type StepCamera, type ExcalidrawElement } from '@paso/shared';
+import { parseStep, persistedAppStateSchema, type Step, type StepCameraSetting, type ExcalidrawElement } from '@paso/shared';
 import { ApiRequestError } from '../lib/api';
 
 export type Target = { projectId: string; sceneId: string; stepId: string };
@@ -160,8 +160,11 @@ export class StepStore {
     this.emit();
     this.schedule(session);
   }
-  /** Sets or removes the step's presentation camera. Saved like any other change: debounced, with recovery. */
-  setCamera(session: Session, camera: StepCamera | undefined) {
+  /**
+   * Sets or removes the step's presentation camera: its own box, or `'previous'` to keep the previous step's. Either
+   * replaces the other. Saved like any other change: debounced, with recovery.
+   */
+  setCamera(session: Session, camera: StepCameraSetting | undefined) {
     const key = targetKey(session.target);
     if (this.removed.has(key) || this.sessions.get(key) !== session) return;
     if (JSON.stringify(session.document.camera) === JSON.stringify(camera)) return;

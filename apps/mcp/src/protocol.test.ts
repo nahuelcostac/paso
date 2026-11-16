@@ -125,6 +125,39 @@ describe('compiled stdio MCP with a compiled local service', () => {
     expect(await api(`${s}/steps/b`)).toEqual(b);
     expect((await api<Envelope<Scene>>(s)).document.stepIds).toEqual(['a', 'b', 'c']);
   });
+  it('keeps the previous step\'s camera with camera "previous", live and by position, and says what it shows', async () => {
+    const projectId = 'kept-camera';
+    const p = `/api/projects/${projectId}`;
+    const s = `${p}/scenes/s`;
+    const target = (stepId: string) => ({ projectId, sceneId: 's', stepId });
+    const box = { x: 10, y: 20, width: 300, height: 200 };
+    await api('/api/projects', 'POST', { id: projectId, name: 'Kept camera' });
+    await api(`${p}/scenes`, 'POST', { id: 's', name: 'Scene' });
+    for (const id of ['a', 'b', 'c']) await api(`${s}/steps`, 'POST', { id });
+    const read = (id: string) => value<Envelope<Step>['document'] & { revision: string; keptCamera?: unknown }>('read_step', target(id));
+    const set = async (id: string, camera: unknown) => value<Envelope<Step>>('update_step', { ...target(id), revision: (await read(id)).revision, camera });
+    await set('a', box);
+    // c keeps what b shows, and b shows the whole scene.
+    expect((await set('c', 'previous')).document.camera).toBe('previous');
+    expect(await read('c')).toMatchObject({ camera: 'previous', keptCamera: null });
+    // Once b keeps a's camera too, c walks back to it.
+    await set('b', 'previous');
+    expect(await read('c')).toMatchObject({ camera: 'previous', keptCamera: { fromStepId: 'a', ...box } });
+    const scene = await value<{ steps: { stepId: string; camera?: unknown }[] }>('read_scene', { projectId, sceneId: 's' });
+    expect(scene.steps.map((step) => step.camera)).toEqual([box, 'previous', 'previous']);
+    // The link is live: moving a's camera moves what c shows.
+    await set('a', { ...box, x: 500 });
+    expect((await read('c')).keptCamera).toEqual({ fromStepId: 'a', ...box, x: 500 });
+    // By position: c moved first has nothing before it and shows the whole scene.
+    const order = await api<Envelope<Scene>>(s);
+    await api(`${s}/steps`, 'PUT', { ids: ['c', 'a', 'b'] }, order.revision);
+    expect((await read('c')).keptCamera).toBeNull();
+    // A box replaces "previous", null removes either, and anything else is refused.
+    expect((await set('b', box)).document.camera).toEqual(box);
+    expect((await set('c', null)).document).not.toHaveProperty('camera');
+    expect((await read('a'))).not.toHaveProperty('keptCamera');
+    expect(JSON.stringify(await call('update_step', { ...target('a'), revision: (await read('a')).revision, camera: 'next' }))).toMatch(/isError|invalid/i);
+  });
   it('allows deleting the last step, as the existing service and empty-scene format allow', async () => {
     const projectId = 'empty-scene';
     const p = `/api/projects/${projectId}`;

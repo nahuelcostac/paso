@@ -2,7 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  createProject, createScene, createStep, duplicateStep, migrateDocument,
+  createProject, createScene, createStep, duplicateStep, migrateDocument, resolveStepCamera,
   parseProject, parseScene, parseStep, projectSchema, sceneSchema, stepSchema,
   validateProjectTree, type ProjectTree,
 } from './index.js';
@@ -99,6 +99,42 @@ describe('the step camera', () => {
     for (const camera of [{ x: 0, y: 0, width: 0, height: 10 }, { x: 0, y: 0, width: 10, height: -1 }, { x: Infinity, y: 0, width: 10, height: 10 }, { x: 0, y: 0, width: 10 }, { x: 0, y: 0, width: 10, height: 10, zoom: 2 }]) {
       expect(() => parseStep({ ...step, camera })).toThrow();
     }
+  });
+});
+
+describe('keeping the previous step\'s camera', () => {
+  it('is the string "previous" in camera, never alongside a box, and old steps still parse as before', () => {
+    const step = createStep({ id: 'kept', camera: 'previous' });
+    expect(parseStep(structuredClone(step)).camera).toBe('previous');
+    expect(duplicateStep(step, 'copy').camera).toBe('previous');
+    const old = { schemaVersion: 1, id: 'old', elements: [], appState: {}, files: {} };
+    expect(parseStep(old)).not.toHaveProperty('camera');
+    for (const camera of ['next', 'Previous', true, null, { previous: true }, { x: 0, y: 0, width: 10, height: 10, previous: true }]) {
+      expect(() => parseStep({ ...step, camera })).toThrow();
+    }
+  });
+});
+
+describe('resolveStepCamera', () => {
+  const a = { x: 0, y: 0, width: 100, height: 50 };
+  const b = { x: 200, y: 10, width: 80, height: 40 };
+  it('uses a step\'s own box, and the whole scene without one', () => {
+    expect(resolveStepCamera([{ camera: a }, {}], 0)).toEqual({ camera: a, stepIndex: 0 });
+    expect(resolveStepCamera([{ camera: a }, {}], 1)).toBeUndefined();
+  });
+  it('walks back through every step that keeps the previous camera', () => {
+    const steps = [{ camera: a }, { camera: 'previous' as const }, { camera: 'previous' as const }, { camera: b }, { camera: 'previous' as const }];
+    expect(resolveStepCamera(steps, 1)).toEqual({ camera: a, stepIndex: 0 });
+    expect(resolveStepCamera(steps, 2)).toEqual({ camera: a, stepIndex: 0 });
+    expect(resolveStepCamera(steps, 4)).toEqual({ camera: b, stepIndex: 3 });
+  });
+  it('keeps what the step before shows: a step without a camera stops the walk on the whole scene', () => {
+    expect(resolveStepCamera([{ camera: a }, {}, { camera: 'previous' }], 2)).toBeUndefined();
+  });
+  it('shows the whole scene on a first step that keeps the previous camera, and for a position past the end', () => {
+    expect(resolveStepCamera([{ camera: 'previous' }, { camera: 'previous' }], 1)).toBeUndefined();
+    expect(resolveStepCamera([], 0)).toBeUndefined();
+    expect(resolveStepCamera([{ camera: a }], 5)).toBeUndefined();
   });
 });
 

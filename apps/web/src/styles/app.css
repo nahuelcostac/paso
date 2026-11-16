@@ -391,12 +391,21 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .camera-control__take { flex: 1; padding: 0 var(--space-3); }
 .camera-control__clear { width: 34px; flex: none; border-left: 1px solid var(--line) !important; }
 .camera-control[data-set] .camera-control__take { color: var(--ink); }
+.camera-control__keep { width: 34px; flex: none; border-left: 1px solid var(--line) !important; }
+.camera-control__keep[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
+/* Under the island while the step keeps a camera that shows the whole scene. It wraps to the corner's width. */
+.camera-control__note { width: 0; min-width: 100%; margin: 0; padding: 6px 10px; border-radius: var(--radius-md); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); color: var(--ink-3); font-size: var(--text-12); line-height: 1.35; }
 /* The step's camera over the canvas: a dashed box with a tag. Its edges, tag and handles take the pointer; inside it the
    drawing stays free to edit. */
 .camera-overlay { position: absolute; z-index: 2; pointer-events: none; border: 1.5px dashed var(--ink-3); border-radius: 4px; }
 .camera-overlay[data-dragging] { border-style: solid; border-color: var(--ink); }
 .camera-overlay__tag { position: absolute; left: -1.5px; bottom: 100%; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 4px; padding: 2px 6px; border-radius: 4px; background: var(--ink); color: var(--on-ink); font-size: var(--text-11); font-weight: var(--weight-semibold); white-space: nowrap; pointer-events: auto; cursor: move; touch-action: none; }
 .camera-overlay__tag .i { width: 12px; height: 12px; }
+/* The camera kept from an earlier step: dotted, without handles, and an outlined tag that opens the step it comes from. */
+.camera-overlay--kept { border-style: dotted; border-width: 2px; }
+.camera-overlay__tag--kept { left: -2px; border: 0; background: var(--paper); color: var(--ink-2); box-shadow: 0 0 0 1px var(--line-strong); font: inherit; font-size: var(--text-11); font-weight: var(--weight-semibold); cursor: pointer; }
+.camera-overlay__tag--kept:hover { background: var(--surface-sunken); color: var(--ink); }
+.camera-overlay__tag--kept:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 /* The edges: 10px strips along the dashed line that move the box. */
 .camera-overlay__edge { position: absolute; pointer-events: auto; cursor: move; touch-action: none; }
 .camera-overlay__edge--n, .camera-overlay__edge--s { left: 6px; right: 6px; height: 10px; }

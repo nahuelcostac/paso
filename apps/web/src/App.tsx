@@ -414,7 +414,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           <Lienzo
             key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
             notices={panelOpen ? undefined : notices}
-            corner={presentButton}
+            corner={presentButton} subscribeEvents={store.subscribeEvents}
           />
         </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={panelOpen ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}
         {/* The agent sits beside the overview, where its changes show across the scenes. */}

@@ -261,6 +261,86 @@ describe('the presentation camera of a step', () => {
   });
 });
 
+describe('keeping the previous step\'s camera', () => {
+  it('turns on beside «Encuadrar», draws the kept box apart from an own one, and replaces an own camera both ways', async () => {
+    const user = userEvent.setup();
+    const { projectId, scenes } = await open([3]);
+    const [first, second, third] = scenes[0].steps;
+    const stepFile = async (id: string) => (await api.getStep({ projectId, sceneId: scenes[0].id, stepId: id })).document;
+    const keep = () => screen.getByRole('button', { name: 'Mantener el encuadre del paso anterior' });
+    const openStep = async (index: number, id: string) => { await user.click(frames()[index]); await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', id)); };
+
+    // On the first step there is nothing to keep: the island has no such button. It gets its own camera.
+    expect(screen.queryByRole('button', { name: 'Mantener el encuadre del paso anterior' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Encuadrar' }));
+    const layer = screen.getByRole('application', { name: 'Marcar el encuadre de la presentación' });
+    fireEvent.pointerDown(layer, { clientX: 500, clientY: 450, pointerId: 1 });
+    fireEvent.pointerMove(layer, { clientX: 100, clientY: 150, pointerId: 1 });
+    fireEvent.pointerUp(layer, { clientX: 100, clientY: 150, pointerId: 1 });
+    await waitFor(async () => expect((await stepFile(first)).camera).toEqual({ x: 100, y: 150, width: 400, height: 300 }), patience);
+    expect(screen.queryByRole('button', { name: 'Mantener el encuadre del paso anterior' })).not.toBeInTheDocument();
+
+    // The second and third steps keep it: a dotted box with no handles, tagged with the step it comes from.
+    await openStep(1, second);
+    await user.click(keep());
+    await openStep(2, third);
+    await user.click(keep());
+    await waitFor(async () => expect((await stepFile(third)).camera).toBe('previous'), patience);
+    const kept = await waitFor(() => { const found = document.querySelector<HTMLElement>('.camera-overlay--kept'); expect(found).not.toBeNull(); return found!; });
+    expect(kept.style).toMatchObject({ left: '100px', top: '150px', width: '400px', height: '300px' });
+    expect(kept.querySelector('.camera-overlay__handle')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Encuadrar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Quitar encuadre' })).not.toBeInTheDocument();
+
+    // The tag opens the step that owns the box. Moving it there moves the kept box on the third step.
+    await user.click(within(kept).getByRole('button', { name: /Encuadre del paso 01/ }));
+    await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', first));
+    const tag = document.querySelector('.camera-overlay__tag')!;
+    fireEvent.pointerDown(tag, { clientX: 110, clientY: 140, pointerId: 2 });
+    fireEvent.pointerMove(tag, { clientX: 90, clientY: 160, pointerId: 2 });
+    fireEvent.pointerUp(tag, { clientX: 90, clientY: 160, pointerId: 2 });
+    await openStep(2, third);
+    await waitFor(() => expect(document.querySelector<HTMLElement>('.camera-overlay--kept')?.style).toMatchObject({ left: '80px', top: '170px' }));
+
+    // Turning the option on replaces an own camera, and off leaves the step with none.
+    await openStep(1, second);
+    await user.click(screen.getByRole('button', { name: 'Encuadrar' }));
+    await user.keyboard('{Enter}');
+    await waitFor(async () => expect(typeof (await stepFile(second)).camera).toBe('object'), patience);
+    expect(document.querySelector('.camera-overlay--kept')).toBeNull();
+    // The cross that removes the own camera comes last, after the option.
+    expect([...document.querySelectorAll('.camera-control button')].map((button) => button.className)).toEqual(['camera-control__take', 'camera-control__keep', 'camera-control__clear']);
+    await user.click(keep());
+    await waitFor(async () => expect((await stepFile(second)).camera).toBe('previous'), patience);
+    expect(document.querySelector('.camera-overlay--kept')).not.toBeNull();
+    await user.click(keep());
+    await waitFor(async () => expect((await stepFile(second)).camera).toBeUndefined(), patience);
+    expect(document.querySelector('.camera-overlay')).toBeNull();
+
+    // The third step now keeps what the second shows: the whole scene.
+    await openStep(2, third);
+    expect(await screen.findByText(/El paso anterior muestra toda la escena/)).toBeInTheDocument();
+    expect(document.querySelector('.camera-overlay')).toBeNull();
+  });
+  it('shows the option on a first step only while that step has it, to turn it off', async () => {
+    // A step that keeps the previous camera can end up first: moved there, or set by an agent.
+    const user = userEvent.setup();
+    const data = await seed([2]);
+    const target = { projectId: data.projectId, sceneId: data.scenes[0].id, stepId: data.scenes[0].steps[0] };
+    const stored = await api.getStep(target);
+    await api.saveStep(target, stored.revision, { ...stored.document, camera: 'previous' });
+    window.location.hash = `#/${target.projectId}/lienzo/${target.sceneId}/${target.stepId}`;
+    render(<App config={config} recovery={recovery} />);
+    const keep = await screen.findByRole('button', { name: 'Mantener el encuadre del paso anterior' }, patience);
+    expect(keep).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText(/Es el primer paso/)).toBeInTheDocument();
+    await user.click(keep);
+    await waitFor(async () => expect((await api.getStep(target)).document.camera).toBeUndefined(), patience);
+    expect(screen.queryByRole('button', { name: 'Mantener el encuadre del paso anterior' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Es el primer paso/)).not.toBeInTheDocument();
+  });
+});
+
 describe('what the person is told about unsaved work', () => {
   it('tells a conflict once, and offers the top-bar button only for another step', async () => {
     const user = userEvent.setup();

@@ -1,10 +1,15 @@
 import { useSyncExternalStore } from 'react';
+import { PREVIOUS_CAMERA } from '@paso/shared';
 import { ApiClient, ApiRequestError, UnavailableError } from '../lib/api';
 import { ActionError, type ServiceEvent } from './projects-store';
 
 export type SceneEntry = { id: string; name: string; revision: string; stepIds: string[] };
 /** What the Storyboard shows about a step: its title, and its revision so thumbnails know when to redraw. */
-export type StepEntry = { id: string; title?: string; revision: string; /** It has a presentation camera. */ framed?: true };
+export type StepEntry = {
+  id: string; title?: string; revision: string;
+  /** Its presentation camera: a box of its own, or the previous step's, kept. */
+  framed?: 'own' | 'previous';
+};
 
 export type StoryboardState = {
   /** loading: nothing known yet. ready: scenes are listed. error: they could not be read. */
@@ -134,7 +139,7 @@ export class StoryboardStore {
       const listed = await this.api.listSteps(this.projectId, sceneId);
       if (this.stepVersions.get(sceneId) !== version || this.disposed) return;
       const steps = { ...this.state.steps };
-      for (const { document, revision } of listed) steps[document.id] = { id: document.id, revision, ...(document.title ? { title: document.title } : {}), ...(document.camera ? { framed: true as const } : {}) };
+      for (const { document, revision } of listed) steps[document.id] = { id: document.id, revision, ...(document.title ? { title: document.title } : {}), ...(document.camera ? { framed: document.camera === PREVIOUS_CAMERA ? 'previous' as const : 'own' as const } : {}) };
       this.set({ steps, stepsLoaded: { ...this.state.stepsLoaded, [sceneId]: true } });
     } catch {
       // The scene may have been deleted meanwhile, or the service is away. Asking again after the next event is enough.

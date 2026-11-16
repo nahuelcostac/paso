@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { PREVIOUS_CAMERA, resolveStepCamera } from '@paso/shared';
 import type { ApiClient } from '../lib/api';
 import { Brand } from '../components/Brand';
 import { pad } from '../components/StepFrame';
@@ -176,9 +177,14 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
     setCurrentId(deck.steps[moveIndex(action, index, deck.steps.length)].id);
   }, [deck, index, exit]);
   // A step with a camera zooms to it, gliding from wherever the previous step was. Leaving one goes back to the whole
-  // scene. Between steps without a camera, a zoom made with the keys stays. The first view starts in place.
-  const frame = useMemo(() => presentationFrame(deck?.content ?? null, viewport), [deck?.content, viewport]);
-  const stepCamera = step?.document.camera;
+  // scene. Between steps without a camera, a zoom made with the keys stays. The first view starts in place. A step
+  // that keeps the previous camera uses what the step before it shows, read from the deck as it is now, so it follows
+  // a change to that camera; arriving on it from a step with the same camera does not move the view.
+  // Keyed by value: a deck read again after a change elsewhere has a new but equal content, and must not count as a resize.
+  const contentKey = JSON.stringify(deck?.content ?? null);
+  const frame = useMemo(() => presentationFrame(JSON.parse(contentKey), viewport), [contentKey, viewport]);
+  const stepCamera = deck && index >= 0 ? resolveStepCamera(deck.steps.map((item) => item.document), index)?.camera : undefined;
+  const keepsPrevious = step?.document.camera === PREVIOUS_CAMERA;
   const cameraSignature = stepCamera ? JSON.stringify(stepCamera) : '';
   const [motion, setMotion] = useState<'none' | 'zoom' | 'camera'>('none');
   const directMotion = useCallback(() => setMotion('none'), []);
@@ -220,9 +226,11 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
     home.current = stepCamera ? cameraZoom(stepCamera, frame, viewport) : NO_ZOOM;
     const resized = before.frame !== undefined && before.frame !== frame;
     if (!stepCamera && !before.camera && !resized) return;
+    if (keepsPrevious && before.stepId !== stepId && before.camera === cameraSignature && !resized) return;
     setMotion(before.stepId === undefined || (resized && before.stepId === stepId) ? 'none' : 'camera');
     setZoom(home.current);
-    // stepCamera is read through its signature, so a new object with the same box does not move the view.
+    // stepCamera is read through its signature, so a new object with the same box does not move the view. keepsPrevious
+    // matters only on arriving at a step, when the effect runs anyway.
   }, [stepId, cameraSignature, frame, viewport]);
   const view = useCallback((action: ViewAction) => {
     if (action === 'zoomReset') { setMotion('zoom'); setZoom(home.current); return; }

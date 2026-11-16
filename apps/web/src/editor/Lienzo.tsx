@@ -9,8 +9,11 @@ import { useTheme } from './use-theme';
 import './excalidraw-runtime';
 import type { CanvasCamera } from './canvas-camera';
 import { ViewToggle } from '../components/ViewToggle';
-import { CameraControl, CameraDraw, CameraOverlay } from './CameraControls';
+import { CameraControl, CameraDraw, CameraOverlay, KeptCameraOverlay, type KeptCamera } from './CameraControls';
 import { createViewStore } from './canvas-view';
+import { useSceneCameras } from './use-scene-cameras';
+import { PREVIOUS_CAMERA, resolveStepCamera } from '@paso/shared';
+import type { ServiceEvent } from '../state/projects-store';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
 const messages = { failed: 'No se pudo guardar. Tu trabajo sigue en este navegador.', conflict: 'El paso cambió fuera de Paso. Tu trabajo local se conserva.' };
@@ -30,7 +33,7 @@ function keyboardInCarousel() {
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
-export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner }: {
+export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents }: {
   api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
   scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
   route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
@@ -39,6 +42,8 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   notices?: React.ReactNode;
   /** Over the canvas's top right corner, where Excalidraw's library button was: Presentar. */
   corner?: React.ReactNode;
+  /** The service's changes, so a camera this step keeps from an earlier one follows it when that one changes. */
+  subscribeEvents?: (listener: (event: ServiceEvent) => void) => () => void;
 }) {
   useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [error, setError] = useState<string>();
@@ -58,6 +63,20 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   // Marking the step's presentation camera by hand: a layer over the canvas. It ends with the step.
   const [framing, setFraming] = useState(false);
   useEffect(() => setFraming(false), [stepId]);
+  // A step that keeps the previous camera shows the box of the nearest earlier step that decides, live: steps open in
+  // this window are read from their sessions, unsaved changes included, and the rest from the service.
+  const listedCameras = useSceneCameras(api, projectId, scene?.id, `${structureRevision}/${stepIds.join()}/${stepId ?? ''}`, subscribeEvents);
+  // Worked out on every render, which follows every change to the store, so an open step's new camera shows at once.
+  const kept = ((): KeptCamera | undefined => {
+    if (!scene || !stepId || !listedCameras || session?.document.camera !== PREVIOUS_CAMERA) return undefined;
+    const index = stepIds.indexOf(stepId);
+    const settings = stepIds.map((id) => {
+      const open = store.session({ projectId, sceneId: scene.id, stepId: id });
+      return { camera: open ? open.document.camera : listedCameras[id] };
+    });
+    const found = resolveStepCamera(settings, index);
+    return found ? { camera: found.camera, number: found.stepIndex + 1 } : { reason: index === 0 ? 'first' : 'scene' };
+  })();
 
   // An address that names a scene or step that is not there lands on the first one.
   useEffect(() => {
@@ -115,12 +134,17 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
       <div className="canvas__corner">
         {corner}
         <ViewToggle route={route} navigate={navigate} />
-        {session && <CameraControl camera={session.document.camera} drawing={framing} onDraw={() => setFraming((on) => !on)} onClear={() => { setFraming(false); store.setCamera(session, undefined); }} />}
+        {session && <CameraControl
+          camera={session.document.camera} first={stepIds[0] === stepId} kept={kept} drawing={framing} onDraw={() => setFraming((on) => !on)}
+          onClear={() => { setFraming(false); store.setCamera(session, undefined); }}
+          onKeep={(keep) => { setFraming(false); store.setCamera(session, keep ? PREVIOUS_CAMERA : undefined); }}
+        />}
       </div>
       {session ? <Suspense fallback={<div className="editor-message">Cargando editor…</div>}>
         <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} />
       </Suspense> : <div className="canvas__placeholder"><p className="canvas__placeholder-title" aria-hidden="true">{projectName}</p><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena desde la barra lateral para empezar a dibujar.'}</p></div>}
-      {session?.document.camera && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
+      {typeof session?.document.camera === 'object' && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
+      {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: scene?.id, stepId: stepIds[kept.number - 1] })} />}
       {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
     </div>
     {notices && <div className="lienzo__notices">{notices}</div>}
