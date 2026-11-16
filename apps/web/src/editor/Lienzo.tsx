@@ -135,7 +135,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
         {corner}
         <ViewToggle route={route} navigate={navigate} />
         {session && <CameraControl
-          camera={session.document.camera} kept={kept} drawing={framing} onDraw={() => setFraming((on) => !on)}
+          camera={session.document.camera} first={stepIds[0] === stepId} kept={kept} drawing={framing} onDraw={() => setFraming((on) => !on)}
           onClear={() => { setFraming(false); store.setCamera(session, undefined); }}
           onKeep={(keep) => { setFraming(false); store.setCamera(session, keep ? PREVIOUS_CAMERA : undefined); }}
         />}

@@ -270,23 +270,15 @@ describe('keeping the previous step\'s camera', () => {
     const keep = () => screen.getByRole('button', { name: 'Mantener el encuadre del paso anterior' });
     const openStep = async (index: number, id: string) => { await user.click(frames()[index]); await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', id)); };
 
-    // On the first step there is nothing to keep: the option can be on, and a note says the whole scene shows.
-    expect(keep()).toHaveAttribute('aria-pressed', 'false');
-    await user.click(keep());
-    await waitFor(async () => expect((await stepFile(first)).camera).toBe('previous'), patience);
-    expect(keep()).toHaveAttribute('aria-pressed', 'true');
-    expect(await screen.findByText(/Es el primer paso/)).toBeInTheDocument();
-    expect(document.querySelector('.camera-overlay')).toBeNull();
-
-    // An own camera replaces the option.
+    // On the first step there is nothing to keep: the island has no such button. It gets its own camera.
+    expect(screen.queryByRole('button', { name: 'Mantener el encuadre del paso anterior' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Encuadrar' }));
     const layer = screen.getByRole('application', { name: 'Marcar el encuadre de la presentación' });
     fireEvent.pointerDown(layer, { clientX: 500, clientY: 450, pointerId: 1 });
     fireEvent.pointerMove(layer, { clientX: 100, clientY: 150, pointerId: 1 });
     fireEvent.pointerUp(layer, { clientX: 100, clientY: 150, pointerId: 1 });
     await waitFor(async () => expect((await stepFile(first)).camera).toEqual({ x: 100, y: 150, width: 400, height: 300 }), patience);
-    expect(keep()).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByText(/Es el primer paso/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mantener el encuadre del paso anterior' })).not.toBeInTheDocument();
 
     // The second and third steps keep it: a dotted box with no handles, tagged with the step it comes from.
     await openStep(1, second);
@@ -327,6 +319,23 @@ describe('keeping the previous step\'s camera', () => {
     await openStep(2, third);
     expect(await screen.findByText(/El paso anterior muestra toda la escena/)).toBeInTheDocument();
     expect(document.querySelector('.camera-overlay')).toBeNull();
+  });
+  it('shows the option on a first step only while that step has it, to turn it off', async () => {
+    // A step that keeps the previous camera can end up first: moved there, or set by an agent.
+    const user = userEvent.setup();
+    const data = await seed([2]);
+    const target = { projectId: data.projectId, sceneId: data.scenes[0].id, stepId: data.scenes[0].steps[0] };
+    const stored = await api.getStep(target);
+    await api.saveStep(target, stored.revision, { ...stored.document, camera: 'previous' });
+    window.location.hash = `#/${target.projectId}/lienzo/${target.sceneId}/${target.stepId}`;
+    render(<App config={config} recovery={recovery} />);
+    const keep = await screen.findByRole('button', { name: 'Mantener el encuadre del paso anterior' }, patience);
+    expect(keep).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText(/Es el primer paso/)).toBeInTheDocument();
+    await user.click(keep);
+    await waitFor(async () => expect((await api.getStep(target)).document.camera).toBeUndefined(), patience);
+    expect(screen.queryByRole('button', { name: 'Mantener el encuadre del paso anterior' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Es el primer paso/)).not.toBeInTheDocument();
   });
 });
 

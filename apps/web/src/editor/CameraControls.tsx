@@ -15,11 +15,14 @@ export type KeptCamera = { camera: StepCamera; number: number } | { camera?: und
  * «Encuadrar»: marks the part of the drawing Presentar zooms to on this step. It opens the drawing mode; with a camera
  * set it reads «Reencuadrar», and the cross beside it removes the camera. The button at the end, the same corners
  * around an arrow going back, keeps the previous step's camera instead: Presentar does not move on reaching this step.
- * Each replaces the other. While the step keeps the previous camera and that shows the whole scene, a note under the
- * island says so, as there is no box to draw.
+ * Each replaces the other. The first step has nothing to keep, so it has no such button, unless it keeps the previous
+ * camera all the same (moved there, or set by an agent): then it shows pressed, to turn it off. While the step keeps
+ * the previous camera and that shows the whole scene, a note under the island says so, as there is no box to draw.
  */
-export function CameraControl({ camera, kept, drawing, onDraw, onClear, onKeep }: {
+export function CameraControl({ camera, first, kept, drawing, onDraw, onClear, onKeep }: {
   camera: StepCameraSetting | undefined;
+  /** The step is the first of its scene. */
+  first: boolean;
   /** Known only while the step keeps the previous camera and the scene's steps have been read. */
   kept?: KeptCamera;
   drawing: boolean; onDraw: () => void; onClear: () => void; onKeep: (keep: boolean) => void;
@@ -41,7 +44,7 @@ export function CameraControl({ camera, kept, drawing, onDraw, onClear, onKeep }
             <X className="i" aria-hidden="true" />
           </button>
         )}
-        <button
+        {(!first || keeps) && <button
           type="button" className="camera-control__keep" aria-pressed={keeps} aria-label="Mantener el encuadre del paso anterior"
           title={keeps
             ? 'Mantiene el encuadre del paso anterior. Pulsa para dejar de mantenerlo: el paso vuelve a mostrar toda la escena'
@@ -49,7 +52,7 @@ export function CameraControl({ camera, kept, drawing, onDraw, onClear, onKeep }
           onClick={() => onKeep(!keeps)}
         >
           <KeepCameraIcon />
-        </button>
+        </button>}
       </div>
       {keeps && kept && !kept.camera && (
         <p className="camera-control__note" role="status">
