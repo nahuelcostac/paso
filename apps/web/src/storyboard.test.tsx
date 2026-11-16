@@ -298,6 +298,8 @@ describe('the camera badge in the Estudio', () => {
     expect(within(first).getByRole('button', { name: 'Paso 1' })).toBeInTheDocument();
     expect(first.querySelectorAll('.frame__framed')).toHaveLength(2);
     expect(first.querySelectorAll('.frame__framed--kept')).toHaveLength(1);
+    // Its own icon, the corners of «Encuadrar» around an arrow going back, not the plain corners of an own camera.
+    expect(first.querySelector('.frame__framed--kept [data-icon="keep-camera"]')).not.toBeNull();
   }, 15_000);
 });
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
-import { Link2, Scan, X } from 'lucide-react';
+import { Scan, X } from 'lucide-react';
 import { PREVIOUS_CAMERA, type StepCamera, type StepCameraSetting } from '@paso/shared';
+import { KeepCameraIcon } from '../components/KeepCameraIcon';
 import { pad } from '../components/StepFrame';
 import { cameraOnScreen, MIN_CAMERA_PX, reshapeCamera, screenToCamera, viewCamera, type CameraHandle, type ViewStore } from './canvas-view';
 
@@ -12,9 +13,10 @@ export type KeptCamera = { camera: StepCamera; number: number } | { camera?: und
 
 /**
  * «Encuadrar»: marks the part of the drawing Presentar zooms to on this step. It opens the drawing mode; with a camera
- * set it reads «Reencuadrar», and the cross beside it removes the camera. The chain at the end keeps the previous
- * step's camera instead: Presentar does not move on reaching this step. Each replaces the other. While the step keeps
- * the previous camera and that shows the whole scene, a note under the island says so, as there is no box to draw.
+ * set it reads «Reencuadrar», and the cross beside it removes the camera. The button at the end, the same corners
+ * around an arrow going back, keeps the previous step's camera instead: Presentar does not move on reaching this step.
+ * Each replaces the other. While the step keeps the previous camera and that shows the whole scene, a note under the
+ * island says so, as there is no box to draw.
  */
 export function CameraControl({ camera, kept, drawing, onDraw, onClear, onKeep }: {
   camera: StepCameraSetting | undefined;
@@ -46,7 +48,7 @@ export function CameraControl({ camera, kept, drawing, onDraw, onClear, onKeep }
             : `Mantener el encuadre del paso anterior: Presentar no se mueve al llegar a este paso${own ? '. Sustituye el encuadre propio' : ''}`}
           onClick={() => onKeep(!keeps)}
         >
-          <Link2 className="i" aria-hidden="true" />
+          <KeepCameraIcon />
         </button>
       </div>
       {keeps && kept && !kept.camera && (
@@ -69,7 +71,7 @@ export function KeptCameraOverlay({ camera, number, view, onOpen }: { camera: St
   return (
     <div className="camera-overlay camera-overlay--kept" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
       <button type="button" className="camera-overlay__tag camera-overlay__tag--kept" title={`Este paso mantiene el encuadre del paso ${pad(number)}. Pulsa para ir a ese paso y cambiarlo`} onClick={onOpen}>
-        <Link2 className="i" aria-hidden="true" />Encuadre del paso {pad(number)}
+        <KeepCameraIcon />Encuadre del paso {pad(number)}
       </button>
     </div>
   );

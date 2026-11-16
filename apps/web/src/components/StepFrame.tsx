@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentPropsWithRef } from 'react';
-import { Link2, Scan } from 'lucide-react';
+import { Scan } from 'lucide-react';
+import { KeepCameraIcon } from './KeepCameraIcon';
 import '../styles/step-frame.css';
 
 export type StepFrameProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 'title'> & {
@@ -60,7 +61,7 @@ export function StepFrame({ number, title, current = false, agentState, framed, 
       <span className="frame__paper" data-state={url ? 'ready' : 'loading'}>
         {url ? <img src={url} alt="" draggable={false} /> : <span className="frame__placeholder" aria-hidden="true" />}
         {framed === 'own' && size === 'storyboard' && <span className="frame__framed" title="Con encuadre: Presentar se acerca a una parte del dibujo" aria-hidden="true"><Scan className="i" /></span>}
-        {framed === 'previous' && size === 'storyboard' && <span className="frame__framed frame__framed--kept" title="Mantiene el encuadre del paso anterior: Presentar no se mueve al llegar a este paso" aria-hidden="true"><Link2 className="i" /></span>}
+        {framed === 'previous' && size === 'storyboard' && <span className="frame__framed frame__framed--kept" title="Mantiene el encuadre del paso anterior: Presentar no se mueve al llegar a este paso" aria-hidden="true"><KeepCameraIcon /></span>}
       </span>
       <span className="frame__label">
         <span className="frame__num">{pad(number)}</span>
