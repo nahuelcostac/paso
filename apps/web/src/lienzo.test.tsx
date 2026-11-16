@@ -308,6 +308,8 @@ describe('keeping the previous step\'s camera', () => {
     await user.keyboard('{Enter}');
     await waitFor(async () => expect(typeof (await stepFile(second)).camera).toBe('object'), patience);
     expect(document.querySelector('.camera-overlay--kept')).toBeNull();
+    // The cross that removes the own camera comes last, after the option.
+    expect([...document.querySelectorAll('.camera-control button')].map((button) => button.className)).toEqual(['camera-control__take', 'camera-control__keep', 'camera-control__clear']);
     await user.click(keep());
     await waitFor(async () => expect((await stepFile(second)).camera).toBe('previous'), patience);
     expect(document.querySelector('.camera-overlay--kept')).not.toBeNull();

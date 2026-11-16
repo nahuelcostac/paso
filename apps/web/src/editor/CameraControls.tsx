@@ -13,9 +13,9 @@ export type KeptCamera = { camera: StepCamera; number: number } | { camera?: und
 
 /**
  * «Encuadrar»: marks the part of the drawing Presentar zooms to on this step. It opens the drawing mode; with a camera
- * set it reads «Reencuadrar», and the cross beside it removes the camera. The button at the end, the same corners
- * around an arrow going back, keeps the previous step's camera instead: Presentar does not move on reaching this step.
- * Each replaces the other. The first step has nothing to keep, so it has no such button, unless it keeps the previous
+ * set it reads «Reencuadrar», and a cross at the end removes the camera. The button beside «Encuadrar», the same
+ * corners around an arrow going back, keeps the previous step's camera instead: Presentar does not move on reaching
+ * this step. Each replaces the other. The first step has nothing to keep, so it has no such button, unless it keeps the previous
  * camera all the same (moved there, or set by an agent): then it shows pressed, to turn it off. While the step keeps
  * the previous camera and that shows the whole scene, a note under the island says so, as there is no box to draw.
  */
@@ -39,11 +39,6 @@ export function CameraControl({ camera, first, kept, drawing, onDraw, onClear, o
         >
           <Scan className="i" aria-hidden="true" /><span className="camera-control__label">{own ? 'Reencuadrar' : 'Encuadrar'}</span>
         </button>
-        {own && (
-          <button type="button" className="camera-control__clear" aria-label="Quitar encuadre" title="Quitar encuadre: el paso vuelve a mostrar toda la escena" onClick={onClear}>
-            <X className="i" aria-hidden="true" />
-          </button>
-        )}
         {(!first || keeps) && <button
           type="button" className="camera-control__keep" aria-pressed={keeps} aria-label="Mantener el encuadre del paso anterior"
           title={keeps
@@ -53,6 +48,11 @@ export function CameraControl({ camera, first, kept, drawing, onDraw, onClear, o
         >
           <KeepCameraIcon />
         </button>}
+        {own && (
+          <button type="button" className="camera-control__clear" aria-label="Quitar encuadre" title="Quitar encuadre: el paso vuelve a mostrar toda la escena" onClick={onClear}>
+            <X className="i" aria-hidden="true" />
+          </button>
+        )}
       </div>
       {keeps && kept && !kept.camera && (
         <p className="camera-control__note" role="status">
