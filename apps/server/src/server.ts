@@ -189,6 +189,7 @@ export async function startServer(options: StartServerOptions) {
       };
       if (rawPath === '/api/health' && method === 'GET') { send(response, 200, { status: 'ok' }); return; }
       if (parts[0] === 'api' && parts[1] === 'harnesses') {
+        if (parts.length === 3 && parts[2] === 'codex-models' && method === 'GET') { send(response, 200, { models: await harnesses.codexModels(new URL(request.url ?? '/', 'http://127.0.0.1').searchParams.get('refresh') === '1') }); return; }
         if (parts.length === 3 && parts[2] === 'detect' && method === 'GET') { send(response, 200, await harnesses.detect()); return; }
         if (parts.length === 2 && method === 'GET') { send(response, 200, await harnesses.list()); return; }
         if (parts.length === 2 && method === 'POST') { const input = await json() as { id?: unknown } | null; send(response, 201, await harnesses.add(input?.id)); return; }

@@ -28,6 +28,7 @@ export type FolderListing = { path: string; parent: string | null; home: string;
 export const harnessIds = ['claude', 'codex', 'agy'] as const;
 export type HarnessId = (typeof harnessIds)[number];
 export type HarnessSessionStatus = 'signed_in' | 'signed_out' | 'unknown';
+export type CodexModel = { id: string; label: string; isDefault: boolean; efforts: string[] };
 export type DetectedHarness = {
   id: HarnessId;
   found: boolean;
@@ -248,6 +249,9 @@ export class ApiClient {
     }
   }
 
+  async codexModels(refresh = false) {
+    return (await this.request<{ models: CodexModel[] }>(`/harnesses/codex-models${refresh ? '?refresh=1' : ''}`)).models;
+  }
   async detectHarnesses() {
     return (await this.request<{ harnesses: DetectedHarness[] }>('/harnesses/detect')).harnesses;
   }

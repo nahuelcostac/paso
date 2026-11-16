@@ -8,6 +8,7 @@ import {
   type AgentSessionEvent,
   type AgentSessionInfo,
   type DetectedHarness,
+  type CodexModel,
   type HarnessId,
   type RunSummary,
   type UndoPlan,
@@ -30,7 +31,7 @@ export const HARNESS_MODELS: Record<HarnessId, ModelOption[]> = {
     { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
     { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
   ],
-  codex: [{ id: '', label: 'Predeterminado' }],
+  codex: [{ id: '', label: 'Predeterminado' }, { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol' }, { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra' }],
   agy: [{ id: '', label: 'Predeterminado' }],
 };
 
@@ -45,12 +46,23 @@ export const HARNESS_EFFORTS: Record<HarnessId, ModelOption[]> = {
   ],
   codex: [
     { id: '', label: 'Automático' }, { id: 'low', label: 'Bajo' }, { id: 'medium', label: 'Medio' },
-    { id: 'high', label: 'Alto' }, { id: 'xhigh', label: 'Muy alto' },
+    { id: 'high', label: 'Alto' }, { id: 'xhigh', label: 'Muy alto' }, { id: 'max', label: 'Máximo' }, { id: 'ultra', label: 'Ultra' },
   ],
   agy: [],
 };
 
-export type HarnessInfo = DetectedHarness & { added: boolean; supported: boolean };
+export type HarnessInfo = DetectedHarness & { added: boolean; supported: boolean; models?: CodexModel[] };
+export function modelOptions(harness: HarnessId, info?: HarnessInfo): ModelOption[] {
+  return harness === 'codex' && info?.models?.length
+    ? [HARNESS_MODELS.codex[0], ...info.models.map((model) => ({ id: model.id, label: model.label + (model.isDefault ? ' (predeterminado)' : '') }))]
+    : HARNESS_MODELS[harness];
+}
+export function effortOptions(harness: HarnessId, model: string, info?: HarnessInfo): ModelOption[] {
+  const selected = info?.models?.find((item) => item.id === model || (!model && item.isDefault));
+  return harness === 'codex' && selected?.efforts.length
+    ? HARNESS_EFFORTS.codex.filter((option) => !option.id || selected.efforts.includes(option.id))
+    : harness === 'codex' ? HARNESS_EFFORTS.codex.filter((option) => !['max', 'ultra'].includes(option.id)) : HARNESS_EFFORTS[harness];
+}
 
 export type ToolItem = {
   id: string;
@@ -193,15 +205,19 @@ export class AgentStore {
   async loadHarnesses(force = false) {
     if (!force && this.state.harnesses.status !== 'idle') return;
     this.set({ harnesses: { ...this.state.harnesses, status: 'loading' } });
+    const modelsRequest = this.api.codexModels(force).catch(() => undefined);
     try {
       const [detected, added] = await Promise.all([this.api.detectHarnesses(), this.api.listHarnesses()]);
       const addedIds = new Set(added.map((harness) => harness.id));
       const list = harnessIds.map((id): HarnessInfo => {
         const found = detected.find((harness) => harness.id === id)
           ?? { id, found: false, path: null, version: null, session: 'unknown' as const };
-        return { ...found, added: addedIds.has(id), supported: SUPPORTED_HARNESSES.includes(id) };
+        return { ...found, models: this.state.harnesses.list.find((item) => item.id === id)?.models, added: addedIds.has(id), supported: SUPPORTED_HARNESSES.includes(id) };
       });
       this.set({ harnesses: { status: 'ready', list } });
+      void modelsRequest.then((models) => {
+        if (models) this.set({ harnesses: { ...this.state.harnesses, list: this.state.harnesses.list.map((item) => item.id === 'codex' ? { ...item, models } : item) } });
+      });
     } catch {
       this.set({ harnesses: { ...this.state.harnesses, status: 'failed' } });
     }
@@ -232,7 +248,7 @@ export class AgentStore {
     const model = choice.model ?? (harness !== shown.harness ? '' : shown.model);
     const changed = harness !== shown.harness || model !== shown.model;
     // A level the new harness does not have goes back to automatic.
-    const effort = HARNESS_EFFORTS[harness].some((option) => option.id === this.state.effort) ? this.state.effort : '';
+    const effort = effortOptions(harness, model, this.state.harnesses.list.find((item) => item.id === harness)).some((option) => option.id === this.state.effort) ? this.state.effort : '';
     this.set({ harness, model, effort, conversation: session && changed ? { ...this.state.conversation, [key]: undefined } : this.state.conversation });
   }
 
@@ -401,7 +417,8 @@ export class AgentStore {
   private effortFor(sessionId: string) {
     const harness = this.state.sessions[sessionId]?.harness ?? this.state.harness;
     const effort = this.state.effort;
-    return effort && HARNESS_EFFORTS[harness].some((option) => option.id === effort) ? effort : undefined;
+    const model = this.state.sessions[sessionId]?.model ?? this.state.model;
+    return effort && effortOptions(harness, model, this.state.harnesses.list.find((item) => item.id === harness)).some((option) => option.id === effort) ? effort : undefined;
   }
 
   private async createSession(projectId: string, sceneId: string | null, key: string) {

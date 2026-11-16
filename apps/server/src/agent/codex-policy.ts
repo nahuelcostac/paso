@@ -24,6 +24,7 @@ export function codexCatalog(model: string) {
     default_reasoning_level: codexDefaultEffort, supported_reasoning_levels: [
       { effort: 'low', description: 'Brief board edits' }, { effort: 'medium', description: 'Balanced' },
       { effort: 'high', description: 'Deeper reasoning' }, { effort: 'xhigh', description: 'Deepest reasoning' },
+      { effort: 'max', description: 'Maximum reasoning' }, { effort: 'ultra', description: 'Extended reasoning' },
     ],
     shell_type: 'disabled', visibility: 'list', supported_in_api: true, priority: 0,
     base_instructions: 'Eres el asistente de Paso. Solo puedes usar las herramientas del tablero. Responde en español.',

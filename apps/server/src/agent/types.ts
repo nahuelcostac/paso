@@ -15,7 +15,7 @@ export type HarnessId = typeof harnessIds[number];
  */
 export const effortLevels: Record<HarnessId, readonly string[]> = {
   claude: ['low', 'medium', 'high', 'xhigh', 'max'],
-  codex: ['low', 'medium', 'high', 'xhigh'],
+  codex: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
   agy: [],
 };
 

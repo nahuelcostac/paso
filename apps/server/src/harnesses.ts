@@ -6,6 +6,7 @@ import { basename, dirname, delimiter, isAbsolute, join, resolve } from 'node:pa
 import { randomBytes } from 'node:crypto';
 import { ApiError, isMissing } from './errors.js';
 import { harnessEnvironment } from './agent/process.js';
+import { discoverCodexModels, fallbackModels, type CodexModel } from './codex-models.js';
 
 const ids = ['claude', 'codex', 'agy'] as const;
 type HarnessId = typeof ids[number];
@@ -67,6 +68,18 @@ export async function detectHarness(id: HarnessId, options: DetectionOptions = {
 }
 export class HarnessRegistry {
   private queue: Promise<unknown> = Promise.resolve();
+  private models: CodexModel[] = fallbackModels;
+  private modelsPending?: Promise<CodexModel[]>;
+  private modelsLoaded = false;
+  async codexModels(refresh = false) {
+    if (!this.modelsPending && (refresh || !this.modelsLoaded)) {
+      this.modelsPending = (async () => {
+        const path = await find('codex', this.options);
+        return path ? discoverCodexModels(path) : fallbackModels;
+      })().then((models) => { this.models = models; this.modelsLoaded = true; return models; }).finally(() => { this.modelsPending = undefined; });
+    }
+    return this.modelsPending ?? this.models;
+  }
   constructor(private file: string, private options: DetectionOptions) {}
   async detect() { return { harnesses: await Promise.all(ids.map((id) => detectHarness(id, this.options))) }; }
   private async read(): Promise<HarnessId[]> {
