@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
 import { startServer } from '@paso/server';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { createServer as createSocket } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
@@ -24,7 +25,11 @@ async function freePort() {
   await new Promise((resolvePromise, reject) => socket.close((error) => error ? reject(error) : resolvePromise()));
   return port;
 }
+// scripts/dev-desktop.mjs draws this from the brand mark, as packaging does for the .app.
+const dockIcon = join(root, 'apps/desktop/dist/icon/paso.png');
+
 async function start() {
+  if (app.dock && existsSync(dockIcon)) app.dock.setIcon(dockIcon);
   const port = await freePort();
   service = await startServer({
     dataDir, port: 0, allowedOrigins: [`http://127.0.0.1:${port}`],

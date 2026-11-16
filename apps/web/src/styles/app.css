@@ -85,8 +85,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 
 
 .brand { display: flex; align-items: center; gap: 10px; flex: none; }
-.brand__mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--ink); color: var(--on-ink); }
-.brand__mark svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* The mark's size and geometry come from brandMark in @paso/shared; only its theme colours live here. */
+.brand__mark { display: block; flex: none; }
+.brand__tile { fill: var(--ink); }
+.brand__step { fill: none; stroke: var(--on-ink); }
 .brand__name { font-size: 21px; font-weight: var(--weight-bold); letter-spacing: -0.04em; line-height: 1; }
 .brand__dot { color: var(--accent); }
 

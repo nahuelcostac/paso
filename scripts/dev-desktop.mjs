@@ -74,6 +74,11 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
 });
 try {
   await run('pnpm', ['--filter', '@paso/mcp...', 'build']);
+  // The Dock icon: the packaged app's icon, drawn from the brand mark that was just built in @paso/shared.
+  if (process.platform === 'darwin' && !stopping) {
+    const { buildIcon } = await import('../apps/desktop/icon/build.mjs');
+    try { await buildIcon(); } catch (error) { console.warn('Could not draw the Dock icon:', error); }
+  }
   if (!stopping) {
     snapshot = await scan();
     timer = setInterval(() => {
