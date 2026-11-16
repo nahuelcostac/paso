@@ -101,6 +101,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // The agent panel: a drawer on a narrow window, otherwise a column the person can hide.
   const [agentOpen, setAgentOpen] = useState(false);
   const [agentDocked, setAgentDocked] = useState(true);
+  // Drafts belong to a diagram, not to an individual scene or a mounted panel.
+  const [agentDrafts, setAgentDrafts] = useState<Record<string, string>>({});
   const agentShown = narrow ? agentOpen : agentDocked;
   const agentWidth = useAgentWidth(left, narrow, boardMin);
 
@@ -418,6 +420,11 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         {/* The agent sits beside the overview, where its changes show across the scenes. */}
         {overview && (narrow || agentDocked) && <AgentPanel
           store={agentStore} projectId={row.id} projectName={row.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
+          input={agentDrafts[JSON.stringify([row.id, onlySceneId ?? null])] ?? ''}
+          setInput={(value) => {
+            const key = JSON.stringify([row.id, onlySceneId ?? null]);
+            setAgentDrafts((drafts) => ({ ...drafts, [key]: typeof value === 'function' ? value(drafts[key] ?? '') : value }));
+          }}
           narrow={narrow} open={agentOpen} onClose={hideAgent}
           onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'lienzo', sceneId: id, stepId })}
           scenesReady={scenes !== undefined}

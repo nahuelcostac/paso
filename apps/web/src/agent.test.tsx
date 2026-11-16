@@ -149,6 +149,37 @@ afterEach(async () => {
   await rm(rootDir, { recursive: true, force: true });
 });
 
+describe('agent message drafts', () => {
+  it('keeps separate diagram drafts through view and scene changes, and clears on send', async () => {
+    await call('POST', '/projects', { id: 'q', name: 'Otro diagrama' });
+    await call('POST', '/projects/q/scenes', { id: 'q1', name: 'Otra escena' });
+    await call('POST', '/projects/q/scenes/q1/steps', { id: 'qstep', elements: [] });
+    await call('POST', '/harnesses', { id: 'claude' });
+    const user = userEvent.setup();
+    let panel = await openPanel();
+    const input = () => within(panel).getByRole('textbox', { name: 'Mensaje para el agente' });
+    await user.type(input(), 'Borrador uno');
+    await user.click(within(await screen.findByRole('list', { name: 'Escenas de Búsqueda binaria' }, patience)).getByRole('button', { name: 'Escena 2: Partir en dos' }));
+    expect(input()).toHaveValue('Borrador uno');
+    await user.click(screen.getByRole('button', { name: 'Lienzo' }));
+    expect(await screen.findByRole('main', { name: 'Lienzo' }, patience)).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Estudio' }, patience));
+    panel = await screen.findByRole('complementary', { name: 'Agente' }, patience);
+    expect(input()).toHaveValue('Borrador uno');
+
+    window.location.hash = '#/q/storyboard/q1/qstep';
+    await waitFor(() => expect(input()).toHaveValue(''), patience);
+    await user.type(input(), 'Borrador dos');
+    window.location.hash = '#/p/storyboard/s1/step1';
+    await waitFor(() => expect(input()).toHaveValue('Borrador uno'), patience);
+    window.location.hash = '#/q/storyboard/q1/qstep';
+    await waitFor(() => expect(input()).toHaveValue('Borrador dos'), patience);
+    await waitFor(() => expect(within(panel).getByRole('button', { name: 'Enviar' })).toBeEnabled(), patience);
+    await user.click(within(panel).getByRole('button', { name: 'Enviar' }));
+    expect(input()).toHaveValue('');
+  });
+});
+
 describe('agent and model picker', () => {
   it('asks once to add Claude Code, shows Codex as available, and passes the chosen model', async () => {
     await installHarness('codex', 'codex-cli 0.80.0');
