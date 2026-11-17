@@ -1,8 +1,6 @@
 /* Carousel: a white bar in normal flow below the canvas, under a thin line. It never overlaps Excalidraw's controls. */
 /* The strip stays white, as the canvas above it: it is part of the drawing's paper, not of the grey chrome. */
 .carousel { --surface: var(--paper); --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus); flex: none; height: var(--carousel-h); display: flex; align-items: center; gap: var(--space-4); padding: 0 var(--space-4); background: var(--surface); border-top: var(--border); min-width: 0; }
-/* Its right end is kept for the page's “Hide steps” button, which stays where “Show steps” was (see .strip-toggle). */
-.carousel { padding-right: 184px; }
 /* The strip scrolls. Its padding keeps the 2px edge and the focus ring from being clipped; the margin cancels it. */
 .carousel__frames { position: relative; display: flex; gap: var(--space-3); flex: 1; min-width: 0; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding: 6px 6px 9px; margin: -6px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; scroll-padding: 0 16px; }
 .carousel__item { position: relative; flex: none; width: 104px; }
@@ -22,3 +20,26 @@
 /* The plus follows the last thumbnail and scrolls with the steps. Its height matches the drawing above the number. */
 .carousel__add { flex: none; display: grid; place-items: center; width: 40px; height: 65px; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); color: var(--ink-3); background: transparent; }
 .carousel__add:hover:not(:disabled) { color: var(--ink); background: var(--surface-sunken); border-color: var(--ink-3); }
+
+/* The strip and its bar, under one thin line. The bar stays when the strip is hidden, at the same height and place,
+   so “Steps” never moves under the pointer. Over it, the strip is a little shorter: the bar holds the pager. */
+.step-dock { --surface: var(--paper); --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus); flex: none; display: flex; flex-direction: column; background: var(--paper); border-top: var(--border); container: dock / inline-size; }
+.step-dock .carousel { border-top: 0; }
+.step-dock .carousel:not(:last-child) { height: var(--carousel-over-bar-h); align-items: flex-end; }
+.step-bar { position: relative; flex: none; display: flex; align-items: center; height: var(--step-bar-h); padding: 0 var(--space-4); }
+.step-bar__ticks { display: flex; align-items: center; gap: 3px; }
+.step-bar__ticks i { width: 10px; height: 3px; border-radius: var(--radius-pill); background: var(--line-strong); }
+.step-bar__ticks i.on { width: 14px; background: var(--accent); }
+/* Present's pager, centred on the bar: previous, where you are, next. */
+.step-bar__pager { position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: flex; align-items: center; gap: 2px; }
+.step-bar__where { min-width: 56px; text-align: center; color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); white-space: nowrap; }
+.step-bar__where b { color: var(--ink); font-weight: var(--weight-bold); }
+.step-bar__arrow { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-sm); color: var(--ink-3); }
+.step-bar__arrow:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
+.step-bar__arrow:disabled { opacity: 0.35; }
+.step-bar__toggle { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-left: auto; padding: 0 var(--space-3) 0 10px; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); font-size: var(--text-12); font-weight: var(--weight-medium); }
+.step-bar__toggle:hover { background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink); }
+.step-bar__toggle[aria-expanded='true'] { color: var(--ink); }
+.step-bar__toggle svg.i { width: 14px; height: 14px; }
+/* A narrow board keeps the numbers and drops the ticks, which would reach the pager. */
+@container dock (max-width: 900px) { .step-bar__ticks { display: none; } }

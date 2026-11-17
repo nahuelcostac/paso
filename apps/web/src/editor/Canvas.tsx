@@ -15,8 +15,7 @@ import { createViewStore } from './canvas-view';
 import { useSceneCameras } from './use-scene-cameras';
 import { PREVIOUS_CAMERA, resolveStepCamera } from '@paso/shared';
 import type { ServiceEvent } from '../state/projects-store';
-import { PanelBottomClose, PanelBottomOpen } from 'lucide-react';
-import { pad } from '../components/StepFrame';
+import { StepBar } from './StepBar';
 import { stripKey, useStepStrip } from './loose-strip';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
@@ -30,10 +29,13 @@ function download(session: Session) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** True when the keyboard is working the carousel. A new canvas then keeps focus out of the way, or the next arrow key would draw. */
+/**
+ * True when the keyboard is working the carousel or its bar's pager. A new canvas then keeps focus out of the way, or
+ * the next arrow key would draw, and the next Enter on “Next step” would be lost.
+ */
 function keyboardInCarousel() {
   const active = document.activeElement;
-  if (!active?.closest('.carousel')) return false;
+  if (!active?.closest('.carousel, .step-bar')) return false;
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
@@ -168,29 +170,27 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
       {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: session.target.sceneId, stepId: shownIds?.[kept.number - 1] })} />}
       {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
     </div>
-    {/* One button, in one place on the page, shows and hides the strip: beside Excalidraw's help button, or inside the
-        strip at the same spot. With several steps it says where you are, the strip's pager. */}
-    {scene && stepIds.length > 0 && <button
-      type="button" className="strip-toggle" aria-expanded={strip.shown} aria-label={strip.shown ? 'Hide steps' : 'Show steps'}
-      title={strip.shown ? 'Hide steps' : 'Show steps'} onClick={() => strip.choose(strip.shown ? 'hidden' : 'shown')}
-    >
-      {strip.shown ? <PanelBottomClose className="i" aria-hidden="true" /> : <PanelBottomOpen className="i" aria-hidden="true" />}
-      {stepIds.length > 1 && <span className="strip-toggle__count" aria-hidden="true"><b>{stepId ? pad(stepIds.indexOf(stepId) + 1) : '–'}</b> / {pad(stepIds.length)}</span>}
-    </button>}
     {notices && <div className="canvas-page__notices">{notices}</div>}
-    {scene && strip.shown && <StepCarousel
-      stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}
-      onSelect={(id) => { if (id !== stepId) navigate({ ...route, sceneId: scene.id, stepId: id }); }}
-      onAdd={() => void copy(() => actions.add(projectId, scene.id, stepIds.at(-1)))()}
-      onDuplicate={(id) => void copy(() => actions.duplicate({ projectId, sceneId: scene.id, stepId: id }))()}
-      onNudge={async (id, delta) => { const result = await actions.nudge(projectId, scene.id, id, delta).catch((failure: Error) => { setError(failure.message); throw failure; }); await refreshScenes(); return result; }}
-      onMove={async (id, index) => { try { await actions.move(projectId, scene.id, id, index); } catch (failure) { setError((failure as Error).message); throw failure; } await refreshScenes(); }}
-      onDelete={async (id) => {
-        const next = await actions.remove({ projectId, sceneId: scene.id, stepId: id });
-        await refreshScenes();
-        // Deleting the step on screen lands on its neighbour. Deleting another one leaves the person where they are.
-        if (id === stepId) navigate({ ...routeRef.current, sceneId: scene.id, stepId: next });
-      }}
-    />}
+    {/* The strip, then its bar, which stays when the strip is hidden: “Steps” in it never moves under the pointer. */}
+    {scene && <div className="step-dock">
+      {strip.shown && <StepCarousel
+        stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}
+        onSelect={(id) => { if (id !== stepId) navigate({ ...route, sceneId: scene.id, stepId: id }); }}
+        onAdd={() => void copy(() => actions.add(projectId, scene.id, stepIds.at(-1)))()}
+        onDuplicate={(id) => void copy(() => actions.duplicate({ projectId, sceneId: scene.id, stepId: id }))()}
+        onNudge={async (id, delta) => { const result = await actions.nudge(projectId, scene.id, id, delta).catch((failure: Error) => { setError(failure.message); throw failure; }); await refreshScenes(); return result; }}
+        onMove={async (id, index) => { try { await actions.move(projectId, scene.id, id, index); } catch (failure) { setError((failure as Error).message); throw failure; } await refreshScenes(); }}
+        onDelete={async (id) => {
+          const next = await actions.remove({ projectId, sceneId: scene.id, stepId: id });
+          await refreshScenes();
+          // Deleting the step on screen lands on its neighbour. Deleting another one leaves the person where they are.
+          if (id === stepId) navigate({ ...routeRef.current, sceneId: scene.id, stepId: next });
+        }}
+      />}
+      {stepIds.length > 0 && <StepBar
+        stepIds={stepIds} currentId={stepId} stripShown={strip.shown} onStep={stepKey}
+        onToggle={() => strip.choose(strip.shown ? 'hidden' : 'shown')}
+      />}
+    </div>}
   </main>;
 }

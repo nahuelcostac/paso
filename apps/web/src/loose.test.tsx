@@ -497,7 +497,7 @@ describe('the step strip of a loose diagram', () => {
     await screen.findByTestId('canvas', {}, patience);
     expect(strip()).not.toBeInTheDocument();
     const show = screen.getByRole('button', { name: 'Show steps' });
-    expect(show).not.toHaveTextContent('/');             // one step: no counter
+    expect(screen.queryByTestId('step-count')).not.toBeInTheDocument();   // one step: no pager
 
     await user.click(show);
     expect(strip()).toBeInTheDocument();
@@ -511,19 +511,23 @@ describe('the step strip of a loose diagram', () => {
     await waitFor(() => expect(frames()).toHaveLength(2), patience);
     const [, second] = await stepsOf('d');
     await waitFor(() => expect(window.location.hash).toBe(`#/_loose/canvas/d/${second}`), patience);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Hide steps' })).toHaveTextContent('02 / 02'), patience);
+    await waitFor(() => expect(screen.getByTestId('step-count')).toHaveTextContent('02 / 02'), patience);
 
-    // Hidden again, the steps stay, the counter says where you are, and ← → on the canvas still move between them.
+    // Hidden again, the steps stay, the bar's pager says where you are, and ← → on the canvas still move between them.
     await user.click(screen.getByRole('button', { name: 'Hide steps' }));
     expect(strip()).not.toBeInTheDocument();
     expect(await stepsOf('d')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Show steps' })).toHaveFocus();
-    expect(screen.getByRole('button', { name: 'Show steps' })).toHaveTextContent('02 / 02');
+    expect(screen.getByRole('button', { name: 'Show steps' })).toBe(show);
+    expect(show).toHaveFocus();
+    expect(screen.getByTestId('step-count')).toHaveTextContent('02 / 02');
     await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', second), patience);
     screen.getByTestId('canvas').focus();
     await user.keyboard('{ArrowLeft}');
     await waitFor(() => expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0'), patience);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Show steps' })).toHaveTextContent('01 / 02'), patience);
+    await waitFor(() => expect(screen.getByTestId('step-count')).toHaveTextContent('01 / 02'), patience);
+    // The bar's pager moves too, with the strip hidden.
+    await user.click(screen.getByRole('button', { name: 'Next step' }));
+    await waitFor(() => expect(window.location.hash).toBe(`#/_loose/canvas/d/${second}`), patience);
 
     // The choice is kept for this diagram, in this browser, even though it now has several steps.
     unmount();
@@ -543,7 +547,8 @@ describe('the step strip of a loose diagram', () => {
     expect(frames()).toHaveLength(3);
     expect(screen.queryByRole('button', { name: 'Show steps' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Hide steps' }));
-    expect(screen.getByRole('button', { name: 'Show steps' })).toHaveTextContent('01 / 03');
+    expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();
+    expect(screen.getByTestId('step-count')).toHaveTextContent('01 / 03');
   });
 
   it('shows a project\'s strip by default, also for a loose diagram moved into one, and lets it be hidden', async () => {

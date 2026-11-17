@@ -431,10 +431,6 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
    hidden, 8px left of Excalidraw's help button (right 16, bottom 16, 40px with Paso's theme) and as tall as it; with
    the strip shown, at the same spot inside the strip, which keeps that end free. With several steps it carries the
    pager's “02 / 03”. */
-.strip-toggle { position: absolute; z-index: 4; right: 64px; bottom: var(--space-4); display: inline-flex; align-items: center; gap: 6px; height: 40px; min-width: 40px; padding: 0 11px; border: 0; border-radius: var(--radius-card); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); color: var(--ink-2); font: inherit; font-size: var(--text-12); font-variant-numeric: tabular-nums; cursor: pointer; }
-.strip-toggle:hover { background: var(--surface-sunken); color: var(--ink); }
-.strip-toggle__count { color: var(--ink-3); white-space: nowrap; }
-.strip-toggle__count b { color: var(--accent-ink); font-weight: var(--weight-bold); }
 .camera-control__take[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
 /* Excalidraw's toolbar stays centred: on a narrower board Present and the switch keep only their icons, so the two
    never meet. The Studio has no toolbar, so it keeps the labels until it is much narrower. */

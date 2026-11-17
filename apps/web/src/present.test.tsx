@@ -225,7 +225,7 @@ describe('moving through the presentation', () => {
     fireEvent.click(dialog, { clientX: 10 });
     await expectShown(steps[0]);
     // Not on the pager, and not while Space is held to pan.
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Next step' }), { button: 0, isPrimary: true, pointerId: 2 });
+    fireEvent.pointerDown(within(dialog).getByRole('button', { name: 'Next step' }), { button: 0, isPrimary: true, pointerId: 2 });
     expect(document.querySelector('.laser')).toBeNull();
     fireEvent.keyDown(window, { key: ' ', code: 'Space' });
     fireEvent.pointerDown(dialog, { button: 0, isPrimary: true, pointerId: 3, clientX: 300, clientY: 300 });
@@ -241,14 +241,16 @@ describe('moving through the presentation', () => {
     const { steps } = await open([[box('a')], [box('b')], [box('c')], [box('d')]], 1);
     await start(user);
     await expectShown(steps[1]);
-    await user.click(screen.getByRole('button', { name: 'Last step' })); await expectShown(steps[3]); await expectIndicator('Step 4 of 4');
-    expect(screen.getByRole('button', { name: 'Last step' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Next step' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Previous step' })); await expectShown(steps[2]);
-    await user.click(screen.getByRole('button', { name: 'First step' })); await expectShown(steps[0]); await expectIndicator('Step 1 of 4');
-    expect(screen.getByRole('button', { name: 'First step' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Next step' })); await expectShown(steps[1]);
-    for (const name of ['First step', 'Previous step', 'Next step', 'Last step']) expect(screen.getByRole('button', { name })).toHaveAttribute('tabindex', '-1');
+    // The Canvas's own step bar stays under the presentation: these are Present's.
+    const pager = within(screen.getByRole('dialog', { name: 'Presentation' }));
+    await user.click(pager.getByRole('button', { name: 'Last step' })); await expectShown(steps[3]); await expectIndicator('Step 4 of 4');
+    expect(pager.getByRole('button', { name: 'Last step' })).toBeDisabled();
+    expect(pager.getByRole('button', { name: 'Next step' })).toBeDisabled();
+    await user.click(pager.getByRole('button', { name: 'Previous step' })); await expectShown(steps[2]);
+    await user.click(pager.getByRole('button', { name: 'First step' })); await expectShown(steps[0]); await expectIndicator('Step 1 of 4');
+    expect(pager.getByRole('button', { name: 'First step' })).toBeDisabled();
+    await user.click(pager.getByRole('button', { name: 'Next step' })); await expectShown(steps[1]);
+    for (const name of ['First step', 'Previous step', 'Next step', 'Last step']) expect(pager.getByRole('button', { name })).toHaveAttribute('tabindex', '-1');
   });
   it('zooms around the pointer from the keyboard, keeping the step', async () => {
     const user = userEvent.setup();
