@@ -221,6 +221,7 @@ describe('agent and model picker', () => {
     // Codex is available: picking one of its models makes it the agent, and the panel asks to add it.
     await user.click(within(agents).getByRole('radio', { name: 'Codex' }));
     expect(picker).toHaveTextContent('0.80.0');
+    expect(within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'GPT-6.1-Sol' })).toBeInTheDocument();
     await user.click(within(within(picker).getByRole('radiogroup', { name: 'Modelo' })).getByRole('radio', { name: 'Predeterminado' }));
     expect(trigger()).toHaveAccessibleName('Agente y modelo: Codex, Predeterminado');
     expect(within(panel).getByRole('button', { name: 'Añadir Codex' })).toBeInTheDocument();

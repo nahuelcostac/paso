@@ -134,7 +134,7 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
     expect(turns[0].params.effort).toBe('low');
     expect(turns[1].params.effort).toBe('high');
     const levels = codexCatalog('m').models[0].supported_reasoning_levels.map((level: { effort: string }) => level.effort);
-    expect(levels).toEqual(['low', 'medium', 'high', 'xhigh']);
+    expect(levels).toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
   });
   it('forgets only the rollout of the deleted thread, in Paso\'s own Codex home', async () => {
     const day = join(root, 'codex-home', 'sessions', '2026', '11', '11');

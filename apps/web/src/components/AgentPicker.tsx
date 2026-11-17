@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ChevronDown, RefreshCw } from 'lucide-react';
 import type { HarnessId } from '../lib/api';
-import { HARNESS_EFFORTS, HARNESS_MODELS, HARNESS_NAMES, type HarnessInfo } from '../state/agent-store';
+import { HARNESS_EFFORTS, HARNESS_NAMES, modelOptions, effortOptions, type HarnessInfo } from '../state/agent-store';
 import { Popover } from './Popover';
 import { ProviderIcon } from './ProviderIcon';
 
@@ -52,7 +52,7 @@ type Props = {
 export function AgentPicker({ harnesses, loading, harness, model, effort, onPick, onPickEffort, onRefresh }: Props) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const models = HARNESS_MODELS[harness];
+  const models = modelOptions(harness, harnesses.find((item) => item.id === harness));
   const modelLabel = models.find((option) => option.id === model)?.label ?? model;
   const effortOption = HARNESS_EFFORTS[harness].find((option) => option.id === effort);
   const named = effortOption && NAMED_LEVELS.has(effortOption.id);
@@ -116,8 +116,8 @@ function PickerPopup({ anchor, harnesses, loading, harness, model, effort, onClo
   }, [harness, model]);
   const info = harnesses.find((candidate) => candidate.id === viewing);
   const status = harnessStatus(info);
-  const efforts = HARNESS_EFFORTS[harness];
-  const modelLabel = HARNESS_MODELS[harness].find((option) => option.id === model)?.label ?? model;
+  const efforts = effortOptions(harness, model, harnesses.find((item) => item.id === harness));
+  const modelLabel = modelOptions(harness, harnesses.find((item) => item.id === harness)).find((option) => option.id === model)?.label ?? model;
   return (
     <Popover anchor={anchor} onClose={onClose} role="dialog" label="Elegir agente y modelo" className="agent-picker" onKeyDown={columnKeys}>
       <div ref={root} className="agent-picker__columns">
@@ -142,7 +142,7 @@ function PickerPopup({ anchor, harnesses, loading, harness, model, effort, onClo
             </div>
           ) : (
             <div role="radiogroup" aria-label="Modelo" className="agent-picker__list">
-              {HARNESS_MODELS[viewing].map((option) => {
+              {modelOptions(viewing, info).map((option) => {
                 const chosen = viewing === harness && option.id === model;
                 return (
                   <button
@@ -161,6 +161,7 @@ function PickerPopup({ anchor, harnesses, loading, harness, model, effort, onClo
               })}
             </div>
           )}
+          {!status && <button type="button" className="btn btn--soft" disabled={loading} onClick={onRefresh}><RefreshCw className={`i${loading ? ' i--spin' : ''}`} aria-hidden="true" />Detectar de nuevo</button>}
           {info && !status && !info.added && <p className="agent-picker__hint">Al elegirlo, Paso te pedirá permiso para usarlo con tu sesión.</p>}
         </div>
         <div className="agent-picker__efforts" data-picker-column="efforts">
