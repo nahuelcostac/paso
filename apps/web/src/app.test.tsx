@@ -5,10 +5,13 @@ import { join } from 'node:path';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startServer } from '@paso/server';
 import { App } from './App';
 import type { ClientConfig } from './lib/api';
+
+// jsdom cannot draw Excalidraw: the Lienzo's canvas is a stand-in here, as in the other suites.
+vi.mock('./editor/StepCanvas', () => import('./editor/canvas-stand-in'));
 
 /**
  * These tests run the real app against a real local service on a temporary data folder:

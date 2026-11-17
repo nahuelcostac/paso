@@ -2,7 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useS
 import type { SceneEnvelope, StepActions } from './step-actions';
 import type { ApiClient } from '../lib/api';
 import type { Route } from '../lib/route';
-import { type StepStore, targetKey, type Session } from './step-store';
+import type { StepStore, Session } from './step-store';
+import { Loading } from './Loading';
 import { StepCarousel } from './StepCarousel';
 import { useThumbnails } from './use-thumbnails';
 import { useTheme } from './use-theme';
@@ -53,7 +54,14 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   const stepIds = useMemo(() => scene?.stepIds ?? [], [scene]);
   const stepId = scene?.stepIds.includes(route.stepId ?? '') ? route.stepId : undefined;
   const current = store.current();
-  const session = current?.target.projectId === projectId && current.target.sceneId === scene?.id && current.target.stepId === stepId ? current : undefined;
+  // The step asked for, once the store has it. Until the canvas shows it, the controls stay with the step on screen.
+  const wanted = current?.target.projectId === projectId && current.target.sceneId === scene?.id && current.target.stepId === stepId ? current : undefined;
+  const [loadFailed, setLoadFailed] = useState(false);
+  const canvasOpen = Boolean(scene && stepId && !loadFailed);
+  const [shown, setShown] = useState<Session>();
+  const session = canvasOpen && shown?.target.projectId === projectId ? shown : undefined;
+  const shownStepId = session?.target.stepId;
+  const shownIds = scenes?.find((item) => item.document.id === session?.target.sceneId)?.document.stepIds;
   const { svgs, titles } = useThumbnails(api, projectId, scene?.id, theme, `${structureRevision}/${stepIds.join()}`);
   // Written during render on purpose: the effect below runs after the canvas mounted, and the canvas asks when it loads.
   const routeRef = useRef(route); routeRef.current = route;
@@ -62,16 +70,19 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   const view = useMemo(createViewStore, []);
   // Marking the step's presentation camera by hand: a layer over the canvas. It ends with the step.
   const [framing, setFraming] = useState(false);
-  useEffect(() => setFraming(false), [stepId]);
+  useEffect(() => setFraming(false), [stepId, shownStepId]);
   // A step that keeps the previous camera shows the box of the nearest earlier step that decides, live: steps open in
   // this window are read from their sessions, unsaved changes included, and the rest from the service.
-  const listedCameras = useSceneCameras(api, projectId, scene?.id, `${structureRevision}/${stepIds.join()}/${stepId ?? ''}`, subscribeEvents);
+  const listedCameras = useSceneCameras(api, projectId, session?.target.sceneId, `${structureRevision}/${stepIds.join()}/${shownStepId ?? ''}`, subscribeEvents);
   // Worked out on every render, which follows every change to the store, so an open step's new camera shows at once.
   const kept = ((): KeptCamera | undefined => {
-    if (!scene || !stepId || !listedCameras || session?.document.camera !== PREVIOUS_CAMERA) return undefined;
-    const index = stepIds.indexOf(stepId);
-    const settings = stepIds.map((id) => {
-      const open = store.session({ projectId, sceneId: scene.id, stepId: id });
+    if (!session || !listedCameras || session.document.camera !== PREVIOUS_CAMERA) return undefined;
+    const { sceneId } = session.target;
+    const ids = shownIds ?? [];
+    const index = ids.indexOf(session.target.stepId);
+    if (index < 0) return undefined;
+    const settings = ids.map((id) => {
+      const open = store.session({ projectId, sceneId, stepId: id });
       return { camera: open ? open.document.camera : listedCameras[id] };
     });
     const found = resolveStepCamera(settings, index);
@@ -88,8 +99,8 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   // Every step change goes through the store: it saves the step being left before it opens the next.
   useEffect(() => {
     if (!scene || !stepId) return;
-    setError(undefined);
-    void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => setError('No se pudo cargar el paso.'));
+    setError(undefined); setLoadFailed(false);
+    void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => { setError('No se pudo cargar el paso.'); setLoadFailed(true); });
     return () => { void store.flushAll(); };
   }, [store, projectId, scene?.id, stepId]);
 
@@ -120,7 +131,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   return <main className="lienzo" aria-label="Lienzo">
     {/* The page's main heading, for screen readers: the sidebar already shows the open diagram. */}
     <h1 className="visually-hidden">{projectName}</h1>
-    {error && <div className="editor-notice" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); void refreshScenes(); if (scene && stepId) void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => setError('No se pudo cargar el paso.')); }}>Reintentar</button></div>}
+    {error && <div className="editor-notice" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); void refreshScenes(); if (scene && stepId) { setLoadFailed(false); void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => { setError('No se pudo cargar el paso.'); setLoadFailed(true); }); } }}>Reintentar</button></div>}
     {session && (session.status === 'failed' || session.status === 'conflict' || session.error) && <div className="editor-notice" role="alert">
       <span>{session.error ?? messages[session.status as 'failed' | 'conflict']}</span>
       <button className="btn" onClick={() => download(session)}>Descargar copia local</button>
@@ -135,16 +146,17 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
         {corner}
         <ViewToggle route={route} navigate={navigate} />
         {session && <CameraControl
-          camera={session.document.camera} first={stepIds[0] === stepId} kept={kept} drawing={framing} onDraw={() => setFraming((on) => !on)}
+          camera={session.document.camera} first={shownIds?.[0] === shownStepId} kept={kept} drawing={framing} onDraw={() => setFraming((on) => !on)}
           onClear={() => { setFraming(false); store.setCamera(session, undefined); }}
           onKeep={(keep) => { setFraming(false); store.setCamera(session, keep ? PREVIOUS_CAMERA : undefined); }}
         />}
       </div>
-      {session ? <Suspense fallback={<div className="editor-message">Cargando editor…</div>}>
-        <StepCanvas key={`${targetKey(session.target)}/${session.canvasVersion}`} api={api} store={store} session={session} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} />
+      {/* One canvas for the diagram: moving to another step swaps the drawing in it, with no loading in between. */}
+      {canvasOpen ? <Suspense fallback={<Loading>Cargando editor…</Loading>}>
+        <StepCanvas key={projectId} api={api} store={store} session={wanted} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} onShow={setShown} />
       </Suspense> : <div className="canvas__placeholder"><p className="canvas__placeholder-title" aria-hidden="true">{projectName}</p><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena desde la barra lateral para empezar a dibujar.'}</p></div>}
       {typeof session?.document.camera === 'object' && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
-      {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: scene?.id, stepId: stepIds[kept.number - 1] })} />}
+      {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: session.target.sceneId, stepId: shownIds?.[kept.number - 1] })} />}
       {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
     </div>
     {notices && <div className="lienzo__notices">{notices}</div>}
