@@ -502,12 +502,16 @@ describe('the step strip of a loose diagram', () => {
     await user.click(show);
     expect(strip()).toBeInTheDocument();
     expect(frames()).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Hide steps' })).toHaveFocus();
+    // The same button, at the same place, now hides the strip.
+    expect(screen.getByRole('button', { name: 'Hide steps' })).toBe(show);
+    expect(show).toHaveFocus();
+    expect(show).toHaveAttribute('aria-expanded', 'true');
     await user.click(screen.getByRole('button', { name: 'Add step' }));
     await waitFor(async () => expect(await stepsOf('d')).toHaveLength(2), patience);
     await waitFor(() => expect(frames()).toHaveLength(2), patience);
     const [, second] = await stepsOf('d');
     await waitFor(() => expect(window.location.hash).toBe(`#/_loose/canvas/d/${second}`), patience);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Hide steps' })).toHaveTextContent('02 / 02'), patience);
 
     // Hidden again, the steps stay, the counter says where you are, and ← → on the canvas still move between them.
     await user.click(screen.getByRole('button', { name: 'Hide steps' }));
@@ -542,18 +546,21 @@ describe('the step strip of a loose diagram', () => {
     expect(screen.getByRole('button', { name: 'Show steps' })).toHaveTextContent('01 / 03');
   });
 
-  it('leaves a project\'s strip as it was, also for a loose diagram moved into one', async () => {
+  it('shows a project\'s strip by default, also for a loose diagram moved into one, and lets it be hidden', async () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
     await seedLoose('d', 'Suelto');
     window.history.replaceState(null, '', '#/p/canvas/p-scene');
     const { unmount } = render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
-    // One step in a project's scene: the strip is there, with nothing to hide it.
+    // One step in a project's scene: the strip is there, and the same button can hide it.
     expect(strip()).toBeInTheDocument();
     expect(frames()).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: 'Hide steps' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show steps' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hide steps' }));
+    expect(strip()).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show steps' }));
+    expect(strip()).toBeInTheDocument();
     unmount();
 
     window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
@@ -566,6 +573,6 @@ describe('the step strip of a loose diagram', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Proyecto' }));
     await waitFor(() => expect(window.location.hash).toBe('#/p/canvas/d/d-step-0'), patience);
     await waitFor(() => expect(strip()).toBeInTheDocument(), patience);
-    expect(screen.queryByRole('button', { name: 'Hide steps' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide steps' })).toBeInTheDocument();
   });
 });

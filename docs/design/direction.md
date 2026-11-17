@@ -86,7 +86,7 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 - Current step: a 2px ink edge and a solid ink number badge. Agent changed it: a pink `agent` chip after the title. Agent is changing it now: a 2px pink edge and a chip reading `changing…` (`agent…` in the carousel). Current and agent states can coexist; the pink edge wins and the ink edge goes outside it.
 - In the carousel, which has no room for a title, the number sits under the thumbnail and the title goes in the tooltip.
 
-**Canvas.** The canvas and the carousel under it fill the space right of the sidebar, edge to edge, on `--paper`: no card, no gutter. A loose diagram can hide the carousel (see “Step strip of a loose diagram”).
+**Canvas.** The canvas and the carousel under it fill the space right of the sidebar, edge to edge, on `--paper`: no card, no gutter. Any diagram can hide the carousel (see “Step strip of a loose diagram”).
 
 **Camera on the Canvas.** The camera belongs to the scene, not the step. Opening a scene fits the union of all its steps (the frame Present uses), capped at 100%, in the clear area between Excalidraw's controls. Moving to another step of the same scene keeps the camera as it is, including any pan or zoom the person made, so what stays still between steps stays still on screen. A new scene or project is framed again.
 
@@ -98,7 +98,7 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 
 **Keys on the Canvas.** As in Present, ← → (and Page Up, Page Down) on the canvas go to the previous or next step of the scene, stopping at both ends. They stay the drawing's while something is selected, drawn or edited (they nudge it), in fields, menus and dialogs, and with any modifier. Space stays Excalidraw's pan. In the carousel the arrows keep their own behaviour (Alt and arrows move the step).
 
-**Carousel.** A 108px white bar under a thin line (it keeps `--paper`, like the canvas), in normal flow below the Excalidraw container. It must never overlap the container. Frames are 104×65, and the strip's left edge lines up with Excalidraw's zoom controls above. Next comes the pager “03 / 06” on a grey pill (current number in bold ink), for the eye only. A compact + button follows the final thumbnail inside the scrolling strip. Each thumbnail shows duplicate and delete buttons together on hover or focus.
+**Carousel.** A 108px white bar under a thin line (it keeps `--paper`, like the canvas), in normal flow below the Excalidraw container. It must never overlap the container. Frames are 104×65, and the strip's left edge lines up with Excalidraw's zoom controls above. A compact + button follows the final thumbnail inside the scrolling strip. Each thumbnail shows duplicate and delete buttons together on hover or focus.
 
 **Carousel behaviour.** The strip scrolls and keeps the open step in view. The + appends a step at the end. Duplicate acts on its own thumbnail and inserts the copy right after it, including when another step is open:
 - *Add step* copies the final step's drawing (same element IDs) and starts without title or speaker notes, because it is a new beat.
@@ -107,9 +107,8 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 - Deleting the open step opens the next one, or the previous one when it was the last. Deleting the last step leaves an empty scene with *Add step* ready.
 
 **Step strip of a loose diagram.** A loose diagram (“New diagram” in the sidebar) is usually one drawing, so it opens on the Canvas as a plain whiteboard: no carousel, and the canvas takes its height. A diagram with more than one step shows the strip from the start, and one with no steps always shows it, since “Add step” is there.
-- “Show steps” is one small island 8px to the left of Excalidraw's help button, as tall as it (40px, `--radius-card`, `--paper` with a thin line and `--shadow-sm`), with Lucide `panel-bottom-open`. With several steps it also carries the pager's “02 / 03” (current number in bold ink), so a hidden strip still says where you are.
-- With the strip shown, “Hide steps” (`panel-bottom-close`, a 34px ghost button) follows the pager at the strip's right end. Hiding the strip never touches the steps.
-- The choice is remembered per diagram in this browser (`paso.loose-strip` in `localStorage`); without one, the number of steps decides. Toggling moves the focus to the other button, and never mounts Excalidraw again.
+- Every diagram, loose or in a project, has one button that shows and hides the strip: a small island 8px to the left of Excalidraw's help button, as tall as it (40px, `--radius-card`, `--paper` with a thin line and `--shadow-sm`), with Lucide `panel-bottom-open` or `panel-bottom-close`. It sits at one spot on the page, so it never moves under the pointer: with the strip shown it is inside the strip's right end, which the strip keeps free. With several steps it carries the pager “02 / 03” (current number in bold ink), for the eye only, so the strip has no pager of its own. Hiding the strip never touches the steps.
+- The choice is remembered in this browser (`paso.loose-strip` in `localStorage`): per loose diagram, and per project for all its scenes. Without one, a project shows the strip and a loose diagram follows its number of steps. Toggling keeps the focus on the button and never mounts Excalidraw again.
 - While the strip is hidden, ← → and Page Up, Page Down on the canvas still move between the steps, as in Present.
 - A project's scenes always show their strip, with no way to hide it; a loose diagram moved into a project gets it back.
 

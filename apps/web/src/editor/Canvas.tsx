@@ -15,9 +15,9 @@ import { createViewStore } from './canvas-view';
 import { useSceneCameras } from './use-scene-cameras';
 import { PREVIOUS_CAMERA, resolveStepCamera } from '@paso/shared';
 import type { ServiceEvent } from '../state/projects-store';
-import { PanelBottomOpen } from 'lucide-react';
+import { PanelBottomClose, PanelBottomOpen } from 'lucide-react';
 import { pad } from '../components/StepFrame';
-import { useLooseStrip } from './loose-strip';
+import { stripKey, useStepStrip } from './loose-strip';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
 const messages = { failed: "Couldn't save. Your work is still in this browser.", conflict: 'The step changed outside Paso. Your local work is kept.' };
@@ -124,16 +124,9 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
   };
   const copy = (make: () => Promise<string>) => async () => { const id = await run(make); if (id) await goTo(id); };
 
-  // A loose diagram's step strip: hidden with one step, shown with several, or as the person chose. Hidden, the steps
-  // stay, and the keys on the canvas still move through them. A toggle hands the focus to the other one.
-  const strip = useLooseStrip(loose ? scene?.id : undefined, stepIds.length);
-  const showStrip = useRef<HTMLButtonElement>(null), hideStrip = useRef<HTMLButtonElement>(null);
-  const toggled = useRef(false);
-  useEffect(() => {
-    if (!toggled.current) return;
-    toggled.current = false; (strip.shown ? hideStrip : showStrip).current?.focus();
-  }, [strip.shown]);
-  const setStrip = (shown: boolean) => { toggled.current = true; strip.choose(shown ? 'shown' : 'hidden'); };
+  // The step strip: a project's scene shows it, a loose diagram shows it with several steps, or as the person chose.
+  // Hidden, the steps stay, and the keys on the canvas still move through them.
+  const strip = useStepStrip(scene ? stripKey(projectId, scene.id, loose) : undefined, stepIds.length, loose);
 
   // ← → on the canvas move through the scene's steps, as in Present. They stop at both ends.
   const stepIdsRef = useRef(stepIds); stepIdsRef.current = stepIds;
@@ -174,15 +167,18 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
       {typeof session?.document.camera === 'object' && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
       {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: session.target.sceneId, stepId: shownIds?.[kept.number - 1] })} />}
       {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
-      {/* Beside Excalidraw's help button. With several steps it shows where you are, as the strip's pager does. */}
-      {scene && !strip.shown && <button ref={showStrip} type="button" className="strip-toggle" aria-label="Show steps" title="Show steps" onClick={() => setStrip(true)}>
-        <PanelBottomOpen className="i" aria-hidden="true" />
-        {stepIds.length > 1 && <span className="strip-toggle__count" aria-hidden="true"><b>{stepId ? pad(stepIds.indexOf(stepId) + 1) : '–'}</b> / {pad(stepIds.length)}</span>}
-      </button>}
     </div>
+    {/* One button, in one place on the page, shows and hides the strip: beside Excalidraw's help button, or inside the
+        strip at the same spot. With several steps it says where you are, the strip's pager. */}
+    {scene && stepIds.length > 0 && <button
+      type="button" className="strip-toggle" aria-expanded={strip.shown} aria-label={strip.shown ? 'Hide steps' : 'Show steps'}
+      title={strip.shown ? 'Hide steps' : 'Show steps'} onClick={() => strip.choose(strip.shown ? 'hidden' : 'shown')}
+    >
+      {strip.shown ? <PanelBottomClose className="i" aria-hidden="true" /> : <PanelBottomOpen className="i" aria-hidden="true" />}
+      {stepIds.length > 1 && <span className="strip-toggle__count" aria-hidden="true"><b>{stepId ? pad(stepIds.indexOf(stepId) + 1) : '–'}</b> / {pad(stepIds.length)}</span>}
+    </button>}
     {notices && <div className="canvas-page__notices">{notices}</div>}
     {scene && strip.shown && <StepCarousel
-      onHide={loose ? () => setStrip(false) : undefined} hideRef={hideStrip}
       stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}
       onSelect={(id) => { if (id !== stepId) navigate({ ...route, sceneId: scene.id, stepId: id }); }}
       onAdd={() => void copy(() => actions.add(projectId, scene.id, stepIds.at(-1)))()}

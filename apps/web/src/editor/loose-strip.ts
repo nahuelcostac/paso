@@ -1,17 +1,19 @@
 import { useCallback, useState } from 'react';
 
-/** What the person chose for a loose diagram's step strip. Without a choice it follows the steps. */
+/** What the person chose for a diagram's step strip. Without a choice it follows the kind of diagram. */
 export type StripChoice = 'shown' | 'hidden';
 
 const KEY = 'paso.loose-strip';
 
 /**
- * Whether a loose diagram shows its step strip. With one step it opens as a plain whiteboard; with several it shows
- * them. The person's choice wins, except that a diagram with no steps always shows the strip: “Add step” is there.
+ * Whether a diagram shows its step strip. A project's scene shows it; a loose diagram with one step opens as a plain
+ * whiteboard, and with several it shows them. The person's choice wins, except that a diagram with no steps always
+ * shows the strip: “Add step” is there.
  */
-export function stripShown(steps: number, choice: StripChoice | undefined): boolean {
+export function stripShown(steps: number, choice: StripChoice | undefined, loose = true): boolean {
   if (steps === 0) return true;
-  return choice ? choice === 'shown' : steps > 1;
+  if (choice) return choice === 'shown';
+  return loose ? steps > 1 : true;
 }
 
 function readChoices(): Record<string, StripChoice> {
@@ -21,18 +23,21 @@ function readChoices(): Record<string, StripChoice> {
   } catch { return {}; }
 }
 
+/** Where a diagram's choice is kept: a loose diagram by its scene, a project by itself, for all its scenes. */
+export const stripKey = (projectId: string, sceneId: string, loose: boolean) => loose ? sceneId : `project:${projectId}`;
+
 /**
- * The step strip of the diagram on the Canvas: always shown for a project's scene, and for a loose diagram (its scene
- * ID given) as `stripShown` says. The choice is remembered per diagram in this browser.
+ * The step strip of the diagram on the Canvas (its key from `stripKey`), as `stripShown` says. The choice is
+ * remembered per diagram in this browser.
  */
-export function useLooseStrip(looseId: string | undefined, steps: number) {
+export function useStepStrip(key: string | undefined, steps: number, loose: boolean) {
   const [choices, setChoices] = useState(readChoices);
-  const shown = looseId === undefined || stripShown(steps, choices[looseId]);
+  const shown = key === undefined || stripShown(steps, choices[key], loose);
   const choose = useCallback((choice: StripChoice) => {
-    if (looseId === undefined) return;
-    const next = { ...readChoices(), [looseId]: choice };
+    if (key === undefined) return;
+    const next = { ...readChoices(), [key]: choice };
     setChoices(next);
     try { window.localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* a convenience: it just won't be remembered */ }
-  }, [looseId]);
+  }, [key]);
   return { shown, choose };
 }

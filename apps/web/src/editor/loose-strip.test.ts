@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stripShown } from './loose-strip';
+import { stripKey, stripShown } from './loose-strip';
 
 describe('the step strip of a loose diagram', () => {
   it('is hidden with one step and shown with several, until the person chooses', () => {
@@ -11,5 +11,11 @@ describe('the step strip of a loose diagram', () => {
   it('always shows with no steps, where “Add step” is', () => {
     expect(stripShown(0, 'hidden')).toBe(true);
     expect(stripShown(0, undefined)).toBe(true);
+  });
+  it('is shown in a project until the person hides it, remembered per project', () => {
+    expect(stripShown(1, undefined, false)).toBe(true);
+    expect(stripShown(3, 'hidden', false)).toBe(false);
+    expect(stripKey('p', 's', false)).toBe('project:p');
+    expect(stripKey('_loose', 's', true)).toBe('s');
   });
 });

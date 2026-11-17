@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type Ref } from 'react';
-import { Copy, PanelBottomClose, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { Copy, Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
-import { pad, StepFrame } from '../components/StepFrame';
+import { StepFrame } from '../components/StepFrame';
 import '../styles/carousel.css';
 
 type Props = {
@@ -22,9 +22,6 @@ type Props = {
   onMove: (stepId: string, index: number) => Promise<void>;
   /** Resolves when the step is gone. A rejection is shown in the dialog. */
   onDelete: (stepId: string) => Promise<void>;
-  /** A loose diagram can hide the strip: a button after the pager. Its steps stay. */
-  onHide?: () => void;
-  hideRef?: Ref<HTMLButtonElement>;
 };
 
 const HINT = 'Arrow keys: change step. Alt and arrow keys: move the step. Delete: delete the step.';
@@ -33,7 +30,7 @@ const HINT = 'Arrow keys: change step. Alt and arrow keys: move the step. Delete
  * The strip of steps under the canvas. It is not inside the Excalidraw container and never overlaps it.
  * Keys act only while focus is in here: Excalidraw uses bare keys, so nothing is bound on the window.
  */
-export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates, busy, onSelect, onAdd, onDuplicate, onNudge, onMove, onDelete, onHide, hideRef }: Props) {
+export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates, busy, onSelect, onAdd, onDuplicate, onNudge, onMove, onDelete }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const frames = useRef(new Map<string, HTMLElement>());
   const refocus = useRef<string | undefined>(undefined);
@@ -115,7 +112,6 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
     finally { setDeleteBusy(false); }
   };
   const confirmingAt = confirming ? stepIds.indexOf(confirming) : -1;
-  const currentAt = currentId ? stepIds.indexOf(currentId) : -1;
 
   return <footer className="carousel" aria-label="Steps of the scene">
     <span id="carousel-hint" className="visually-hidden">{HINT}</span>
@@ -148,13 +144,6 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
         <Plus className="i" aria-hidden="true" />
       </button>
     </div>
-    {/* Where you are, at a glance. Screen readers get it from the current frame's aria-current. */}
-    {stepIds.length > 0 && <p className="carousel__pager" aria-hidden="true">
-      <span className="carousel__pager-now">{currentAt >= 0 ? pad(currentAt + 1) : '–'}</span> / {pad(stepIds.length)}
-    </p>}
-    {onHide && <button type="button" ref={hideRef} className="carousel__hide" aria-label="Hide steps" title="Hide steps" onClick={onHide}>
-      <PanelBottomClose className="i" aria-hidden="true" />
-    </button>}
     {confirming && <Dialog title={`Delete step ${confirmingAt + 1}?`} onClose={() => { if (!deleteBusy) setConfirming(undefined); }}>
       <p className="dialog__text">Its drawing is deleted, and this can't be undone.{stepIds.length === 1 ? " It's the scene's last step: the scene will be empty." : ''}</p>
       {deleteError && <p className="dialog__error" role="alert">{deleteError}</p>}

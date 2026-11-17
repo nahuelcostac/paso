@@ -352,7 +352,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 
 
 /* The Canvas fills everything right of the sidebar, edge to edge: the canvas, then its step strip. No card, no gutter. */
-.canvas-page { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
+.canvas-page { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
 .editor-notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--danger-soft); color: var(--ink); border-bottom: var(--border); }
 .editor-notice .btn { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
 .canvas--editor > .canvas__placeholder { height: 100%; justify-content: center; padding: var(--space-5); }
@@ -427,8 +427,10 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .camera-draw:focus { outline: none; }
 .camera-draw__hint { position: absolute; left: 50%; top: 72px; translate: -50% 0; margin: 0; padding: 6px 12px; border-radius: var(--radius-md); background: var(--ink); color: var(--on-ink); font-size: var(--text-12); font-weight: var(--weight-medium); white-space: nowrap; pointer-events: none; box-shadow: var(--shadow-md); }
 .camera-draw__box { position: absolute; border: 1.5px solid var(--ink); border-radius: 4px; background: color-mix(in srgb, var(--paper) 20%, transparent); pointer-events: none; }
-/* A loose diagram without its step strip: one small island 8px left of Excalidraw's help button (right 16, bottom 16,
-   40px with Paso's theme), as tall as it. With several steps it carries the pager's “02 / 03”. */
+/* Shows and hides the step strip. It sits at one spot on the page, so it never moves under the pointer: with the strip
+   hidden, 8px left of Excalidraw's help button (right 16, bottom 16, 40px with Paso's theme) and as tall as it; with
+   the strip shown, at the same spot inside the strip, which keeps that end free. With several steps it carries the
+   pager's “02 / 03”. */
 .strip-toggle { position: absolute; z-index: 4; right: 64px; bottom: var(--space-4); display: inline-flex; align-items: center; gap: 6px; height: 40px; min-width: 40px; padding: 0 11px; border: 0; border-radius: var(--radius-card); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); color: var(--ink-2); font: inherit; font-size: var(--text-12); font-variant-numeric: tabular-nums; cursor: pointer; }
 .strip-toggle:hover { background: var(--surface-sunken); color: var(--ink); }
 .strip-toggle__count { color: var(--ink-3); white-space: nowrap; }
