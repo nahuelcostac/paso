@@ -340,11 +340,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       className={`app${panelOpen ? '' : ' app--panel-closed'}${leftDocked ? '' : ' app--left-floating'}${openProject && overview && agentDocked && !narrow ? ' app--agent' : ''}${rightRail ? ' app--agent-folded' : ''}${openProject && overview && narrow ? ' app--agent-drawer' : ''}`}
       style={{ '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
-      {/* Each side's toggle, as in Notion: one place on the page whether the side shows or not. The sidebar's sits at the
-          top left, after the window's own buttons in the desktop app; the chat's in its head, or its rail when folded. */}
-      <div className="window-grip" aria-hidden="true" />
-      <PanelToggle side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Hide sidebar" show="Show sidebar" controls="projects-panel" />
-      {openProject && overview && <PanelToggle side="right" open={agentShown} onToggle={toggleAgent} hide="Hide agent" show="Show agent" controls="agent-panel" />}
       {rightRail && <div className="agent-rail" aria-hidden="true" />}
       {/* A docked side's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
       {leftDocked && <Splitter
@@ -441,6 +436,13 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           onOpenScene={(id) => navigate({ projectId: row.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
         />}
       </> : <MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} />}
+      {/* Each side's toggle, as in Notion: one place on the page whether the side shows or not. The sidebar's sits at the
+          top left, after the window's own buttons in the desktop app; the chat's in its head, or its rail when folded.
+          They come last: the desktop app reads the window's drag areas in document order, and the heads under them
+          are drag areas, so a toggle placed before them would lose its clicks to the window. */}
+      <div className="window-grip" aria-hidden="true" />
+      <PanelToggle side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Hide sidebar" show="Show sidebar" controls="projects-panel" />
+      {openProject && overview && <PanelToggle side="right" open={agentShown} onToggle={toggleAgent} hide="Hide agent" show="Show agent" controls="agent-panel" />}
     </div>
   );
 }

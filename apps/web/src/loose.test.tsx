@@ -81,9 +81,9 @@ describe('loose diagrams in the sidebar', () => {
     await seedProject('p', 'Proyecto');
     render(<App config={config} recovery={memory()} />);
     await screen.findByRole('button', { name: /^Proyecto/ }, patience);
-    // “New diagram” sits right above “New project”.
-    const navButtons = within(sidebar()).getAllByRole('button').map((button) => button.textContent);
-    expect(navButtons.indexOf('New diagram')).toBe(navButtons.indexOf('New project') - 1);
+    // “New diagram” is the last icon of the search row, right after “New project”.
+    const navButtons = within(sidebar()).getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent);
+    expect(navButtons.indexOf('New diagram')).toBe(navButtons.indexOf('New project') + 1);
 
     await user.click(within(sidebar()).getByRole('button', { name: 'New diagram' }));
     await user.type(screen.getByLabelText('Name of the new diagram'), 'Pizarra rápida{Enter}');
@@ -144,7 +144,7 @@ describe('loose diagrams in the sidebar', () => {
     await seedLoose('b', 'Cola de prioridad');
     render(<App config={config} recovery={memory()} />);
     await screen.findByRole('button', { name: /^Árbol binario/ }, patience);
-    await user.click(within(sidebar()).getByRole('button', { name: 'Search…' }));
+    await user.click(within(sidebar()).getByRole('button', { name: 'Search' }));
     await user.type(within(sidebar()).getByRole('searchbox', { name: 'Search projects and diagrams' }), 'arbol');
     expect(screen.getByRole('button', { name: /^Árbol binario/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Cola de prioridad/ })).not.toBeInTheDocument();

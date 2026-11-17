@@ -87,7 +87,15 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .app--agent-drawer .panel-toggle--right { top: 18px; right: var(--space-4); }
 /* What the sidebar's toggle takes from the left of the window, gap included. */
 .app { --toggle-corner: calc(var(--window-controls-w) + 52px); }
-.app--left-floating .canvas--editor .App-menu_top > :first-child { margin-left: calc(var(--toggle-corner) - var(--space-4)); }
+/* Excalidraw's main menu (export, preferences…) sits right before its toolbar, the two centred on the board as one
+   group, so the top left corner stays free for the sidebar's toggle. Its column also holds the selected shape's
+   properties: `display: contents` lets the menu join the toolbar's row while the properties stay on the left, below. */
+.canvas--editor .excalidraw .App-menu_top { grid-template-columns: 1fr auto auto 1fr; column-gap: var(--space-2); row-gap: var(--space-4); }
+.canvas--editor .excalidraw .App-menu_top__left { display: contents; }
+.canvas--editor .excalidraw .App-menu_top__left > :first-child { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
+.canvas--editor .excalidraw .App-menu_top__left > :not(:first-child) { grid-column: 1 / 3; grid-row: 2; justify-self: start; }
+.canvas--editor .excalidraw .App-menu_top > .shapes-section { grid-column: 3; grid-row: 1; }
+.canvas--editor .excalidraw .App-menu_top > .layer-ui__wrapper__top-right { grid-column: 4; grid-row: 1; }
 /* In the Studio the page starts under the toggle's row instead: the title and the notices keep clear of it. */
 .app--left-floating .board { padding-top: 60px; }
 .app--left-floating .board__top { margin-top: 0; }
@@ -119,6 +127,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .brand__tile { fill: var(--ink); }
 .brand__step { fill: none; stroke: var(--on-ink); }
 .brand__name { font-size: 21px; font-weight: var(--weight-bold); letter-spacing: -0.04em; line-height: 1; }
+/* In the sidebar's head the mark is small, as T3 Code's name beside the window's buttons. */
+.projects__head .brand { gap: var(--space-2); }
+.projects__head .brand__mark { width: 22px; height: 22px; }
+.projects__head .brand__name { font-size: var(--text-15); letter-spacing: -0.02em; }
 
 .menu--scenes { min-width: 220px; max-width: min(320px, calc(100vw - 16px)); }
 .menu--scenes hr { margin: var(--space-1) var(--space-2); border: 0; border-top: var(--border); }
@@ -160,6 +172,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .nav-row { display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; padding: 0 var(--space-2); border-radius: var(--radius-md); color: var(--ink-2); font-weight: var(--weight-medium); text-align: left; }
 .nav-row svg.i { color: var(--muted); }
 button.nav-row:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
+/* “Search” and, on its right, “New project” and “New diagram” as icons, in one row, as in T3 Code. */
+.nav-actions { display: flex; align-items: center; gap: 2px; }
+.nav-actions__search { flex: 1; min-width: 0; }
+.nav-actions__new { color: var(--ink-3); }
 .nav-row--field { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line-strong); cursor: text; }
 .nav-row--field:focus-within { box-shadow: inset 0 0 0 1px var(--accent-line), var(--focus-ring); }
 .nav-row--field input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--ink); font-weight: var(--weight-medium); }

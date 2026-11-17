@@ -221,7 +221,7 @@ describe('workspaces in the sidebar', () => {
     expect(within(sidebar).getByRole('region', { name: 'Earlier' })).toHaveTextContent('Tema 1');
 
     // Search filters the list in place.
-    await user.click(within(sidebar).getByRole('button', { name: 'Search…' }));
+    await user.click(within(sidebar).getByRole('button', { name: 'Search' }));
     await user.type(within(sidebar).getByRole('searchbox', { name: 'Search projects and diagrams' }), 'nada');
     expect(within(sidebar).getByText('No matches.')).toBeInTheDocument();
     await user.keyboard('{Escape}');
@@ -498,6 +498,12 @@ describe('the board and its overview', () => {
     const toggle = screen.getByRole('button', { name: 'Hide sidebar' });
     expect(toggle).toHaveAttribute('aria-controls', 'projects-panel');
     expect(toggle.querySelector('svg')).toHaveClass('lucide-panel-left');
+    // After the sidebar in the document: the desktop app reads its drag areas in order, and the head is one of them.
+    expect(sidebar.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // “Search”, then the two ways to make something new as icons, in one row.
+    const row = sidebar.querySelector('.nav-actions')!;
+    expect([...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['Search', 'New project', 'New diagram']);
+    expect(within(sidebar).getByRole('button', { name: 'New project' })).toHaveTextContent(/^$/);
     await user.click(toggle);
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
     // The same button, in the same place: nothing else is left of the sidebar, not even the edge to drag.

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isLooseProject, LOOSE_PROJECT_ID, type Scene } from '@paso/shared';
-import { ChevronsUpDown, CloudOff, Folder, Layers, Search, ServerOff, Shapes, SquarePen, SquarePlus, TriangleAlert, X } from 'lucide-react';
+import { ChevronsUpDown, CloudOff, Folder, FolderPlus, Layers, Search, ServerOff, Shapes, SquarePen, TriangleAlert, X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
 import { nativeFolderChooser } from '../lib/desktop';
 import { describeContents, fold, groupByRecency } from '../lib/format';
@@ -324,27 +324,30 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           <ChevronsUpDown className="i" aria-hidden="true" />
         </button>
         <hr />
-        {query === null ? (
-          <button ref={searchButton} type="button" className="nav-row" onClick={() => setQuery('')}>
-            <Search className="i" aria-hidden="true" />Search…
+        {/* As in T3 Code: “Search” on the left of one row, and the two ways to make something new as icons on its right. */}
+        <div className="nav-actions">
+          {query === null ? (
+            <button ref={searchButton} type="button" className="nav-row nav-actions__search" onClick={() => setQuery('')}>
+              <Search className="i" aria-hidden="true" />Search
+            </button>
+          ) : (
+            <label className="nav-row nav-row--field nav-actions__search">
+              <Search className="i" aria-hidden="true" />
+              <input
+                type="search" autoFocus value={query} placeholder="Search" aria-label="Search projects and diagrams" spellCheck={false}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setQuery(null); requestAnimationFrame(() => searchButton.current?.focus()); } }}
+                onBlur={(event) => { if (!event.currentTarget.value.trim()) setQuery(null); }}
+              />
+            </label>
+          )}
+          <button type="button" className="icon-btn nav-actions__new" aria-label="New project" title="New project" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); setCreatingLoose(false); onCreatingChange(true); }}>
+            <FolderPlus className="i" aria-hidden="true" />
           </button>
-        ) : (
-          <label className="nav-row nav-row--field">
-            <Search className="i" aria-hidden="true" />
-            <input
-              type="search" autoFocus value={query} placeholder="Search…" aria-label="Search projects and diagrams" spellCheck={false}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setQuery(null); requestAnimationFrame(() => searchButton.current?.focus()); } }}
-              onBlur={(event) => { if (!event.currentTarget.value.trim()) setQuery(null); }}
-            />
-          </label>
-        )}
-        <button type="button" className="nav-row" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); onCreatingChange(false); setCreatingLoose(true); }}>
-          <SquarePlus className="i" aria-hidden="true" />New diagram
-        </button>
-        <button type="button" className="nav-row" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); setCreatingLoose(false); onCreatingChange(true); }}>
-          <SquarePen className="i" aria-hidden="true" />New project
-        </button>
+          <button type="button" className="icon-btn nav-actions__new" aria-label="New diagram" title="New diagram" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); onCreatingChange(false); setCreatingLoose(true); }}>
+            <SquarePen className="i" aria-hidden="true" />
+          </button>
+        </div>
         <hr />
       </div>
 

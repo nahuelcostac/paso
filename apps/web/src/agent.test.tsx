@@ -380,6 +380,8 @@ describe('a turn as it happens', () => {
     const toggle = screen.getByRole('button', { name: 'Hide agent' });
     expect(within(panel).queryByRole('button', { name: 'Hide agent' })).not.toBeInTheDocument();
     expect(toggle.querySelector('svg')).toHaveClass('lucide-panel-right');
+    // After the panel in the document, so the head's drag area in the desktop app never takes its clicks.
+    expect(panel.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.click(toggle);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show agent' })).toBe(toggle);
