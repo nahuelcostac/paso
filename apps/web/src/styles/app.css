@@ -427,6 +427,12 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .camera-draw:focus { outline: none; }
 .camera-draw__hint { position: absolute; left: 50%; top: 72px; translate: -50% 0; margin: 0; padding: 6px 12px; border-radius: var(--radius-md); background: var(--ink); color: var(--on-ink); font-size: var(--text-12); font-weight: var(--weight-medium); white-space: nowrap; pointer-events: none; box-shadow: var(--shadow-md); }
 .camera-draw__box { position: absolute; border: 1.5px solid var(--ink); border-radius: 4px; background: color-mix(in srgb, var(--paper) 20%, transparent); pointer-events: none; }
+/* A loose diagram without its step strip: one small island 8px left of Excalidraw's help button (right 16, bottom 16,
+   40px with Paso's theme), as tall as it. With several steps it carries the pager's «02 / 03». */
+.strip-toggle { position: absolute; z-index: 4; right: 64px; bottom: var(--space-4); display: inline-flex; align-items: center; gap: 6px; height: 40px; min-width: 40px; padding: 0 11px; border: 0; border-radius: var(--radius-card); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); color: var(--ink-2); font: inherit; font-size: var(--text-12); font-variant-numeric: tabular-nums; cursor: pointer; }
+.strip-toggle:hover { background: var(--surface-sunken); color: var(--ink); }
+.strip-toggle__count { color: var(--ink-3); white-space: nowrap; }
+.strip-toggle__count b { color: var(--accent-ink); font-weight: var(--weight-bold); }
 .camera-control__take[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
 /* Excalidraw's toolbar stays centred: on a narrower board Presentar and the switch keep only their icons, so the two
    never meet. The Estudio has no toolbar, so it keeps the labels until it is much narrower. */

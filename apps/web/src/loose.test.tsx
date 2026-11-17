@@ -483,3 +483,89 @@ describe('moving a scene out of a project, or to another one', () => {
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/lienzo\/p-scene/), patience);
   });
 });
+
+describe('the step strip of a loose diagram', () => {
+  const strip = () => screen.queryByRole('contentinfo', { name: 'Pasos de la escena' }) ?? screen.queryByLabelText('Pasos de la escena');
+  const frames = () => screen.getAllByRole('button', { name: /^Paso \d+/ });
+  const stepsOf = async (id: string) => ((await call(`/api/projects/_loose/scenes/${id}`)) as { document: { stepIds: string[] } }).document.stepIds;
+
+  it('opens a new one as a plain whiteboard, shows and hides the strip, and remembers the choice', async () => {
+    const user = userEvent.setup();
+    await seedLoose('d', 'Pizarra');
+    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    const { unmount } = render(<App config={config} recovery={memory()} />);
+    await screen.findByTestId('canvas', {}, patience);
+    expect(strip()).not.toBeInTheDocument();
+    const show = screen.getByRole('button', { name: 'Mostrar pasos' });
+    expect(show).not.toHaveTextContent('/');             // one step: no counter
+
+    await user.click(show);
+    expect(strip()).toBeInTheDocument();
+    expect(frames()).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Ocultar pasos' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Añadir paso' }));
+    await waitFor(async () => expect(await stepsOf('d')).toHaveLength(2), patience);
+    await waitFor(() => expect(frames()).toHaveLength(2), patience);
+    const [, second] = await stepsOf('d');
+    await waitFor(() => expect(window.location.hash).toBe(`#/_loose/lienzo/d/${second}`), patience);
+
+    // Hidden again, the steps stay, the counter says where you are, and ← → on the canvas still move between them.
+    await user.click(screen.getByRole('button', { name: 'Ocultar pasos' }));
+    expect(strip()).not.toBeInTheDocument();
+    expect(await stepsOf('d')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveTextContent('02 / 02');
+    await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', second), patience);
+    screen.getByTestId('canvas').focus();
+    await user.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(window.location.hash).toBe('#/_loose/lienzo/d/d-step-0'), patience);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveTextContent('01 / 02'), patience);
+
+    // The choice is kept for this diagram, in this browser, even though it now has several steps.
+    unmount();
+    render(<App config={config} recovery={memory()} />);
+    await screen.findByTestId('canvas', {}, patience);
+    expect(strip()).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toBeInTheDocument();
+  });
+
+  it('shows the strip from the start when the diagram has several steps', async () => {
+    const user = userEvent.setup();
+    await seedLoose('d', 'Varios', 3);
+    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    render(<App config={config} recovery={memory()} />);
+    await screen.findByTestId('canvas', {}, patience);
+    expect(strip()).toBeInTheDocument();
+    expect(frames()).toHaveLength(3);
+    expect(screen.queryByRole('button', { name: 'Mostrar pasos' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ocultar pasos' }));
+    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveTextContent('01 / 03');
+  });
+
+  it('leaves a project\'s strip as it was, also for a loose diagram moved into one', async () => {
+    const user = userEvent.setup();
+    await seedProject('p', 'Proyecto');
+    await seedLoose('d', 'Suelto');
+    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    const { unmount } = render(<App config={config} recovery={memory()} />);
+    await screen.findByTestId('canvas', {}, patience);
+    // One step in a project's scene: the strip is there, with nothing to hide it.
+    expect(strip()).toBeInTheDocument();
+    expect(frames()).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Ocultar pasos' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mostrar pasos' })).not.toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    render(<App config={config} recovery={memory()} />);
+    await screen.findByTestId('canvas', {}, patience);
+    expect(strip()).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Más acciones de Suelto' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mover a proyecto…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mover «Suelto» a un proyecto' });
+    await user.click(within(dialog).getByRole('button', { name: 'Proyecto' }));
+    await waitFor(() => expect(window.location.hash).toBe('#/p/lienzo/d/d-step-0'), patience);
+    await waitFor(() => expect(strip()).toBeInTheDocument(), patience);
+    expect(screen.queryByRole('button', { name: 'Ocultar pasos' })).not.toBeInTheDocument();
+  });
+});

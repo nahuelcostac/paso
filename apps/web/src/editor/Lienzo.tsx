@@ -15,6 +15,9 @@ import { createViewStore } from './canvas-view';
 import { useSceneCameras } from './use-scene-cameras';
 import { PREVIOUS_CAMERA, resolveStepCamera } from '@paso/shared';
 import type { ServiceEvent } from '../state/projects-store';
+import { PanelBottomOpen } from 'lucide-react';
+import { pad } from '../components/StepFrame';
+import { useLooseStrip } from './loose-strip';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
 const messages = { failed: 'No se pudo guardar. Tu trabajo sigue en este navegador.', conflict: 'El paso cambió fuera de Paso. Tu trabajo local se conserva.' };
@@ -34,7 +37,7 @@ function keyboardInCarousel() {
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
-export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents }: {
+export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents, loose = false }: {
   api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
   scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
   route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
@@ -45,6 +48,8 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   corner?: React.ReactNode;
   /** The service's changes, so a camera this step keeps from an earlier one follows it when that one changes. */
   subscribeEvents?: (listener: (event: ServiceEvent) => void) => () => void;
+  /** A loose diagram: a plain whiteboard, whose step strip shows on request or when it has several steps. */
+  loose?: boolean;
 }) {
   useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [error, setError] = useState<string>();
@@ -119,6 +124,17 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   };
   const copy = (make: () => Promise<string>) => async () => { const id = await run(make); if (id) await goTo(id); };
 
+  // A loose diagram's step strip: hidden with one step, shown with several, or as the person chose. Hidden, the steps
+  // stay, and the keys on the canvas still move through them. A toggle hands the focus to the other one.
+  const strip = useLooseStrip(loose ? scene?.id : undefined, stepIds.length);
+  const showStrip = useRef<HTMLButtonElement>(null), hideStrip = useRef<HTMLButtonElement>(null);
+  const toggled = useRef(false);
+  useEffect(() => {
+    if (!toggled.current) return;
+    toggled.current = false; (strip.shown ? hideStrip : showStrip).current?.focus();
+  }, [strip.shown]);
+  const setStrip = (shown: boolean) => { toggled.current = true; strip.choose(shown ? 'shown' : 'hidden'); };
+
   // ← → on the canvas move through the scene's steps, as in Presentar. They stop at both ends.
   const stepIdsRef = useRef(stepIds); stepIdsRef.current = stepIds;
   const stepRef = useRef(stepId); stepRef.current = stepId;
@@ -158,9 +174,15 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
       {typeof session?.document.camera === 'object' && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
       {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: session.target.sceneId, stepId: shownIds?.[kept.number - 1] })} />}
       {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
+      {/* Beside Excalidraw's help button. With several steps it shows where you are, as the strip's pager does. */}
+      {scene && !strip.shown && <button ref={showStrip} type="button" className="strip-toggle" aria-label="Mostrar pasos" title="Mostrar pasos" onClick={() => setStrip(true)}>
+        <PanelBottomOpen className="i" aria-hidden="true" />
+        {stepIds.length > 1 && <span className="strip-toggle__count" aria-hidden="true"><b>{stepId ? pad(stepIds.indexOf(stepId) + 1) : '–'}</b> / {pad(stepIds.length)}</span>}
+      </button>}
     </div>
     {notices && <div className="lienzo__notices">{notices}</div>}
-    {scene && <StepCarousel
+    {scene && strip.shown && <StepCarousel
+      onHide={loose ? () => setStrip(false) : undefined} hideRef={hideStrip}
       stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}
       onSelect={(id) => { if (id !== stepId) navigate({ ...route, sceneId: scene.id, stepId: id }); }}
       onAdd={() => void copy(() => actions.add(projectId, scene.id, stepIds.at(-1)))()}
