@@ -56,8 +56,8 @@ export const codexAdapter: HarnessAdapter = {
             ...(request.resumeToken ? { threadId: request.resumeToken } : { environments: [], dynamicTools: board!.tools }),
             cwd: policy.cwd, sandbox: 'read-only', approvalPolicy: 'never', approvalsReviewer: 'user',
             model: policy.model, config: policy.config,
-            baseInstructions: 'Eres el asistente de Paso. Solo usas herramientas del tablero y respondes en español.',
-            developerInstructions: `Trabajas en el ${where} (IDs de servicio). Lee el paso antes de editarlo. No tienes terminal, archivos ni web.`,
+            baseInstructions: "You are Paso's assistant. You only use the board tools, and you reply in the language of the user's message.",
+            developerInstructions: `You are working in the ${where} (service IDs). Read a step before you edit it. You have no terminal, files or web.`,
             runtimeWorkspaceRoots: [],
           });
           return;

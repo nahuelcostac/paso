@@ -22,7 +22,7 @@ type Props = {
 
 /**
  * Moving a scene, which the sidebar runs: dragging it to another place in its project, onto another project or the loose
- * diagrams, or «Mover a…».
+ * diagrams, or “Move to…”.
  */
 export type SceneTransfer = {
   drag: (scene: Scene) => { handlers: DragHandlers; dragging: boolean };
@@ -33,8 +33,8 @@ export type SceneTransfer = {
   insert: (sceneId: string) => 'before' | 'after' | undefined;
 };
 
-const failure = (error: unknown) => error instanceof Error ? error.message : 'Inténtalo de nuevo.';
-const stepsText = (count: number) => count === 0 ? 'La escena no tiene pasos' : count === 1 ? 'Se borrará 1 paso' : `Se borrarán ${count} pasos`;
+const failure = (error: unknown) => error instanceof Error ? error.message : 'Try again.';
+const stepsText = (count: number) => count === 0 ? 'The scene has no steps' : count === 1 ? 'This deletes 1 step' : `This deletes ${count} steps`;
 
 function SceneMenu({ anchor, name, onClose, onRename, onTransfer, onDelete }: {
   anchor: HTMLElement; name: string; onClose: () => void; onRename: () => void; onTransfer?: () => void; onDelete: () => void;
@@ -43,11 +43,11 @@ function SceneMenu({ anchor, name, onClose, onRename, onTransfer, onDelete }: {
   const keys = useMenuKeys(list);
   const run = (action: () => void) => () => { onClose(); action(); };
   return (
-    <Popover anchor={anchor} onClose={onClose} align="end" role="menu" label={`Acciones de la escena «${name}»`} className="menu" onKeyDown={keys}>
+    <Popover anchor={anchor} onClose={onClose} align="end" role="menu" label={`Actions for the scene “${name}”`} className="menu" onKeyDown={keys}>
       <div ref={list}>
-        <button type="button" role="menuitem" onClick={run(onRename)}><Pencil className="i" aria-hidden="true" />Renombrar</button>
-        {onTransfer && <button type="button" role="menuitem" onClick={run(onTransfer)}><FolderInput className="i" aria-hidden="true" />Mover a…</button>}
-        <button type="button" role="menuitem" className="menu__danger" onClick={run(onDelete)}><Trash2 className="i" aria-hidden="true" />Eliminar…</button>
+        <button type="button" role="menuitem" onClick={run(onRename)}><Pencil className="i" aria-hidden="true" />Rename</button>
+        {onTransfer && <button type="button" role="menuitem" onClick={run(onTransfer)}><FolderInput className="i" aria-hidden="true" />Move to…</button>}
+        <button type="button" role="menuitem" className="menu__danger" onClick={run(onDelete)}><Trash2 className="i" aria-hidden="true" />Delete…</button>
       </div>
     </Popover>
   );
@@ -55,7 +55,7 @@ function SceneMenu({ anchor, name, onClose, onRename, onTransfer, onDelete }: {
 
 /**
  * The open diagram's scenes, under its row in the sidebar, like pages: a click opens a scene on the board, and each has a
- * menu to rename, move or delete it. «Añadir diagrama» closes the list. Dragging a scene puts it above or below another
+ * menu to rename, move or delete it. “Add scene” closes the list. Dragging a scene puts it above or below another
  * one of the list, or moves it onto another project or the loose diagrams.
  */
 export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate, onRename, onDelete, transfer }: Props) {
@@ -69,12 +69,12 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
     if (!deleting) return;
     setDeleting({ ...deleting, busy: true, error: undefined });
     try { await onDelete(deleting.scene.id); setDeleting(null); }
-    catch (failed) { setDeleting({ scene: deleting.scene, error: `No se pudo eliminar la escena. ${failure(failed)}` }); }
+    catch (failed) { setDeleting({ scene: deleting.scene, error: `Couldn't delete the scene. ${failure(failed)}` }); }
   };
 
   return (
     <>
-      <ul className="scene-list" aria-label={`Escenas de ${diagram}`}>
+      <ul className="scene-list" aria-label={`Scenes of ${diagram}`}>
         {scenes.map((scene, index) => {
           const current = scene.id === currentId;
           const drag = transfer?.drag(scene);
@@ -86,10 +86,10 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
                 {renaming === scene.id ? (
                   <div className="scene-row__text">
                     <NameField
-                      initial={scene.name} label={`Nombre de la escena ${index + 1}`}
+                      initial={scene.name} label={`Name of scene ${index + 1}`}
                       onSave={async (name) => {
                         try { await onRename(scene.id, name); setRenaming(null); }
-                        catch (failed) { throw new Error(`No se pudo renombrar la escena. ${failure(failed)}`); }
+                        catch (failed) { throw new Error(`Couldn't rename the scene. ${failure(failed)}`); }
                       }}
                       onCancel={() => setRenaming(null)}
                       onAbandon={(message) => { setRenaming(null); setError(message); }}
@@ -101,11 +101,11 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
                       type="button" className="scene-row__open" aria-current={current ? 'true' : undefined}
                       onClick={() => { if (!transfer?.consumeClick()) onSelect(scene.id); }} {...drag?.handlers}
                     >
-                      <span className="visually-hidden">Escena {index + 1}: </span><span className="scene-row__name">{scene.name}</span>
+                      <span className="visually-hidden">Scene {index + 1}: </span><span className="scene-row__name">{scene.name}</span>
                     </button>
                     <button
                       type="button" className="scene-row__more" aria-haspopup="menu" aria-expanded={menu?.id === scene.id}
-                      aria-label={`Acciones de la escena «${scene.name}»`}
+                      aria-label={`Actions for the scene “${scene.name}”`}
                       onClick={(event) => setMenu(menu?.id === scene.id ? null : { id: scene.id, anchor: event.currentTarget })}
                     >
                       <EllipsisVertical className="i" aria-hidden="true" />
@@ -118,7 +118,7 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
         })}
         <li>
           <button type="button" className="scene-row scene-row--add" disabled={busy} onClick={onCreate}>
-            <Plus className="i" aria-hidden="true" />Añadir diagrama
+            <Plus className="i" aria-hidden="true" />Add scene
           </button>
         </li>
       </ul>
@@ -133,12 +133,12 @@ export function SceneList({ diagram, scenes, currentId, busy, onSelect, onCreate
         />
       )}
       {deleting && (
-        <Dialog title={`¿Eliminar la escena «${deleting.scene.name}»?`} onClose={() => { if (!deleting.busy) setDeleting(null); }}>
-          <p className="dialog__text">{stepsText(deleting.scene.stepIds.length)}. No se puede deshacer.</p>
+        <Dialog title={`Delete the scene “${deleting.scene.name}”?`} onClose={() => { if (!deleting.busy) setDeleting(null); }}>
+          <p className="dialog__text">{stepsText(deleting.scene.stepIds.length)}. This can't be undone.</p>
           {deleting.error && <p className="dialog__error" role="alert">{deleting.error}</p>}
           <div className="dialog__actions">
-            <button type="button" className="btn btn--soft" data-autofocus disabled={deleting.busy} onClick={() => setDeleting(null)}>Cancelar</button>
-            <button type="button" className="btn btn--danger" disabled={deleting.busy} onClick={() => void confirmDelete()}>Eliminar escena</button>
+            <button type="button" className="btn btn--soft" data-autofocus disabled={deleting.busy} onClick={() => setDeleting(null)}>Cancel</button>
+            <button type="button" className="btn btn--danger" disabled={deleting.busy} onClick={() => void confirmDelete()}>Delete scene</button>
           </div>
         </Dialog>
       )}

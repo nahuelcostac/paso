@@ -83,7 +83,7 @@ describe('workspaces', () => {
     await start();
     const listing = await api<Listing>('/api/workspaces');
     expect(listing.data.activeId).toBe(added.data.id);
-    expect(listing.data.workspaces.map((w) => w.name)).toEqual(['Mis diagramas', 'Mis clases']);
+    expect(listing.data.workspaces.map((w) => w.name)).toEqual(['My projects', 'Mis clases']);
     expect(await projectNames()).toEqual(['Sigue aquí']);
   });
 

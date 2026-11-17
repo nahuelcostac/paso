@@ -24,7 +24,7 @@ export function claimSingleInstance(app, current) {
 }
 
 /**
- * The page may only go full screen, which Presentar asks for, and only from the app's own origin. Every other
+ * The page may only go full screen, which Present asks for, and only from the app's own origin. Every other
  * permission, such as the camera or notifications, is denied.
  */
 export function allowsPermission(permission, requestingUrl, origin) {

@@ -156,20 +156,20 @@ export class SessionManager {
   }
   private get(id: string) {
     const session = this.sessions.get(id);
-    if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'No existe esa sesión del asistente.');
+    if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', "That agent session doesn't exist.");
     return session;
   }
 
   async create(input: { harness: unknown; projectId: unknown; sceneId?: unknown; model?: unknown }): Promise<SessionInfo> {
     await this.load();
-    if (typeof input.harness !== 'string' || !(harnessIds as readonly string[]).includes(input.harness)) throw new ApiError(400, 'INVALID_HARNESS', 'Asistente desconocido.');
+    if (typeof input.harness !== 'string' || !(harnessIds as readonly string[]).includes(input.harness)) throw new ApiError(400, 'INVALID_HARNESS', 'Unknown agent.');
     const harness = input.harness as HarnessId;
     const projectId = idSchema.parse(input.projectId);
     const sceneId = input.sceneId === undefined ? undefined : idSchema.parse(input.sceneId);
-    if (input.model !== undefined && (typeof input.model !== 'string' || !modelPattern.test(input.model))) throw new ApiError(400, 'INVALID_MODEL', 'Nombre de modelo no válido.');
-    if (!this.adapters[harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', 'Este asistente todavía no se puede usar desde Paso.');
+    if (input.model !== undefined && (typeof input.model !== 'string' || !modelPattern.test(input.model))) throw new ApiError(400, 'INVALID_MODEL', 'Invalid model name.');
+    if (!this.adapters[harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', "This agent can't be used from Paso yet.");
     const detected = await this.options.detect(harness);
-    if (!detected.found) throw new ApiError(422, 'HARNESS_NOT_FOUND', 'No se ha encontrado el asistente. Instálalo y vuelve a intentarlo.');
+    if (!detected.found) throw new ApiError(422, 'HARNESS_NOT_FOUND', "The agent wasn't found. Install it and try again.");
     await this.options.validateTarget(projectId, sceneId);
     const now = new Date().toISOString();
     const session: Session = {
@@ -206,9 +206,9 @@ export class SessionManager {
   async resume(id: string): Promise<SessionInfo> {
     await this.load();
     const session = this.get(id);
-    if (!session.resumeToken) throw new ApiError(409, 'SESSION_NOT_RESUMABLE', 'Esta sesión no tiene una conversación que reanudar.');
-    if (!this.adapters[session.harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', 'Este asistente todavía no se puede usar desde Paso.');
-    if (!(await this.options.detect(session.harness)).found) throw new ApiError(422, 'HARNESS_NOT_FOUND', 'No se ha encontrado el asistente. Instálalo y vuelve a intentarlo.');
+    if (!session.resumeToken) throw new ApiError(409, 'SESSION_NOT_RESUMABLE', 'This session has no conversation to resume.');
+    if (!this.adapters[session.harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', "This agent can't be used from Paso yet.");
+    if (!(await this.options.detect(session.harness)).found) throw new ApiError(422, 'HARNESS_NOT_FOUND', "The agent wasn't found. Install it and try again.");
     await this.options.validateTarget(session.projectId, session.sceneId);
     return this.info(session);
   }
@@ -235,23 +235,23 @@ export class SessionManager {
     if (typeof text !== 'string' || !text.trim() || text.length > maxMessageChars) {
       throw new ApiError(400, 'INVALID_MESSAGE', `El mensaje debe tener texto y no superar ${maxMessageChars} caracteres.`);
     }
-    if (this.closing) throw new ApiError(503, 'SERVICE_CLOSING', 'El servicio se está cerrando.');
+    if (this.closing) throw new ApiError(503, 'SERVICE_CLOSING', 'The service is shutting down.');
     const session = this.get(id);
     if (effort !== undefined && (typeof effort !== 'string' || !effortLevels[session.harness].includes(effort))) {
-      throw new ApiError(400, 'INVALID_EFFORT', 'Ese modo de razonamiento no está disponible para este asistente.');
+      throw new ApiError(400, 'INVALID_EFFORT', "That reasoning level isn't available for this agent.");
     }
-    if (!this.adapters[session.harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', 'Este asistente todavía no se puede usar desde Paso.');
+    if (!this.adapters[session.harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', "This agent can't be used from Paso yet.");
     await this.options.validateTarget(session.projectId, session.sceneId);
     // A continued conversation adds to its stored history, so its numbering carries on.
     await this.history(session);
     // From here to marking the session as running there is no await, so limits cannot race.
-    if (session.state === 'running') throw new ApiError(409, 'SESSION_BUSY', 'El asistente todavía está trabajando en esta sesión.');
+    if (session.state === 'running') throw new ApiError(409, 'SESSION_BUSY', 'The agent is still working in this session.');
     const running = [...this.sessions.values()].filter((s) => s.state === 'running');
     if (running.filter((s) => s.projectId === session.projectId).length >= (this.options.maxRunsPerProject ?? 1)) {
-      throw new ApiError(409, 'PROJECT_BUSY', 'Ya hay un asistente trabajando en este diagrama. Espera a que termine o cancélalo.');
+      throw new ApiError(409, 'PROJECT_BUSY', 'An agent is already working on this project. Wait for it to finish, or stop it.');
     }
     if (running.length >= (this.options.maxRuns ?? 4)) {
-      throw new ApiError(409, 'TOO_MANY_RUNS', 'Hay demasiados asistentes trabajando a la vez. Espera a que termine alguno.');
+      throw new ApiError(409, 'TOO_MANY_RUNS', 'Too many agents are working at once. Wait for one to finish.');
     }
     const controller = new AbortController();
     const runId = randomUUID();

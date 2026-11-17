@@ -27,7 +27,7 @@ export function NameField({ initial, placeholder, label, onSave, onCancel, onAba
     if (!name || name === initial) { finished.current = true; onCancel(); return; }
     setBusy(true); setError(null);
     try { await onSave(name); finished.current = true; }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'No se pudo guardar.'); setBusy(false); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "Couldn't save."); setBusy(false); }
   };
 
   return (

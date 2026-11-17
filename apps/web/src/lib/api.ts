@@ -165,7 +165,7 @@ export class ApiClient {
   updateProject(id: string, revision: string, input: { name?: string; icon?: string | null }) {
     return this.request<ProjectEnvelope>(`/projects/${encodeURIComponent(id)}`, { method: 'PATCH', body: input, revision });
   }
-  /** «Abrir carpeta»: the service opens the project's folder in the system's file manager. */
+  /** “Open folder”: the service opens the project's folder in the system's file manager. */
   revealProject(id: string) {
     return this.request<void>(`/projects/${encodeURIComponent(id)}/reveal`, { method: 'POST' });
   }
@@ -237,7 +237,7 @@ export class ApiClient {
     const response = await fetch(`${this.config.baseUrl}/api/projects/${encodeURIComponent(projectId)}/${path}`, {
       ...init, headers: { ...init.headers, Authorization: `Bearer ${this.config.token}` },
     });
-    if (!response.ok) throw new ApiRequestError(response.status, 'ASSET', 'No se pudo cargar o guardar una imagen.');
+    if (!response.ok) throw new ApiRequestError(response.status, 'ASSET', "Couldn't load or save an image.");
     return response;
   }
   async uploadFiles(target: Target, document: Step, binaries: Binaries, keepalive = false) {

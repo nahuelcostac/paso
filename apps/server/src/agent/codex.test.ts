@@ -68,6 +68,10 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
     expect(thread.params.environments).toEqual([]);
     expect(thread.params.approvalPolicy).toBe('never');
     expect(thread.params.dynamicTools).toHaveLength(13);
+    // English instructions; the agent still answers in the person's own language.
+    expect(thread.params.baseInstructions).toContain("in the language of the user's message");
+    expect(thread.params.developerInstructions).toMatch(/^You are working in the project "[^"]+"/);
+    expect(codexCatalog('model').models[0].base_instructions).toContain("in the language of the user's message");
     expect(turn.params.input[0].text).toBe('prompt; $(touch /tmp/unsafe)');
     expect(call.args.join(' ')).not.toContain('touch');
     expect(codexCatalog('model').models[0]).toMatchObject({ shell_type: 'disabled', apply_patch_tool_type: null, tool_mode: 'direct', multi_agent_version: null, node_repl_disabled: true, experimental_supported_tools: [] });

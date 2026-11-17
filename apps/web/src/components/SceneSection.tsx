@@ -41,14 +41,14 @@ type Props = {
   onGripPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
   onGripPointerMove: (event: PointerEvent<HTMLButtonElement>) => void;
   onGripPointerEnd: (event: PointerEvent<HTMLButtonElement>) => void;
-  /** False in the Estudio, which shows one scene: the sidebar renames, moves and deletes scenes. */
+  /** False in the Studio, which shows one scene: the sidebar renames, moves and deletes scenes. */
   manage?: boolean;
   /** Names a step: a click on a card's title, or F2 on the card, opens the field. Resolves when saved. */
   onRenameStep?: (stepId: string, title: string) => Promise<void>;
   registerGrip: (element: HTMLButtonElement | null) => void;
 };
 
-/** One scene: «Escena 1 de 3» over its title, its step count, then its steps as a grid of numbered cards. */
+/** One scene: “Scene 1 of 3” over its title, its step count, then its steps as a grid of numbered cards. */
 export function SceneSection(props: Props) {
   const { scene, index, total, state, store, api, cache, theme, root, currentStepId, stepAgentStates, renaming, grabbed, dragging, dropMarker } = props;
   const section = useRef<HTMLElement>(null);
@@ -102,7 +102,7 @@ export function SceneSection(props: Props) {
     <section
       ref={section}
       className="scene"
-      aria-label={`Escena ${index + 1}: ${name}`}
+      aria-label={`Scene ${index + 1}: ${name}`}
       data-scene-id={scene.id}
       data-grabbed={grabbed || undefined}
       data-dragging={dragging || undefined}
@@ -110,10 +110,10 @@ export function SceneSection(props: Props) {
     >
       <div className="scene__head">
         <div className="scene__heading">
-          <span className="eyebrow scene__num">Escena {index + 1} de {total}</span>
+          <span className="eyebrow scene__num">Scene {index + 1} of {total}</span>
           {renaming ? (
             <div className="scene__rename">
-              <NameField initial={name} label={`Nombre de la escena ${index + 1}`} onSave={props.onRename} onCancel={props.onRenameEnd} onAbandon={props.onRenameAbandon} />
+              <NameField initial={name} label={`Name of scene ${index + 1}`} onSave={props.onRename} onCancel={props.onRenameEnd} onAbandon={props.onRenameAbandon} />
             </div>
           ) : <h2 className="scene__title">{name}</h2>}
         </div>
@@ -124,9 +124,9 @@ export function SceneSection(props: Props) {
               ref={props.registerGrip}
               type="button"
               className="scene__tool scene__grip"
-              aria-label={`Reordenar la escena ${index + 1}, ${name}`}
+              aria-label={`Reorder scene ${index + 1}, ${name}`}
               aria-pressed={grabbed}
-              title="Arrastra, o pulsa Intro y usa las flechas"
+              title="Drag, or press Enter and use the arrow keys"
               onKeyDown={props.onGripKeyDown}
               onBlur={props.onGripBlur}
               onPointerDown={props.onGripPointerDown}
@@ -136,14 +136,14 @@ export function SceneSection(props: Props) {
             >
               <GripVertical className="i" aria-hidden="true" />
             </button>
-            <button ref={more} type="button" className="scene__tool" aria-haspopup="menu" aria-expanded={menu !== null} aria-label={`Más acciones de la escena ${index + 1}, ${name}`} onClick={() => setMenu(menu ? null : more.current)}>
+            <button ref={more} type="button" className="scene__tool" aria-haspopup="menu" aria-expanded={menu !== null} aria-label={`More actions for scene ${index + 1}, ${name}`} onClick={() => setMenu(menu ? null : more.current)}>
               <Ellipsis className="i" aria-hidden="true" />
             </button>
           </span>
         )}
       </div>
 
-      <div ref={grid} className="scene__steps" role="group" aria-label={`Pasos de ${name}`} onKeyDown={move}>
+      <div ref={grid} className="scene__steps" role="group" aria-label={`Steps of ${name}`} onKeyDown={move}>
         {scene.stepIds.map((id, at) => {
           const title = state.steps[id]?.title;
           const frame = (
@@ -173,15 +173,15 @@ export function SceneSection(props: Props) {
                 <div className="step-card__rename">
                   <NameField
                     initial={title ?? ''}
-                    placeholder="Sin título"
-                    label={`Título del paso ${at + 1}`}
+                    placeholder="Untitled"
+                    label={`Title of step ${at + 1}`}
                     onSave={async (next) => { await rename(id, next); endStepRename(at); }}
                     onCancel={() => endStepRename(at)}
                     onAbandon={(message) => { endStepRename(at); props.onRenameAbandon(message); }}
                   />
                 </div>
               ) : (
-                <button type="button" className="step-card__title" tabIndex={-1} title="Cambiar el título" aria-label={`Cambiar el título del paso ${at + 1}`} onClick={() => setRenamingStep(id)}>
+                <button type="button" className="step-card__title" tabIndex={-1} title="Change the title" aria-label={`Change the title of step ${at + 1}`} onClick={() => setRenamingStep(id)}>
                   <Pencil className="i" aria-hidden="true" />
                 </button>
               )}
@@ -192,29 +192,29 @@ export function SceneSection(props: Props) {
           ref={(element) => { items.current[count] = element; }}
           type="button"
           className={`frame-add${count === 0 ? ' frame-add--empty' : ''}`}
-          aria-label={`Añadir paso a la escena ${index + 1}`}
+          aria-label={`Add step to scene ${index + 1}`}
           tabIndex={last === count ? 0 : -1}
           disabled={adding}
           onFocus={() => setActive(count)}
           onClick={() => void add()}
         >
           <span className="frame-add__icon"><Plus className="i" aria-hidden="true" /></span>
-          <span className="frame-add__text">{count === 0 ? 'Añadir el primer paso' : 'El siguiente paso'}</span>
-          <span className="frame-add__sub">Añade un paso a esta escena</span>
+          <span className="frame-add__text">{count === 0 ? 'Add the first step' : 'The next step'}</span>
+          <span className="frame-add__sub">Add a step to this scene</span>
         </button>
       </div>
 
       {menu && (
         <ActionMenu
           anchor={menu}
-          label={`Acciones de la escena ${index + 1}`}
+          label={`Actions for scene ${index + 1}`}
           onClose={() => setMenu(null)}
           actions={[
-            { label: 'Añadir paso', icon: <Plus className="i" aria-hidden="true" />, onSelect: () => void add() },
-            { label: 'Renombrar', icon: <Pencil className="i" aria-hidden="true" />, onSelect: props.onRenameStart },
-            { label: 'Mover arriba', icon: <ArrowUp className="i" aria-hidden="true" />, disabled: index === 0, onSelect: () => props.onMove(-1) },
-            { label: 'Mover abajo', icon: <ArrowDown className="i" aria-hidden="true" />, disabled: index === total - 1, onSelect: () => props.onMove(1) },
-            { label: 'Eliminar…', icon: <Trash2 className="i" aria-hidden="true" />, danger: true, onSelect: props.onDelete },
+            { label: 'Add step', icon: <Plus className="i" aria-hidden="true" />, onSelect: () => void add() },
+            { label: 'Rename', icon: <Pencil className="i" aria-hidden="true" />, onSelect: props.onRenameStart },
+            { label: 'Move up', icon: <ArrowUp className="i" aria-hidden="true" />, disabled: index === 0, onSelect: () => props.onMove(-1) },
+            { label: 'Move down', icon: <ArrowDown className="i" aria-hidden="true" />, disabled: index === total - 1, onSelect: () => props.onMove(1) },
+            { label: 'Delete…', icon: <Trash2 className="i" aria-hidden="true" />, danger: true, onSelect: props.onDelete },
           ]}
         />
       )}

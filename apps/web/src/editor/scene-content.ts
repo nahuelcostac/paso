@@ -14,7 +14,7 @@ export async function restoreSceneContent(steps: Step[]) {
 }
 
 /**
- * An invisible box around everything the scene's steps draw, the frame Presentar uses too. It is only handed to
+ * An invisible box around everything the scene's steps draw, the frame Present uses too. It is only handed to
  * Excalidraw's fit and never enters the drawing. Undefined when no step draws anything.
  */
 export async function sceneFrame(steps: Step[]): Promise<readonly ExcalidrawElement[] | undefined> {

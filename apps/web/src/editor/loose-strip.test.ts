@@ -8,7 +8,7 @@ describe('the step strip of a loose diagram', () => {
     expect(stripShown(1, 'shown')).toBe(true);
     expect(stripShown(4, 'hidden')).toBe(false);
   });
-  it('always shows with no steps, where «Añadir paso» is', () => {
+  it('always shows with no steps, where “Add step” is', () => {
     expect(stripShown(0, 'hidden')).toBe(true);
     expect(stripShown(0, undefined)).toBe(true);
   });

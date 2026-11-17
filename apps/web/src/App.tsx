@@ -22,7 +22,7 @@ import { AgentStore, HARNESS_NAMES, activeTurn, stepMarks, useAgent } from './st
 import { formatSize } from './lib/format';
 import { stepCount } from './components/LooseRow';
 
-const Lienzo = lazy(() => import('./editor/Lienzo'));
+const Canvas = lazy(() => import('./editor/Canvas'));
 
 /** Below this the canvas would not fit beside the panel. */
 const NARROW = '(max-width: 1063px)';
@@ -120,7 +120,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const { scenes: projectScenes, refresh: refreshProjectScenes } = useScenes(api, openProject?.id ?? null, openProject?.revision);
   const onlySceneId = looseOpen ? looseDiagram?.id : undefined;
   // A loose diagram just created may not be in the scene list read so far: until it is, its scenes are still loading,
-  // so the Lienzo does not mistake it for a missing scene and send the route elsewhere.
+  // so the Canvas does not mistake it for a missing scene and send the route elsewhere.
   const scenes = useMemo(() => {
     if (!onlySceneId) return projectScenes;
     const only = projectScenes?.filter((item) => item.document.id === onlySceneId);
@@ -130,7 +130,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     const listed = await refreshProjectScenes();
     return onlySceneId ? listed.filter((item) => item.document.id === onlySceneId) : listed;
   }, [refreshProjectScenes, onlySceneId]);
-  const lienzo = route.view === 'lienzo' && openProject !== undefined;
+  const onCanvas = route.view === 'canvas' && openProject !== undefined;
   const sceneId = scenes?.find((item) => item.document.id === route.sceneId)?.document.id;
   const [creatingScene, setCreatingScene] = useState(false);
   const [sceneError, setSceneError] = useState<string>();
@@ -147,18 +147,18 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     try {
       const listed = store.getState().rows.find((candidate) => candidate.id === projectId);
       const count = isOpen(projectId) ? scenes?.length ?? 0 : listed?.kind === 'ok' ? listed.scenes : 0;
-      const created = await actions.createScene(projectId, `Escena ${count + 1}`);
+      const created = await actions.createScene(projectId, `Scene ${count + 1}`);
       await scenesOf(projectId);
-      navigate({ projectId, view: 'lienzo', ...created });
-    } catch (error) { setSceneError(error instanceof Error ? error.message : 'No se pudo crear la escena.'); }
+      navigate({ projectId, view: 'canvas', ...created });
+    } catch (error) { setSceneError(error instanceof Error ? error.message : "Couldn't create the scene."); }
     finally { setCreatingScene(false); }
   };
   /** Scene changes from the scene selector. Each reads the fresh revision first and saves the open step before it. */
   const sceneFailure = (error: unknown): never => {
-    if (error instanceof UnavailableError) throw new Error('No hay conexión con el servicio local.');
-    if (error instanceof ApiRequestError && (error.status === 409 || error.status === 428)) throw new Error('La escena cambió fuera de Paso. Ya está actualizada: inténtalo de nuevo.');
-    if (error instanceof ApiRequestError && error.status === 404) throw new Error('La escena ya no existe.');
-    throw new Error('Inténtalo de nuevo.');
+    if (error instanceof UnavailableError) throw new Error('No connection to the local service.');
+    if (error instanceof ApiRequestError && (error.status === 409 || error.status === 428)) throw new Error("The scene changed outside Paso. It's up to date now: try again.");
+    if (error instanceof ApiRequestError && error.status === 404) throw new Error('The scene no longer exists.');
+    throw new Error('Try again.');
   };
   const renameScene = async (projectId: string, id: string, name: string) => {
     try { const fresh = await api.getScene(projectId, id); await api.renameScene(projectId, id, fresh.revision, name); }
@@ -191,7 +191,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     } catch (error) { await scenesOf(projectId); sceneFailure(error); }
     await scenesOf(projectId);
     // Another scene than the open one: the person stays where they are.
-    if (isOpen(projectId) && id === route.sceneId) navigate({ projectId, view: 'lienzo', ...(next ? { sceneId: next } : {}) }, { replace: true });
+    if (isOpen(projectId) && id === route.sceneId) navigate({ projectId, view: 'canvas', ...(next ? { sceneId: next } : {}) }, { replace: true });
   };
 
   // Where each diagram was left, so opening it again lands on the same step. Kept in this browser only.
@@ -202,22 +202,22 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // A loose diagram is remembered on its own, as each is a diagram of its own.
   const placeKey = (projectId: string, sceneId?: string) => isLooseProject(projectId) ? `${projectId}/${sceneId}` : projectId;
   useEffect(() => {
-    if (route.view !== 'lienzo' || !route.projectId || !route.sceneId) return;
+    if (route.view !== 'canvas' || !route.projectId || !route.sceneId) return;
     lastPlace.current[placeKey(route.projectId, route.sceneId)] = { sceneId: route.sceneId, ...(route.stepId ? { stepId: route.stepId } : {}) };
     try { window.localStorage.setItem('paso.last-place', JSON.stringify(lastPlace.current)); } catch { /* a convenience only */ }
   }, [route]);
-  const openDiagram = (id: string) => navigate({ projectId: id, view: 'lienzo', ...lastPlace.current[id] });
+  const openDiagram = (id: string) => navigate({ projectId: id, view: 'canvas', ...lastPlace.current[id] });
   const openLoose = (id: string, replace = false) => {
     const last = lastPlace.current[placeKey(LOOSE_PROJECT_ID, id)];
-    navigate({ projectId: LOOSE_PROJECT_ID, view: 'lienzo', sceneId: id, ...(last?.sceneId === id && last.stepId ? { stepId: last.stepId } : {}) }, { replace });
+    navigate({ projectId: LOOSE_PROJECT_ID, view: 'canvas', sceneId: id, ...(last?.sceneId === id && last.stepId ? { stepId: last.stepId } : {}) }, { replace });
   };
-  /** «Nuevo diagrama»: a loose diagram with one empty step, open on the board. */
+  /** “New diagram”: a loose diagram with one empty step, open on the board. */
   const createLoose = async (name: string) => {
     let created: { sceneId: string; stepId: string };
     try { created = await actions.createScene(LOOSE_PROJECT_ID, name); }
-    catch (error) { throw new ActionError(error instanceof Error ? error.message : 'Inténtalo de nuevo.'); }
+    catch (error) { throw new ActionError(error instanceof Error ? error.message : 'Try again.'); }
     await store.addedLoose();
-    navigate({ projectId: LOOSE_PROJECT_ID, view: 'lienzo', ...created });
+    navigate({ projectId: LOOSE_PROJECT_ID, view: 'canvas', ...created });
     if (window.matchMedia(NARROW).matches) setPanelOpen(false);
   };
   /** Steps of a loose diagram with work that is not on the service. Such a diagram is not moved. */
@@ -232,7 +232,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
    */
   const transferScene = async (sourceId: string, sceneId: string, targetId: string, index?: number) => {
     await steps.flushAll();
-    if (unsavedIn(sourceId, sceneId)) throw new ActionError('Tiene cambios sin guardar: resuélvelos y vuelve a intentarlo.');
+    if (unsavedIn(sourceId, sceneId)) throw new ActionError('It has unsaved changes: resolve them and try again.');
     // Where the person was before the move: once the scene leaves, the board may already have stepped away from it.
     const here = routeRef.current;
     await store.moveScene(sourceId, sceneId, targetId, index);
@@ -246,19 +246,19 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     const here = routeRef.current;
     if (isLooseProject(here.projectId) && here.sceneId === id) {
       const next = store.getState().rows.find((candidate) => candidate.kind === 'ok');
-      navigate({ projectId: next?.id ?? null, view: 'lienzo', ...(next ? lastPlace.current[next.id] : {}) }, { replace: true });
+      navigate({ projectId: next?.id ?? null, view: 'canvas', ...(next ? lastPlace.current[next.id] : {}) }, { replace: true });
     }
   };
 
-  // Local work that is not on the service: a failed save or a conflict. The step on screen has its own notice in the Lienzo.
-  const showing = lienzo && route.sceneId && route.stepId ? targetKey({ projectId: route.projectId!, sceneId: route.sceneId, stepId: route.stepId }) : undefined;
+  // Local work that is not on the service: a failed save or a conflict. The step on screen has its own notice in the Canvas.
+  const showing = onCanvas && route.sceneId && route.stepId ? targetKey({ projectId: route.projectId!, sceneId: route.sceneId, stepId: route.stepId }) : undefined;
   const failedStep = steps.unresolved().find((session) => targetKey(session.target) !== showing);
 
   // No project in the address: open the first one that can be opened.
   useEffect(() => {
     if (state.phase !== 'ready' || route.projectId) return;
     const first = state.rows.find((candidate) => candidate.kind === 'ok');
-    if (first) navigate({ projectId: first.id, view: 'lienzo', ...lastPlace.current[first.id] }, { replace: true });
+    if (first) navigate({ projectId: first.id, view: 'canvas', ...lastPlace.current[first.id] }, { replace: true });
     else if (state.loose?.diagrams[0]) openLoose(state.loose.diagrams[0].id, true);
   }, [state.phase, state.rows, state.loose, route, navigate]);
 
@@ -274,18 +274,18 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   useEffect(() => {
     const previous = lastWorkspace.current;
     lastWorkspace.current = workspaceId;
-    if (previous && workspaceId && previous !== workspaceId) { setCreating(false); navigate({ projectId: null, view: 'lienzo' }); }
+    if (previous && workspaceId && previous !== workspaceId) { setCreating(false); navigate({ projectId: null, view: 'canvas' }); }
   }, [workspaceId, navigate]);
   /** Saves the open step before another workspace replaces its project. */
   const switchWorkspace = async (open: () => Promise<void>) => { await steps.flushAll(); await open(); };
-  /** «Nuevo proyecto» is ready to draw on: it gets its first scene, with one empty step, and opens on the board. */
+  /** “New project” is ready to draw on: it gets its first scene, with one empty step, and opens on the board. */
   const diagramCreated = async (id: string) => {
     try {
-      const created = await actions.createScene(id, 'Escena 1');
-      navigate({ projectId: id, view: 'lienzo', ...created });
+      const created = await actions.createScene(id, 'Scene 1');
+      navigate({ projectId: id, view: 'canvas', ...created });
     } catch {
-      navigate({ projectId: id, view: 'lienzo' });
-      setSceneError('El diagrama se creó, pero no su primera escena. Créala con el selector de escenas.');
+      navigate({ projectId: id, view: 'canvas' });
+      setSceneError('The project was created, but not its first scene. Add one from its scene list.');
     }
   };
 
@@ -307,12 +307,12 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // Failures with no place of their own. They sit in the sidebar, or above the step strip while it is folded.
   const notices = failedStep || sceneError ? <>
     {failedStep && <div className="notice notice--error" role="alert">
-      <span>Un paso de otra escena no se pudo guardar.</span>
-      <button type="button" className="notice__action" onClick={() => navigate({ ...failedStep.target, view: 'lienzo' })}>Revisar paso sin guardar</button>
+      <span>A step in another scene couldn't be saved.</span>
+      <button type="button" className="notice__action" onClick={() => navigate({ ...failedStep.target, view: 'canvas' })}>Review unsaved step</button>
     </div>}
     {sceneError && <div className="notice notice--error" role="alert">
       <span>{sceneError}</span>
-      <button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setSceneError(undefined)}>×</button>
+      <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setSceneError(undefined)}>×</button>
     </div>}
   </> : undefined;
   // The agent folds into a narrow column on the right; on a narrow window that column stays, and the panel is a drawer.
@@ -323,7 +323,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     document.querySelector<HTMLElement>('.splitter--right .splitter__tab')?.focus();
   };
 
-  // Presentar, in the top right corner of both views, above the Lienzo | Estudio switch. Leaving it keeps the view.
+  // Present, in the top right corner of both views, above the Canvas | Studio switch. Leaving it keeps the view.
   const presentButton = row?.kind === 'ok' ? <PresentButton
     key={`${row.id}/${onlySceneId ?? ''}`} api={api} store={steps} subscribeEvents={store.subscribeEvents} projectId={row.id}
     scene={scenes?.find((item) => item.document.id === sceneId)?.document} stepId={route.stepId}
@@ -337,19 +337,19 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     >
       {/* Each side's inner edge: a tab folds and unfolds it, and a drag changes its width. Over the content, only the tab. */}
       <Splitter
-        side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Ocultar diagramas" show="Mostrar diagramas"
-        controls="projects-panel" label="Anchura de los diagramas" resize={leftNarrow ? undefined : projectsWidth}
+        side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Hide sidebar" show="Show sidebar"
+        controls="projects-panel" label="Sidebar width" resize={leftNarrow ? undefined : projectsWidth}
       />
       {openProject && overview && <Splitter
         side="right" open={agentShown} onToggle={() => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(!agentDocked)}
-        hide="Ocultar el agente" show="Mostrar el agente" controls="agent-panel" label="Anchura del chat" resize={narrow ? undefined : agentWidth}
+        hide="Hide agent" show="Show agent" controls="agent-panel" label="Chat width" resize={narrow ? undefined : agentWidth}
       />}
       {rightRail && openProject && statusShown && working && <AgentWorking
         working={{
-          sentence: `${HARNESS_NAMES[working.turn.harness]} está ${workingAt ? 'cambiando el paso' : 'trabajando'}`,
+          sentence: `${HARNESS_NAMES[working.turn.harness]} is ${workingAt ? 'changing a step' : 'working'}`,
           step: workingAt ? {
-            label: `Ir al paso ${workingAt.stepNumber} de la escena ${workingAt.sceneNumber}`, number: workingAt.stepNumber,
-            onOpen: () => navigate({ projectId: openProject.id, view: 'lienzo', sceneId: workingAt.sceneId, stepId: working.step!.stepId }),
+            label: `Go to step ${workingAt.stepNumber} of scene ${workingAt.sceneNumber}`, number: workingAt.stepNumber,
+            onOpen: () => navigate({ projectId: openProject.id, view: 'canvas', sceneId: workingAt.sceneId, stepId: working.step!.stepId }),
           } : undefined,
           onStop: () => void agentStore.stop(openProject.id),
         }}
@@ -374,7 +374,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
               diagram={projectRow.project.name} scenes={listed} currentId={open ? sceneId : undefined} busy={creatingScene}
               // In the overview a scene is selected where it is, for the chat; on the board it opens.
               onSelect={(id) => {
-                navigate({ projectId: projectRow.id, view: open ? route.view : 'lienzo', sceneId: id, stepId: listed.find((scene) => scene.id === id)?.stepIds[0] });
+                navigate({ projectId: projectRow.id, view: open ? route.view : 'canvas', sceneId: id, stepId: listed.find((scene) => scene.id === id)?.stepIds[0] });
                 if (!open && window.matchMedia(NARROW).matches) setPanelOpen(false);
               }}
               onCreate={() => void createScene(projectRow.id)}
@@ -405,13 +405,13 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           onDeleted={(id) => {
             if (id !== route.projectId) return;
             const next = store.getState().rows.find((candidate) => candidate.kind === 'ok');
-            navigate({ projectId: next?.id ?? null, view: 'lienzo', ...(next ? lastPlace.current[next.id] : {}) }, { replace: true });
+            navigate({ projectId: next?.id ?? null, view: 'canvas', ...(next ? lastPlace.current[next.id] : {}) }, { replace: true });
           }}
         />
       )}
       {row?.kind === 'ok' ? <>
-        {route.view === 'lienzo' ? <Suspense fallback={<main className="main-message" aria-label="Lienzo">Cargando…</main>}>
-          <Lienzo
+        {route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
+          <Canvas
             key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
             notices={panelOpen ? undefined : notices}
             corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen}
@@ -426,7 +426,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
             setAgentDrafts((drafts) => ({ ...drafts, [key]: typeof value === 'function' ? value(drafts[key] ?? '') : value }));
           }}
           narrow={narrow} open={agentOpen} onClose={hideAgent}
-          onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'lienzo', sceneId: id, stepId })}
+          onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'canvas', sceneId: id, stepId })}
           scenesReady={scenes !== undefined}
           onOpenScene={(id) => navigate({ projectId: row.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
         />}

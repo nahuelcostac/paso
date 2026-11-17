@@ -84,7 +84,7 @@ switch (name) {
   case 'unknown-flag': process.stderr.write("error: unknown option '--setting-sources'\n"); process.exit(1); break;
   case 'edit': {
     const promptArg = args[args.indexOf('--append-system-prompt') + 1] ?? '';
-    const match = /proyecto «([^»]+)»(?:, escena «([^»]+)»)?/.exec(promptArg);
+    const match = /(?<!reserved )project "([^"]+)"(?:, scene "([^"]+)")?/.exec(promptArg);
     const projectId = match?.[1];
     let sceneId = match?.[2];
     const baseUrl = process.env.PASO_SERVICE_URL;
@@ -110,7 +110,7 @@ switch (name) {
             headers: { ...headers, 'If-Match': `"${firstStep.revision}"` },
             body: JSON.stringify({
               ...firstStep.document,
-              title: 'Paso editado por agente',
+              title: 'Step edited by the agent',
               elements: [
                 ...firstStep.document.elements,
                 { id: 'agent-rect-1', type: 'rectangle', x: 80, y: 120, width: 180, height: 90, strokeColor: '#1e1e1e', backgroundColor: '#e3f5cf', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid', roughness: 0, opacity: 100, angle: 0, seed: 1, version: 1, versionNonce: 1, isDeleted: false, groupIds: [], frameId: null, boundElements: null, updated: 1, link: null, locked: false },
@@ -123,7 +123,7 @@ switch (name) {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            title: 'Paso creado por agente',
+            title: 'Step created by the agent',
             elements: [
               { id: 'agent-rect-2', type: 'rectangle', x: 320, y: 120, width: 180, height: 90, strokeColor: '#1e1e1e', backgroundColor: '#cce5ff', fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid', roughness: 0, opacity: 100, angle: 0, seed: 2, version: 1, versionNonce: 2, isDeleted: false, groupIds: [], frameId: null, boundElements: null, updated: 1, link: null, locked: false },
             ],
@@ -134,8 +134,8 @@ switch (name) {
         out({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't-create', content: [{ type: 'text', text: 'ok' }] }] } });
       }
     }
-    delta('He actualizado '); delta('la escena.');
-    assistant([{ type: 'text', text: 'He actualizado la escena.' }]);
+    delta('I updated '); delta('the scene.');
+    assistant([{ type: 'text', text: 'I updated the scene.' }]);
     result();
     break;
   }

@@ -12,9 +12,9 @@ import { cameraOnScreen, MIN_CAMERA_PX, reshapeCamera, screenToCamera, viewCamer
 export type KeptCamera = { camera: StepCamera; number: number } | { camera?: undefined; reason: 'first' | 'scene' };
 
 /**
- * «Encuadrar»: marks the part of the drawing Presentar zooms to on this step. It opens the drawing mode; with a camera
- * set it reads «Reencuadrar», and a cross at the end removes the camera. The button beside «Encuadrar», the same
- * corners around an arrow going back, keeps the previous step's camera instead: Presentar does not move on reaching
+ * “Frame”: marks the part of the drawing Present zooms to on this step. It opens the drawing mode; with a camera
+ * set it reads “Reframe”, and a cross at the end removes the camera. The button beside “Frame”, the same
+ * corners around an arrow going back, keeps the previous step's camera instead: Present does not move on reaching
  * this step. Each replaces the other. The first step has nothing to keep, so it has no such button, unless it keeps the previous
  * camera all the same (moved there, or set by an agent): then it shows pressed, to turn it off. While the step keeps
  * the previous camera and that shows the whole scene, a note under the island says so, as there is no box to draw.
@@ -34,29 +34,29 @@ export function CameraControl({ camera, first, kept, drawing, onDraw, onClear, o
       <div className="camera-control" data-set={own || undefined} data-kept={keeps || undefined}>
         <button
           type="button" className="camera-control__take" aria-pressed={drawing}
-          title="Marca la zona a la que se acercará la presentación en este paso: arrastra sobre el lienzo, o pulsa Intro para usar lo que ves"
+          title="Mark the area the presentation zooms to on this step: drag over the canvas, or press Enter to use what you see"
           onClick={onDraw}
         >
-          <Scan className="i" aria-hidden="true" /><span className="camera-control__label">{own ? 'Reencuadrar' : 'Encuadrar'}</span>
+          <Scan className="i" aria-hidden="true" /><span className="camera-control__label">{own ? 'Reframe' : 'Frame'}</span>
         </button>
         {(!first || keeps) && <button
-          type="button" className="camera-control__keep" aria-pressed={keeps} aria-label="Mantener el encuadre del paso anterior"
+          type="button" className="camera-control__keep" aria-pressed={keeps} aria-label="Keep previous step's framing"
           title={keeps
-            ? 'Mantiene el encuadre del paso anterior. Pulsa para dejar de mantenerlo: el paso vuelve a mostrar toda la escena'
-            : `Mantener el encuadre del paso anterior: Presentar no se mueve al llegar a este paso${own ? '. Sustituye el encuadre propio' : ''}`}
+            ? "Keeps the previous step's framing. Press to stop keeping it: the step shows the whole scene again"
+            : `Keep previous step's framing: Present doesn't move on reaching this step${own ? ". Replaces this step's own framing" : ''}`}
           onClick={() => onKeep(!keeps)}
         >
           <KeepCameraIcon />
         </button>}
         {own && (
-          <button type="button" className="camera-control__clear" aria-label="Quitar encuadre" title="Quitar encuadre: el paso vuelve a mostrar toda la escena" onClick={onClear}>
+          <button type="button" className="camera-control__clear" aria-label="Remove framing" title="Remove framing: the step shows the whole scene again" onClick={onClear}>
             <X className="i" aria-hidden="true" />
           </button>
         )}
       </div>
       {keeps && kept && !kept.camera && (
         <p className="camera-control__note" role="status">
-          {kept.reason === 'first' ? 'Es el primer paso: no hay encuadre que mantener y se verá toda la escena.' : 'El paso anterior muestra toda la escena, y este también.'}
+          {kept.reason === 'first' ? "This is the first step: there's no framing to keep, so the whole scene shows." : 'The previous step shows the whole scene, and so does this one.'}
         </p>
       )}
     </>
@@ -73,8 +73,8 @@ export function KeptCameraOverlay({ camera, number, view, onOpen }: { camera: St
   const box = cameraOnScreen(camera, now);
   return (
     <div className="camera-overlay camera-overlay--kept" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
-      <button type="button" className="camera-overlay__tag camera-overlay__tag--kept" title={`Este paso mantiene el encuadre del paso ${pad(number)}. Pulsa para ir a ese paso y cambiarlo`} onClick={onOpen}>
-        <KeepCameraIcon />Encuadre del paso {pad(number)}
+      <button type="button" className="camera-overlay__tag camera-overlay__tag--kept" title={`This step keeps the framing of step ${pad(number)}. Press to go to that step and change it`} onClick={onOpen}>
+        <KeepCameraIcon />Framing of step {pad(number)}
       </button>
     </div>
   );
@@ -104,7 +104,7 @@ export function CameraDraw({ view, onDone, onCancel }: { view: ViewStore; onDone
   const box = start && end ? { left: Math.min(start.x, end.x), top: Math.min(start.y, end.y), width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) } : undefined;
   return (
     <div
-      ref={layer} className="camera-draw" tabIndex={-1} role="application" aria-label="Marcar el encuadre de la presentación"
+      ref={layer} className="camera-draw" tabIndex={-1} role="application" aria-label="Mark the presentation framing"
       onKeyDown={(event) => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onCancel(); }
         else if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); current(); }
@@ -123,7 +123,7 @@ export function CameraDraw({ view, onDone, onCancel }: { view: ViewStore; onDone
         onDone(screenToCamera({ ...drawn, width: Math.max(MIN_CAMERA_PX, drawn.width), height: Math.max(MIN_CAMERA_PX, drawn.height) }, now));
       }}
     >
-      <p className="camera-draw__hint">Arrastra para marcar lo que mostrará la presentación · Intro: usar lo que ves · Esc: cancelar</p>
+      <p className="camera-draw__hint">Drag to mark what the presentation shows · Enter: use what you see · Esc: cancel</p>
       {box && <div className="camera-draw__box" style={box} />}
     </div>
   );
@@ -131,8 +131,8 @@ export function CameraDraw({ view, onDone, onCancel }: { view: ViewStore; onDone
 
 const HANDLES: Array<Exclude<CameraHandle, 'move'>> = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const HANDLE_NAMES: Record<Exclude<CameraHandle, 'move'>, string> = {
-  nw: 'esquina superior izquierda', n: 'lado superior', ne: 'esquina superior derecha', e: 'lado derecho',
-  se: 'esquina inferior derecha', s: 'lado inferior', sw: 'esquina inferior izquierda', w: 'lado izquierdo',
+  nw: 'top left corner', n: 'top edge', ne: 'top right corner', e: 'right edge',
+  se: 'bottom right corner', s: 'bottom edge', sw: 'bottom left corner', w: 'left edge',
 };
 
 /**
@@ -167,9 +167,9 @@ export function CameraOverlay({ camera, view, onChange }: { camera: StepCamera; 
   });
   return (
     <div className="camera-overlay" data-dragging={draft ? true : undefined} style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
-      <span className="camera-overlay__tag" title="Arrastra para mover el encuadre" {...grab('move')}><Scan className="i" aria-hidden="true" />Encuadre de la presentación</span>
+      <span className="camera-overlay__tag" title="Drag to move the framing" {...grab('move')}><Scan className="i" aria-hidden="true" />Presentation framing</span>
       {(['n', 's', 'e', 'w'] as const).map((side) => <span key={side} className={`camera-overlay__edge camera-overlay__edge--${side}`} aria-hidden="true" {...grab('move')} />)}
-      {HANDLES.map((handle) => <span key={handle} className={`camera-overlay__handle camera-overlay__handle--${handle}`} title={`Redimensionar: ${HANDLE_NAMES[handle]}`} aria-hidden="true" {...grab(handle)} />)}
+      {HANDLES.map((handle) => <span key={handle} className={`camera-overlay__handle camera-overlay__handle--${handle}`} title={`Resize: ${HANDLE_NAMES[handle]}`} aria-hidden="true" {...grab(handle)} />)}
     </div>
   );
 }

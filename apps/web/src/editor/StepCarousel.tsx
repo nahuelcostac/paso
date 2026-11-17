@@ -27,7 +27,7 @@ type Props = {
   hideRef?: Ref<HTMLButtonElement>;
 };
 
-const HINT = 'Flechas: cambiar de paso. Alt y flechas: mover el paso. Supr: eliminar el paso.';
+const HINT = 'Arrow keys: change step. Alt and arrow keys: move the step. Delete: delete the step.';
 
 /**
  * The strip of steps under the canvas. It is not inside the Excalidraw container and never overlaps it.
@@ -75,7 +75,7 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
     if (arrow && event.altKey) {
       event.preventDefault();
       refocus.current = id;
-      void onNudge(id, arrow).then((result) => { if (result) setAnnouncement(`Paso movido a la posición ${result.index + 1} de ${result.count}.`); }).catch(() => {})
+      void onNudge(id, arrow).then((result) => { if (result) setAnnouncement(`Step moved to position ${result.index + 1} of ${result.count}.`); }).catch(() => {})
         // The effect above refocuses once the new order is drawn. At either end nothing moves, so this clears the request.
         .finally(() => setTimeout(() => { if (refocus.current === id) { frames.current.get(id)?.focus(); refocus.current = undefined; } }, 250));
       return;
@@ -104,20 +104,20 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
     reset();
     if (to === from) return;
     refocus.current = undefined;
-    void onMove(moved, to).then(() => setAnnouncement(`Paso movido a la posición ${to + 1} de ${stepIds.length}.`)).catch(() => {});
+    void onMove(moved, to).then(() => setAnnouncement(`Step moved to position ${to + 1} of ${stepIds.length}.`)).catch(() => {});
   };
 
   const confirmDelete = async () => {
     if (!confirming) return;
     setDeleteBusy(true); setDeleteError(undefined);
-    try { await onDelete(confirming); setAnnouncement('Paso eliminado.'); setConfirming(undefined); }
-    catch (error) { setDeleteError(error instanceof Error ? error.message : 'No se pudo eliminar el paso.'); }
+    try { await onDelete(confirming); setAnnouncement('Step deleted.'); setConfirming(undefined); }
+    catch (error) { setDeleteError(error instanceof Error ? error.message : "Couldn't delete the step."); }
     finally { setDeleteBusy(false); }
   };
   const confirmingAt = confirming ? stepIds.indexOf(confirming) : -1;
   const currentAt = currentId ? stepIds.indexOf(currentId) : -1;
 
-  return <footer className="carousel" aria-label="Pasos de la escena">
+  return <footer className="carousel" aria-label="Steps of the scene">
     <span id="carousel-hint" className="visually-hidden">{HINT}</span>
     <div className="visually-hidden" role="status" aria-live="polite">{announcement}</div>
     <div className="carousel__frames" ref={scroller}>
@@ -136,15 +136,15 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
             onClick={() => onSelect(id)} onKeyDown={(event) => onKeyDown(event, id, index)}
           />
           <div className="carousel__item-actions">
-            <button type="button" className="carousel__duplicate" disabled={busy} aria-label={`Duplicar el paso ${index + 1}`} title="Duplicar paso"
+            <button type="button" className="carousel__duplicate" disabled={busy} aria-label={`Duplicate step ${index + 1}`} title="Duplicate step"
               onClick={() => onDuplicate(id)}><Copy className="i" aria-hidden="true" /></button>
-            <button type="button" className="carousel__delete" disabled={busy} tabIndex={-1} aria-label={`Eliminar el paso ${index + 1}`} title="Eliminar paso"
+            <button type="button" className="carousel__delete" disabled={busy} tabIndex={-1} aria-label={`Delete step ${index + 1}`} title="Delete step"
               onClick={() => { setDeleteError(undefined); setConfirming(id); }}><Trash2 className="i" aria-hidden="true" /></button>
           </div>
         </div>
       ))}
-      {stepIds.length === 0 && <p className="carousel__empty">Sin pasos</p>}
-      <button type="button" className="carousel__add" disabled={busy} onClick={onAdd} aria-label="Añadir paso" title="Añadir un paso al final, a partir del último dibujo">
+      {stepIds.length === 0 && <p className="carousel__empty">No steps</p>}
+      <button type="button" className="carousel__add" disabled={busy} onClick={onAdd} aria-label="Add step" title="Add a step at the end, starting from the last drawing">
         <Plus className="i" aria-hidden="true" />
       </button>
     </div>
@@ -152,15 +152,15 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
     {stepIds.length > 0 && <p className="carousel__pager" aria-hidden="true">
       <span className="carousel__pager-now">{currentAt >= 0 ? pad(currentAt + 1) : '–'}</span> / {pad(stepIds.length)}
     </p>}
-    {onHide && <button type="button" ref={hideRef} className="carousel__hide" aria-label="Ocultar pasos" title="Ocultar pasos" onClick={onHide}>
+    {onHide && <button type="button" ref={hideRef} className="carousel__hide" aria-label="Hide steps" title="Hide steps" onClick={onHide}>
       <PanelBottomClose className="i" aria-hidden="true" />
     </button>}
-    {confirming && <Dialog title={`¿Eliminar el paso ${confirmingAt + 1}?`} onClose={() => { if (!deleteBusy) setConfirming(undefined); }}>
-      <p className="dialog__text">Se borra su dibujo y no se puede deshacer.{stepIds.length === 1 ? ' Es el último paso de la escena: quedará vacía.' : ''}</p>
+    {confirming && <Dialog title={`Delete step ${confirmingAt + 1}?`} onClose={() => { if (!deleteBusy) setConfirming(undefined); }}>
+      <p className="dialog__text">Its drawing is deleted, and this can't be undone.{stepIds.length === 1 ? " It's the scene's last step: the scene will be empty." : ''}</p>
       {deleteError && <p className="dialog__error" role="alert">{deleteError}</p>}
       <div className="dialog__actions">
-        <button type="button" className="btn" data-autofocus disabled={deleteBusy} onClick={() => setConfirming(undefined)}>Cancelar</button>
-        <button type="button" className="btn btn--danger" disabled={deleteBusy} onClick={() => void confirmDelete()}>Eliminar paso</button>
+        <button type="button" className="btn" data-autofocus disabled={deleteBusy} onClick={() => setConfirming(undefined)}>Cancel</button>
+        <button type="button" className="btn btn--danger" disabled={deleteBusy} onClick={() => void confirmDelete()}>Delete step</button>
       </div>
     </Dialog>}
   </footer>;

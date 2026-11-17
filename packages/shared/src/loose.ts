@@ -6,6 +6,6 @@ export const LOOSE_PROJECT_ID = '_loose';
 /** The reserved project's folder inside the workspace. A leading dot hides it in Finder and in `ls`. */
 export const LOOSE_PROJECT_FOLDER = '.loose';
 /** The reserved project's `name`, for anyone reading `project.json`. The app never shows it. */
-export const LOOSE_PROJECT_NAME = 'Diagramas sueltos';
+export const LOOSE_PROJECT_NAME = 'Loose diagrams';
 
 export const isLooseProject = (id: string | null | undefined) => id === LOOSE_PROJECT_ID;

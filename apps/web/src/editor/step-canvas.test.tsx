@@ -55,10 +55,10 @@ vi.mock('@excalidraw/excalidraw', async () => {
     useEffect(() => { if (!live.appState.isLoading) onChange(live.elements, live.appState, live.files); });
     return <div className="excalidraw-container" tabIndex={0} data-testid="excalidraw">
       <span data-testid="drawn">{live.elements.map((item) => item.id).join(',')}</span>
-      <button type="button" onClick={() => { live.undo.push(live.elements); live.elements = [...live.elements, element(`drawn-${live.elements.length}`)]; update(); }}>Dibujar</button>
+      <button type="button" onClick={() => { live.undo.push(live.elements); live.elements = [...live.elements, element(`drawn-${live.elements.length}`)]; update(); }}>Draw</button>
       {/* An edit Excalidraw has made but not reported yet. */}
-      <button type="button" onClick={() => { live.elements = [...live.elements, element(`quiet-${live.elements.length}`)]; }}>Dibujar sin avisar</button>
-      <button type="button" onClick={() => { const before = live.undo.pop(); if (before) { live.elements = before as Scene['elements']; update(); } }}>Deshacer</button>
+      <button type="button" onClick={() => { live.elements = [...live.elements, element(`quiet-${live.elements.length}`)]; }}>Draw without reporting</button>
+      <button type="button" onClick={() => { const before = live.undo.pop(); if (before) { live.elements = before as Scene['elements']; update(); } }}>Undo</button>
     </div>;
   }
   const Pass = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
@@ -84,7 +84,7 @@ let store: StepStore;
 const camera: { current: CanvasCamera | undefined } = { current: undefined };
 const api = { listSteps: async () => [...documents.values()], asset: async () => new Response('') } as unknown as ApiClient;
 
-function Lienzo() {
+function Canvas() {
   useSyncExternalStore(store.subscribe, store.getSnapshot);
   return <div style={{ width: 1000, height: 700 }}><StepCanvas api={api} store={store} session={store.current()} theme="light" keepFocus={() => false} camera={camera} /></div>;
 }
@@ -93,7 +93,7 @@ function watch() {
   const seen: string[] = [];
   const note = () => {
     const canvas = document.querySelector('.step-canvas');
-    seen.push(document.body.textContent?.includes('Cargando') ? 'loading' : canvas ? `step ${canvas.getAttribute('data-step-id')}` : 'empty');
+    seen.push(document.body.textContent?.includes('Loading') ? 'loading' : canvas ? `step ${canvas.getAttribute('data-step-id')}` : 'empty');
   };
   const observer = new MutationObserver(note);
   observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
@@ -122,9 +122,9 @@ beforeEach(async () => {
 });
 afterEach(() => { cleanup(); store.stopTimers(); });
 
-describe('moving between steps on the Lienzo', () => {
+describe('moving between steps on the Canvas', () => {
   it('swaps the drawing in one Excalidraw, never showing the loading message, through a scene of ten steps', async () => {
-    render(<Lienzo />);
+    render(<Canvas />);
     await waitFor(() => expect(drawn()).toBe('s1-shape'));
     const watching = watch();
     for (const id of [...ids.slice(1), ...ids.slice(0, -1).reverse()]) {
@@ -139,7 +139,7 @@ describe('moving between steps on the Lienzo', () => {
   });
 
   it('keeps the step on screen until the next one is ready, then shows it at once', async () => {
-    render(<Lienzo />);
+    render(<Canvas />);
     await waitFor(() => expect(drawn()).toBe('s1-shape'));
     let ready!: () => void;
     fake.fonts = new Promise((resolve) => { ready = resolve; });
@@ -147,16 +147,16 @@ describe('moving between steps on the Lienzo', () => {
     // Well past the loading delay: still the first step, and no message.
     await act(() => new Promise((resolve) => setTimeout(resolve, LOADING_DELAY_MS + 100)));
     expect(drawn()).toBe('s1-shape');
-    expect(screen.queryByText('Cargando dibujo…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading drawing…')).not.toBeInTheDocument();
     await act(async () => { ready(); });
     await waitFor(() => expect(drawn()).toBe('s2-shape'));
   });
 
   it('saves the edits made on the step being left, even one Excalidraw has not reported yet', async () => {
-    render(<Lienzo />);
+    render(<Canvas />);
     await waitFor(() => expect(drawn()).toBe('s1-shape'));
-    fireEvent.click(screen.getByRole('button', { name: 'Dibujar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Dibujar sin avisar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Draw' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Draw without reporting' }));
     await go('s2');
     await waitFor(() => expect(drawn()).toBe('s2-shape'));
     await act(() => store.flushAll());
@@ -166,25 +166,25 @@ describe('moving between steps on the Lienzo', () => {
   });
 
   it('never undoes into another step', async () => {
-    render(<Lienzo />);
+    render(<Canvas />);
     await waitFor(() => expect(drawn()).toBe('s1-shape'));
-    fireEvent.click(screen.getByRole('button', { name: 'Dibujar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Draw' }));
     await go('s2');
     await waitFor(() => expect(drawn()).toBe('s2-shape'));
-    fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(drawn()).toBe('s2-shape');
     await act(() => store.flushAll());
     expect(documents.get('s2')!.document.elements.map((item) => item.id)).toEqual(['s2-shape']);
     expect(documents.get('s1')!.document.elements.map((item) => item.id)).toEqual(['s1-shape', 'drawn-1']);
     // Undo still works within the step: what was drawn here goes.
-    fireEvent.click(screen.getByRole('button', { name: 'Dibujar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Draw' }));
     expect(drawn()).toBe('s2-shape,drawn-1');
-    fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(drawn()).toBe('s2-shape');
   });
 
   it('still shows an agent\'s changes live after a switch, in the same canvas', async () => {
-    render(<Lienzo />);
+    render(<Canvas />);
     await waitFor(() => expect(drawn()).toBe('s1-shape'));
     await go('s2');
     await waitFor(() => expect(drawn()).toBe('s2-shape'));
@@ -197,7 +197,7 @@ describe('moving between steps on the Lienzo', () => {
     expect(watching.seen).not.toContain('loading');
     expect(fake.mounts).toBe(1);
     // The reloaded step is the one edits go to.
-    fireEvent.click(screen.getByRole('button', { name: 'Dibujar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Draw' }));
     await act(() => store.flushAll());
     expect(documents.get('s2')!.document.elements.map((item) => item.id)).toEqual(['s2-shape', 'agent', 'drawn-2']);
   });
@@ -205,9 +205,9 @@ describe('moving between steps on the Lienzo', () => {
   it('mentions loading a diagram only once it takes long enough to notice', async () => {
     let ready!: () => void;
     fake.fonts = new Promise((resolve) => { ready = resolve; });
-    render(<Lienzo />);
-    expect(screen.queryByText('Cargando dibujo…')).not.toBeInTheDocument();
-    expect(await screen.findByText('Cargando dibujo…', {}, { timeout: LOADING_DELAY_MS * 3 })).toBeInTheDocument();
+    render(<Canvas />);
+    expect(screen.queryByText('Loading drawing…')).not.toBeInTheDocument();
+    expect(await screen.findByText('Loading drawing…', {}, { timeout: LOADING_DELAY_MS * 3 })).toBeInTheDocument();
     await act(async () => { ready(); });
     await waitFor(() => expect(drawn()).toBe('s1-shape'));
   });

@@ -52,27 +52,27 @@ function locateStep(scenes: Scene[], stepId: string | undefined) {
 }
 
 const TOOL_WORDS: Record<string, [running: string, done: string]> = {
-  list_projects: ['Leyendo los diagramas', 'Leyó los diagramas'],
-  read_project: ['Leyendo el diagrama', 'Leyó el diagrama'],
-  read_scene: ['Leyendo la escena', 'Leyó la escena'],
-  read_step: ['Leyendo el paso', 'Leyó el paso'],
-  get_step_image: ['Mirando el paso', 'Miró el paso'],
-  create_scene: ['Creando una escena', 'Creó una escena'],
-  create_step: ['Creando el paso', 'Creó el paso'],
-  duplicate_step: ['Duplicando un paso', 'Duplicó un paso en'],
-  update_step: ['Cambiando los detalles del paso', 'Cambió los detalles del paso'],
-  delete_step: ['Borrando el paso', 'Borró el paso'],
-  add_elements: ['Cambiando el paso', 'Cambió el paso'],
-  update_elements: ['Cambiando el paso', 'Cambió el paso'],
-  delete_elements: ['Cambiando el paso', 'Cambió el paso'],
+  list_projects: ['Reading the projects', 'Read the projects'],
+  read_project: ['Reading the project', 'Read the project'],
+  read_scene: ['Reading the scene', 'Read the scene'],
+  read_step: ['Reading the step', 'Read the step'],
+  get_step_image: ['Looking at the step', 'Looked at the step'],
+  create_scene: ['Creating a scene', 'Created a scene'],
+  create_step: ['Creating the step', 'Created the step'],
+  duplicate_step: ['Duplicating a step', 'Duplicated a step'],
+  update_step: ["Changing the step's details", "Changed the step's details"],
+  delete_step: ['Deleting the step', 'Deleted the step'],
+  add_elements: ['Changing the step', 'Changed the step'],
+  update_elements: ['Changing the step', 'Changed the step'],
+  delete_elements: ['Changing the step', 'Changed the step'],
 };
 
 function toolLabel(item: ToolItem, scenes: Scene[]) {
-  const [running, done] = TOOL_WORDS[item.tool] ?? ['Usando una herramienta', 'Usó una herramienta'];
+  const [running, done] = TOOL_WORDS[item.tool] ?? ['Using a tool', 'Used a tool'];
   const label = item.status === 'running' ? running : done;
   if (item.tool === 'read_scene' && item.sceneId) {
     const at = scenes.findIndex((scene) => scene.id === item.sceneId);
-    if (at >= 0) return `${label} ${at + 1}`;
+    if (at >= 0) return `${item.status === 'running' ? 'Reading' : 'Read'} scene ${at + 1}`;
   }
   return label;
 }
@@ -98,33 +98,33 @@ function Elapsed({ since }: { since: number }) {
   return <>{Math.max(0, Math.floor((now - since) / 1000))} s</>;
 }
 
-/** The service's undo warnings, in Spanish and in the board's terms. Codes it may add later still get a plain sentence. */
+/** The service's undo warnings, in plain words and in the board's terms. Codes it may add later still get a plain sentence. */
 export function warningText(warning: UndoWarning, scenes: Scene[]) {
   const where = locateStep(scenes, warning.id);
-  const step = where ? `el paso ${where.stepNumber} de «${where.scene.name}»` : warning.title ? `el paso «${warning.title}»` : 'un paso';
+  const step = where ? `step ${where.stepNumber} of “${where.scene.name}”` : warning.title ? `the step “${warning.title}”` : 'a step';
   const Step = step[0].toUpperCase() + step.slice(1);
   const sceneName = scenes.find((scene) => scene.id === (warning.kind === 'scene' ? warning.id : warning.sceneId))?.name;
   switch (warning.code) {
-    case 'STEP_MODIFIED_CONCURRENTLY': return `Alguien editó ${step} mientras el agente trabajaba. Al deshacer también se pierden esas ediciones.`;
-    case 'STEP_MODIFIED_AFTER_RUN': return `${Step} se editó después de la ejecución. Al deshacer se pierden esas ediciones.`;
-    case 'STEP_DELETED': return `${Step} se borró después de la ejecución. Al deshacer vuelve a aparecer como estaba antes.`;
-    case 'SCENE_DELETED': return 'Se borró una escena con un paso que cambió el agente. Ese paso no se puede recuperar.';
-    case 'SCENE_HAS_POST_RUN_STEPS': return `${sceneName ? `La escena «${sceneName}»` : 'Una escena'} que creó el agente tiene pasos nuevos de otra persona. Se conserva, con esos pasos.`;
+    case 'STEP_MODIFIED_CONCURRENTLY': return `Someone edited ${step} while the agent was working. Undoing also loses those edits.`;
+    case 'STEP_MODIFIED_AFTER_RUN': return `${Step} was edited after the run. Undoing loses those edits.`;
+    case 'STEP_DELETED': return `${Step} was deleted after the run. Undoing brings it back as it was before.`;
+    case 'SCENE_DELETED': return "A scene with a step the agent changed was deleted. That step can't be recovered.";
+    case 'SCENE_HAS_POST_RUN_STEPS': return `${sceneName ? `The scene “${sceneName}”` : 'A scene'} the agent created has new steps from someone else. It is kept, with those steps.`;
     case 'ORDER_MODIFIED_AFTER_RUN': return warning.kind === 'project'
-      ? 'El orden de las escenas cambió después de la ejecución. Se recupera el anterior, con las escenas nuevas en su sitio.'
-      : `El orden de los pasos${sceneName ? ` de «${sceneName}»` : ''} cambió después de la ejecución. Se recupera el anterior, con los pasos nuevos en su sitio.`;
-    default: return 'Algo cambió después de la ejecución y deshacerla puede afectarlo.';
+      ? 'The order of the scenes changed after the run. The previous order comes back, with the new scenes in place.'
+      : `The order of the steps${sceneName ? ` of “${sceneName}”` : ''} changed after the run. The previous order comes back, with the new steps in place.`;
+    default: return 'Something changed after the run, and undoing it may affect that.';
   }
 }
 
 function planLines(plan: UndoPlan) {
   const { stepsToRestore, stepsToDelete, stepsToRecreate, scenesToDelete, orderChanges } = plan.changes;
   const lines: string[] = [];
-  if (stepsToRestore.length) lines.push(stepsToRestore.length === 1 ? 'Un paso recupera su contenido, título y notas anteriores.' : `${stepsToRestore.length} pasos recuperan su contenido, título y notas anteriores.`);
-  if (stepsToDelete.length) lines.push(stepsToDelete.length === 1 ? 'Se borra un paso que creó el agente.' : `Se borran ${stepsToDelete.length} pasos que creó el agente.`);
-  if (scenesToDelete.length) lines.push(scenesToDelete.length === 1 ? 'Se borra una escena que creó el agente.' : `Se borran ${scenesToDelete.length} escenas que creó el agente.`);
-  if (stepsToRecreate.length) lines.push(stepsToRecreate.length === 1 ? 'Vuelve un paso borrado, con su contenido y en su posición anterior.' : `Vuelven ${stepsToRecreate.length} pasos borrados, con su contenido y en su posición anterior.`);
-  if (!lines.length && orderChanges.length) lines.push('Se recupera el orden de antes.');
+  if (stepsToRestore.length) lines.push(stepsToRestore.length === 1 ? 'One step gets back its previous content, title and notes.' : `${stepsToRestore.length} steps get back their previous content, title and notes.`);
+  if (stepsToDelete.length) lines.push(stepsToDelete.length === 1 ? 'A step the agent created is deleted.' : `${stepsToDelete.length} steps the agent created are deleted.`);
+  if (scenesToDelete.length) lines.push(scenesToDelete.length === 1 ? 'A scene the agent created is deleted.' : `${scenesToDelete.length} scenes the agent created are deleted.`);
+  if (stepsToRecreate.length) lines.push(stepsToRecreate.length === 1 ? 'A deleted step comes back, with its content and in its previous place.' : `${stepsToRecreate.length} deleted steps come back, with their content and in their previous places.`);
+  if (!lines.length && orderChanges.length) lines.push('The previous order comes back.');
   return lines;
 }
 
@@ -140,12 +140,12 @@ function UndoDialog({ state, scenes, onCancel, onConfirm }: {
   if (decidedFor !== plan.confirmationToken) { setDecidedFor(plan.confirmationToken); setUnderstood(false); }
   const lines = planLines(plan);
   return (
-    <Dialog title="¿Deshacer esta ejecución?" onClose={() => { if (!busy) onCancel(); }}>
+    <Dialog title="Undo this run?" onClose={() => { if (!busy) onCancel(); }}>
       <ul className="dialog__list undo__changes">
-        {lines.length ? lines.map((line) => <li key={line}>{line}</li>) : <li>No queda nada que deshacer.</li>}
+        {lines.length ? lines.map((line) => <li key={line}>{line}</li>) : <li>Nothing is left to undo.</li>}
       </ul>
       {plan.warnings.length > 0 && (
-        <ul className="undo__warnings" aria-label="Avisos">
+        <ul className="undo__warnings" aria-label="Warnings">
           {plan.warnings.map((warning, index) => (
             <li key={`${warning.code}-${warning.id}-${index}`}><TriangleAlert className="i" aria-hidden="true" /><span>{warningText(warning, scenes)}</span></li>
           ))}
@@ -154,17 +154,17 @@ function UndoDialog({ state, scenes, onCancel, onConfirm }: {
       {plan.requiresForce && (
         <label className="undo__confirm">
           <input type="checkbox" checked={understood} onChange={(event) => setUnderstood(event.target.checked)} />
-          <span>Entiendo que se perderán ediciones hechas por personas.</span>
+          <span>I understand that edits made by people will be lost.</span>
         </label>
       )}
       {error && <p className="dialog__error" role="alert">{error}</p>}
       <div className="dialog__actions">
-        <button type="button" className="btn btn--soft" data-autofocus disabled={busy} onClick={onCancel}>Cancelar</button>
+        <button type="button" className="btn btn--soft" data-autofocus disabled={busy} onClick={onCancel}>Cancel</button>
         <button
           type="button" className={plan.requiresForce ? 'btn btn--danger' : 'btn btn--soft'}
           disabled={busy || !plan.canUndo || (plan.requiresForce && !understood)} onClick={() => onConfirm(plan.requiresForce)}
         >
-          {plan.requiresForce ? 'Deshacer y perder las ediciones' : 'Deshacer ejecución'}
+          {plan.requiresForce ? 'Undo and lose the edits' : 'Undo run'}
         </button>
       </div>
     </Dialog>
@@ -232,7 +232,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   const add = async (id: HarnessId) => {
     setAdding(true); setAddError(undefined);
     try { await store.addHarness(id); }
-    catch (error) { setAddError(error instanceof ApiRequestError ? error.message : 'No se pudo añadir el asistente.'); }
+    catch (error) { setAddError(error instanceof ApiRequestError ? error.message : "Couldn't add the agent."); }
     finally { setAdding(false); }
   };
 
@@ -253,7 +253,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
         // The project changed after the preview: show what undoing does now, and ask again.
         try {
           const fresh = await store.previewUndo(projectId, runId);
-          setUndo({ runId, plan: fresh, busy: false, error: 'El diagrama cambió mientras mirabas el resumen. Revísalo de nuevo.' });
+          setUndo({ runId, plan: fresh, busy: false, error: 'The project changed while you were reading the summary. Review it again.' });
         } catch (again) { setUndo({ runId, plan, busy: false, error: undoErrorMessage(again) }); }
       } else {
         setUndo({ runId, plan, busy: false, error: undoErrorMessage(error) });
@@ -263,17 +263,17 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
 
   const undoButton = (runId: string) => (
     <button type="button" className="btn btn--bare" disabled={undo?.runId === runId && undo.busy} onClick={() => void startUndo(runId)}>
-      <Undo2 className="i" aria-hidden="true" />Deshacer ejecución
+      <Undo2 className="i" aria-hidden="true" />Undo run
     </button>
   );
 
   const runMeta = (turn: AgentTurn, run: RunSummary | undefined) => {
     const changes = run ? countRunChanges(run) : turn.entries.reduce((total, entry) => total + (entry.kind === 'work' ? entry.items.filter((item) => !item.readOnly && item.status === 'done').length : 0), 0);
     const parts = [
-      turn.status === 'cancelled' ? 'Detenida' : turn.status === 'failed' ? 'Falló' : undefined,
+      turn.status === 'cancelled' ? 'Stopped' : turn.status === 'failed' ? 'Failed' : undefined,
       clock(run?.finishedAt ?? turn.endedAt),
       // A run without changes is undone silently on the way to an older one: it still changed nothing.
-      changes === 0 ? 'Sin cambios' : run?.status === 'undone' ? 'Deshecha' : plural(changes, 'cambio', 'cambios'),
+      changes === 0 ? 'No changes' : run?.status === 'undone' ? 'Undone' : plural(changes, 'change', 'changes'),
     ].filter(Boolean);
     return parts.join(' · ');
   };
@@ -281,49 +281,49 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
 
   let harnessNotice: { text: string; action?: { label: string; run: () => void } } | undefined;
   if (state.harnesses.status === 'failed') {
-    harnessNotice = { text: 'No se pudo comprobar qué asistentes hay en este equipo.', action: { label: 'Comprobar de nuevo', run: () => void store.loadHarnesses(true) } };
+    harnessNotice = { text: "Couldn't check which agents are on this computer.", action: { label: 'Check again', run: () => void store.loadHarnesses(true) } };
   } else if (info && !info.found) {
-    harnessNotice = { text: `No se encuentra ${HARNESS_NAMES[harness]} en este equipo. Instálalo y vuelve a comprobarlo.`, action: { label: 'Comprobar de nuevo', run: () => void store.loadHarnesses(true) } };
+    harnessNotice = { text: `${HARNESS_NAMES[harness]} isn't on this computer. Install it and check again.`, action: { label: 'Check again', run: () => void store.loadHarnesses(true) } };
   } else if (info && info.session === 'signed_out') {
-    harnessNotice = { text: `${HARNESS_NAMES[harness]} no tiene la sesión iniciada. Inicia sesión en un terminal y vuelve a comprobarlo.`, action: { label: 'Comprobar de nuevo', run: () => void store.loadHarnesses(true) } };
+    harnessNotice = { text: `${HARNESS_NAMES[harness]} isn't signed in. Sign in from a terminal and check again.`, action: { label: 'Check again', run: () => void store.loadHarnesses(true) } };
   } else if (info && !info.added) {
     harnessNotice = {
-      text: `Paso usará ${HARNESS_NAMES[harness]} con tu propia sesión y tu cuota. Solo tendrá las herramientas del tablero: no puede usar el terminal ni ver tus archivos.`,
-      action: { label: adding ? 'Añadiendo…' : `Añadir ${HARNESS_NAMES[harness]}`, run: () => void add(harness) },
+      text: `Paso will use ${HARNESS_NAMES[harness]} with your own session and quota. It only gets the board tools: it can't use the terminal or see your files.`,
+      action: { label: adding ? 'Adding…' : `Add ${HARNESS_NAMES[harness]}`, run: () => void add(harness) },
     };
   }
 
   return (
     <aside
-      id="agent-panel" className="agent" aria-label="Agente" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
+      id="agent-panel" className="agent" aria-label="Agent" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
     >
       <div className="agent__head">
         {/* What the agent works on: the scene selected in the sidebar. There is nothing to pick here. */}
-        <h2 className="agent__target" title={`${projectName} · ${targetScene ? targetScene.name : 'Todo el diagrama'}`}>
+        <h2 className="agent__target" title={`${projectName} · ${targetScene ? targetScene.name : 'The whole project'}`}>
           {targetScene && <span className="agent__scene-num">{pad(targetIndex + 1)}</span>}
-          <span className="agent__title">{targetScene ? targetScene.name : 'Todo el diagrama'}</span>
+          <span className="agent__title">{targetScene ? targetScene.name : 'The whole project'}</span>
         </h2>
         <button
-          type="button" className="icon-btn" aria-label="Historial de conversaciones" title="Historial de conversaciones"
+          type="button" className="icon-btn" aria-label="Conversation history" title="Conversation history"
           aria-haspopup="dialog" aria-expanded={menu?.kind === 'history'}
           onClick={(event) => setMenu(menu?.kind === 'history' ? null : { kind: 'history', anchor: event.currentTarget })}
         >
           <History className="i" aria-hidden="true" />
         </button>
-        <button type="button" className="icon-btn" aria-label="Nueva conversación" title="Nueva conversación" disabled={!sessionId} onClick={() => store.newConversation(projectId, targetSceneId)}>
+        <button type="button" className="icon-btn" aria-label="New conversation" title="New conversation" disabled={!sessionId} onClick={() => store.newConversation(projectId, targetSceneId)}>
           <SquarePen className="i" aria-hidden="true" />
         </button>
         {/* As a drawer it closes here; docked, the tab on its edge folds it. */}
-        {narrow && <button type="button" className="icon-btn" aria-label="Cerrar el agente" title="Cerrar el agente" onClick={onClose}>
+        {narrow && <button type="button" className="icon-btn" aria-label="Close agent" title="Close agent" onClick={onClose}>
           <X className="i" aria-hidden="true" />
         </button>}
       </div>
 
-      <div ref={log} className="agent__log" role="log" aria-label="Conversación con el agente">
+      <div ref={log} className="agent__log" role="log" aria-label="Conversation with the agent">
         {undoTarget && !undoTargetShown && (
           <div className="run-end run-end--earlier">
-            <span>Última ejecución · {clock(undoTarget.finishedAt)} · {plural(countRunChanges(undoTarget), 'cambio', 'cambios')}</span>
+            <span>Last run · {clock(undoTarget.finishedAt)} · {plural(countRunChanges(undoTarget), 'change', 'changes')}</span>
             <span className="spacer" />
             {!running && undoButton(undoTarget.id)}
           </div>
@@ -351,12 +351,12 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
                         {where && item.stepId && (
                           <button
                             type="button" className="chip chip--agent"
-                            aria-label={`Ir al paso ${where.stepNumber} de la escena ${where.sceneNumber}`}
-                            title={`Escena ${where.sceneNumber} · ${where.scene.name}`}
+                            aria-label={`Go to step ${where.stepNumber} of scene ${where.sceneNumber}`}
+                            title={`Scene ${where.sceneNumber} · ${where.scene.name}`}
                             onClick={() => onOpenStep(where.scene.id, item.stepId!)}
                           >{where.stepNumber}</button>
                         )}
-                        {item.status === 'error' ? <span className="work__detail">no se pudo</span>
+                        {item.status === 'error' ? <span className="work__detail">failed</span>
                           : item.tool === 'read_scene' && scene ? <span className="work__detail">{formatSteps(scene.stepIds.length)}</span>
                             : null}
                       </li>
@@ -368,7 +368,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
                 <div className="notice notice--error" role="alert"><TriangleAlert className="i" aria-hidden="true" /><span>{turn.errorMessage}</span></div>
               )}
               {turn.status === 'running' ? (
-                <p className="working">Trabajando · <Elapsed since={turn.startedAt} /></p>
+                <p className="working">Working · <Elapsed since={turn.startedAt} /></p>
               ) : (
                 <div className="run-end">
                   <span>{runMeta(turn, run)}</span>
@@ -384,21 +384,21 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
           <div className="notice" role="status">
             <LoaderCircle className="i i--spin" aria-hidden="true" />
             <div className="notice__body">
-              <span>{HARNESS_NAMES[runningElsewhere.harness]} está trabajando en {runningElsewhere.sceneId ? `la escena ${scenes.findIndex((scene) => scene.id === runningElsewhere.sceneId) + 1}` : 'todo el diagrama'}.</span>
-              <button type="button" className="notice__action" onClick={() => { if (runningElsewhere.sceneId) onOpenScene(runningElsewhere.sceneId); }}>Ver la conversación</button>
+              <span>{HARNESS_NAMES[runningElsewhere.harness]} is working on {runningElsewhere.sceneId ? `scene ${scenes.findIndex((scene) => scene.id === runningElsewhere.sceneId) + 1}` : 'the whole project'}.</span>
+              <button type="button" className="notice__action" onClick={() => { if (runningElsewhere.sceneId) onOpenScene(runningElsewhere.sceneId); }}>View the conversation</button>
             </div>
           </div>
         )}
         {undo && !undo.plan && undo.error && (
           <div className="notice notice--error" role="alert">
             <TriangleAlert className="i" aria-hidden="true" /><span>{undo.error}</span>
-            <button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setUndo(null)}><X className="i" aria-hidden="true" /></button>
+            <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setUndo(null)}><X className="i" aria-hidden="true" /></button>
           </div>
         )}
         {state.notice[projectId] && (
           <div className="notice notice--error" role="alert">
             <TriangleAlert className="i" aria-hidden="true" /><span>{state.notice[projectId]}</span>
-            <button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => store.clearNotice(projectId)}><X className="i" aria-hidden="true" /></button>
+            <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => store.clearNotice(projectId)}><X className="i" aria-hidden="true" /></button>
           </div>
         )}
         {harnessNotice && (
@@ -414,7 +414,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
 
       <div className="composer">
         <textarea
-          ref={textarea} className="composer__input" rows={2} placeholder="Pide un cambio…" aria-label="Mensaje para el agente"
+          ref={textarea} className="composer__input" rows={2} placeholder="Ask for a change…" aria-label="Message to the agent"
           value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={onComposerKey}
         />
         <div className="composer__foot">
@@ -427,11 +427,11 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
           />
           <span className="spacer" />
           {running ? (
-            <button type="button" className="composer__send" aria-label="Detener" title="Detener" onClick={() => void store.stop(projectId)}>
+            <button type="button" className="composer__send" aria-label="Stop" title="Stop" onClick={() => void store.stop(projectId)}>
               <Square className="i" aria-hidden="true" />
             </button>
           ) : (
-            <button type="button" className="composer__send" aria-label="Enviar" title="Enviar" disabled={!usable || !input.trim()} onClick={() => void send()}>
+            <button type="button" className="composer__send" aria-label="Send" title="Send" disabled={!usable || !input.trim()} onClick={() => void send()}>
               <ArrowUp className="i" aria-hidden="true" />
             </button>
           )}
@@ -446,24 +446,24 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
         />
       )}
       {deleting && (
-        <Dialog title="¿Borrar esta conversación?" onClose={() => { if (!deleting.busy) setDeleting(null); }}>
+        <Dialog title="Delete this conversation?" onClose={() => { if (!deleting.busy) setDeleting(null); }}>
           <p className="dialog__text">
-            Se borran sus mensajes de Paso y la copia que guarda {HARNESS_NAMES[deleting.session.harness]} en este equipo. No se puede deshacer.
-            Lo que el agente cambió en el diagrama se queda, y se puede seguir deshaciendo.
+            This deletes its messages from Paso and the copy {HARNESS_NAMES[deleting.session.harness]} keeps on this computer. This can't be undone.
+            What the agent changed in the project stays, and can still be undone.
           </p>
           {deleting.error && <p className="dialog__error" role="alert">{deleting.error}</p>}
           <div className="dialog__actions">
-            <button type="button" className="btn btn--soft" data-autofocus onClick={() => setDeleting(null)}>Cancelar</button>
+            <button type="button" className="btn btn--soft" data-autofocus onClick={() => setDeleting(null)}>Cancel</button>
             <button
               type="button" className="btn btn--danger" disabled={deleting.busy}
               onClick={async () => {
                 setDeleting({ ...deleting, busy: true, error: undefined });
                 try { await store.deleteConversation(deleting.session.id); setDeleting(null); }
                 catch (error) {
-                  setDeleting({ ...deleting, busy: false, error: error instanceof UnavailableError ? 'No hay conexión con el servicio local.' : error instanceof ApiRequestError ? error.message : 'No se pudo borrar la conversación.' });
+                  setDeleting({ ...deleting, busy: false, error: error instanceof UnavailableError ? 'No connection to the local service.' : error instanceof ApiRequestError ? error.message : "Couldn't delete the conversation." });
                 }
               }}
-            >Borrar conversación</button>
+            >Delete conversation</button>
           </div>
         </Dialog>
       )}
@@ -477,10 +477,10 @@ const whenLabel = (iso: string) => {
   if (Number.isNaN(date.getTime())) return '';
   const today = new Date();
   const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-  if (date.toDateString() === today.toDateString()) return `hoy, ${time}`;
+  if (date.toDateString() === today.toDateString()) return `today, ${time}`;
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return `ayer, ${time}`;
-  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
+  if (date.toDateString() === yesterday.toDateString()) return `yesterday, ${time}`;
+  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
 };
 
 /**
@@ -494,13 +494,13 @@ function HistoryPopover({ anchor, conversations, current, onClose, onOpen, onDel
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => { first.current?.focus(); }, []);
   return (
-    <Popover anchor={anchor} align="end" onClose={onClose} role="dialog" label="Historial de conversaciones" className="menu history">
-      <p className="history__head">Conversaciones de esta escena</p>
-      {conversations.length === 0 ? <p className="menu__empty">Aún no hay conversaciones en esta escena.</p> : (
+    <Popover anchor={anchor} align="end" onClose={onClose} role="dialog" label="Conversation history" className="menu history">
+      <p className="history__head">This scene's conversations</p>
+      {conversations.length === 0 ? <p className="menu__empty">No conversations in this scene yet.</p> : (
         <ul className="history__list">
           {conversations.map((conversation, index) => {
             const modelLabel = HARNESS_MODELS[conversation.harness].find((option) => option.id === (conversation.model ?? ''))?.label ?? conversation.model;
-            const title = conversation.title || 'Conversación sin título';
+            const title = conversation.title || 'Untitled conversation';
             const running = conversation.state === 'running';
             return (
               <li key={conversation.id} className="history__item" data-current={conversation.id === current || undefined}>
@@ -508,11 +508,11 @@ function HistoryPopover({ anchor, conversations, current, onClose, onOpen, onDel
                   <span className="history__title">{title}</span>
                   <span className="history__meta">
                     <ProviderIcon id={conversation.harness} size={12} />
-                    {running ? 'Trabajando… · ' : ''}{HARNESS_NAMES[conversation.harness]}{modelLabel && modelLabel !== 'Predeterminado' ? ` · ${modelLabel}` : ''} · {plural(conversation.turns, 'mensaje', 'mensajes')} · {whenLabel(conversation.updatedAt)}
+                    {running ? 'Working… · ' : ''}{HARNESS_NAMES[conversation.harness]}{modelLabel && modelLabel !== 'Default' ? ` · ${modelLabel}` : ''} · {plural(conversation.turns, 'message', 'messages')} · {whenLabel(conversation.updatedAt)}
                   </span>
                 </button>
                 <button
-                  type="button" className="icon-btn history__delete" aria-label={`Borrar la conversación «${title}»`} title={running ? 'Detén al agente para poder borrarla' : 'Borrar conversación'}
+                  type="button" className="icon-btn history__delete" aria-label={`Delete the conversation “${title}”`} title={running ? 'Stop the agent to delete it' : 'Delete conversation'}
                   disabled={running} onClick={() => onDelete(conversation)}
                 >
                   <Trash2 className="i" aria-hidden="true" />

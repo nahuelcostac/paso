@@ -6,11 +6,11 @@ import type { StepStore, Target } from './step-store';
 export type StructureApi = Pick<ApiClient, 'getScene' | 'getStep' | 'createScene' | 'createStep' | 'duplicateStep' | 'reorderSteps'>;
 export type SceneEnvelope = { document: Scene; revision: string };
 
-/** A failure the person can read. `message` is a complete Spanish sentence. */
+/** A failure the person can read. `message` is a complete sentence. */
 export class StructureError extends Error {}
 
-const unsaved = () => new StructureError('Este paso tiene cambios sin guardar. Revisa el aviso, resuélvelo e inténtalo de nuevo.');
-const stale = () => new StructureError('La escena cambió fuera de Paso. Ya está actualizada: inténtalo de nuevo.');
+const unsaved = () => new StructureError('This step has unsaved changes. Check the notice, resolve it and try again.');
+const stale = () => new StructureError("The scene changed outside Paso. It's up to date now: try again.");
 
 /**
  * Everything that changes a scene's list of steps. It runs one action at a time, so two quick presses
@@ -44,8 +44,8 @@ export class StepActions {
     catch (error) {
       if (error instanceof StructureError) throw error;
       if (error instanceof ApiRequestError && (error.status === 409 || error.status === 428)) throw stale();
-      if (error instanceof ApiRequestError && error.status === 404) throw new StructureError('El paso o la escena ya no existe.');
-      throw new StructureError('No se pudo completar la acción. Inténtalo de nuevo.');
+      if (error instanceof ApiRequestError && error.status === 404) throw new StructureError('The step or the scene no longer exists.');
+      throw new StructureError("Couldn't complete the action. Try again.");
     }
   }
 
@@ -71,7 +71,7 @@ export class StepActions {
   }
 
   /**
-   * "Añadir paso": a new step right after `after`, starting as a copy of its drawing, with no title and no
+   * "Add step": a new step right after `after`, starting as a copy of its drawing, with no title and no
    * speaker notes, because it is a new beat. Without `after` (an empty scene) the step is blank.
    */
   add(projectId: string, sceneId: string, after?: string) {
@@ -86,7 +86,7 @@ export class StepActions {
     }));
   }
 
-  /** "Duplicar paso": an exact copy of `target`, title and notes included, right after it. */
+  /** "Duplicate step": an exact copy of `target`, title and notes included, right after it. */
   duplicate(target: Target) {
     return this.serial(() => this.failure(async () => {
       for (let attempt = 0; ; attempt++) {
@@ -103,7 +103,7 @@ export class StepActions {
         try {
           const scene = await this.api.getScene(target.projectId, target.sceneId);
           await this.place(target.projectId, target.sceneId, copy.document.id, scene.document.stepIds.filter((id) => id !== copy.document.id).indexOf(target.stepId) + 1);
-        } catch { throw new StructureError('El paso se duplicó, pero no se pudo colocar justo después del original. Está al final de la escena.'); }
+        } catch { throw new StructureError("The step was duplicated, but couldn't be placed right after the original. It's at the end of the scene."); }
         return copy.document.id;
       }
     }));

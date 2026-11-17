@@ -10,10 +10,10 @@ it('shows discovered Codex models and their reasoning levels', async () => {
   render(<AgentPicker harnesses={[{ id: 'codex', found: true, path: '/codex', version: '1', session: 'signed_in', added: true, supported: true,
     models: [{ id: 'custom', label: 'Modelo nuevo', isDefault: true, efforts: ['medium', 'high'] }] }]}
   loading={false} harness="codex" model="custom" effort="" onPick={pick} onPickEffort={vi.fn()} onRefresh={vi.fn()} />);
-  await userEvent.click(screen.getByRole('button', { name: /Agente y modelo/ }));
+  await userEvent.click(screen.getByRole('button', { name: /Agent and model/ }));
   const dialog = screen.getByRole('dialog');
-  expect(within(dialog).getByRole('radio', { name: 'Modelo nuevo (predeterminado)' })).toBeChecked();
-  expect(within(dialog).getByRole('radio', { name: 'Predeterminado' })).toBeInTheDocument();
-  const efforts = within(dialog).getByRole('radiogroup', { name: 'Razonamiento' });
-  expect(within(efforts).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Automático', 'Medio', 'Alto']);
+  expect(within(dialog).getByRole('radio', { name: 'Modelo nuevo (default)' })).toBeChecked();
+  expect(within(dialog).getByRole('radio', { name: 'Default' })).toBeInTheDocument();
+  const efforts = within(dialog).getByRole('radiogroup', { name: 'Reasoning' });
+  expect(within(efforts).getAllByRole('radio').map((item) => item.textContent)).toEqual(['Automatic', 'Medium', 'High']);
 });

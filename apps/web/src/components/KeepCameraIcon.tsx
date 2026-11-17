@@ -1,5 +1,5 @@
 /**
- * «Mantener el encuadre del paso anterior»: the corners of «Encuadrar» (lucide's Scan) around an arrow going back, so it
+ * “Keep previous step's framing”: the corners of “Frame” (lucide's Scan) around an arrow going back, so it
  * reads as the camera from before. Drawn like a lucide icon; svg.i gives the stroke.
  */
 export function KeepCameraIcon({ className = 'i' }: { className?: string }) {

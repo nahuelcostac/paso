@@ -1,6 +1,6 @@
 import type { AppState } from '@excalidraw/excalidraw/types';
 
-/** Keys that change step on the canvas, as in Presentar. Space is left out: Excalidraw pans with it. */
+/** Keys that change step on the canvas, as in Present. Space is left out: Excalidraw pans with it. */
 const STEP_KEYS: Record<string, -1 | 1> = { ArrowLeft: -1, PageUp: -1, ArrowRight: 1, PageDown: 1 };
 
 type Press = Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'defaultPrevented'>;

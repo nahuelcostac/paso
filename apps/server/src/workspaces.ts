@@ -11,7 +11,7 @@ export type Workspace = { id: string; name: string; path: string };
 export type WorkspaceInfo = Workspace & { default: boolean; available: boolean };
 
 export const DEFAULT_WORKSPACE_ID = 'default';
-const DEFAULT_WORKSPACE_NAME = 'Mis diagramas';
+const DEFAULT_WORKSPACE_NAME = 'My projects';
 
 const workspaceSchema = z.object({ id: idSchema, name: z.string().trim().min(1).max(200), path: z.string().min(1) }).strict();
 const fileSchema = z.object({
@@ -106,20 +106,20 @@ export class WorkspaceRegistry {
     const { path, name } = addInput.parse(input);
     if (!isAbsolute(path)) throw new ApiError(400, 'INVALID_PATH', 'Use an absolute path.');
     let real: string;
-    try { real = await realpath(path); } catch { throw new ApiError(422, 'FOLDER_NOT_FOUND', 'La carpeta no existe.'); }
-    if (!await isFolder(real)) throw new ApiError(422, 'FOLDER_NOT_FOUND', 'No es una carpeta.');
+    try { real = await realpath(path); } catch { throw new ApiError(422, 'FOLDER_NOT_FOUND', "The folder doesn't exist."); }
+    if (!await isFolder(real)) throw new ApiError(422, 'FOLDER_NOT_FOUND', "It isn't a folder.");
     if (real === parse(real).root || real === resolve(homedir())) {
-      throw new ApiError(422, 'FOLDER_TOO_BROAD', 'Elige una carpeta concreta, no la carpeta personal ni la raíz del disco.');
+      throw new ApiError(422, 'FOLDER_TOO_BROAD', 'Choose a specific folder, not your home folder or the root of the disk.');
     }
     const existing = [this.get(DEFAULT_WORKSPACE_ID), ...this.extra];
     const realOf = async (target: string) => { try { return await realpath(target); } catch { return resolve(target); } };
     for (const workspace of existing) {
       const other = await realOf(workspace.path);
-      if (other === real) throw new ApiError(409, 'WORKSPACE_EXISTS', `Esta carpeta ya es el workspace «${workspace.name}».`);
-      if (overlaps(real, other)) throw new ApiError(422, 'WORKSPACE_OVERLAP', `Esta carpeta está dentro de «${workspace.name}» o lo contiene.`);
+      if (other === real) throw new ApiError(409, 'WORKSPACE_EXISTS', `This folder is already the workspace “${workspace.name}”.`);
+      if (overlaps(real, other)) throw new ApiError(422, 'WORKSPACE_OVERLAP', `This folder is inside “${workspace.name}” or contains it.`);
     }
     for (const folder of this.reserved) {
-      if (overlaps(real, await realOf(folder))) throw new ApiError(422, 'RESERVED_FOLDER', 'Esta carpeta la usa Paso para sus propios datos.');
+      if (overlaps(real, await realOf(folder))) throw new ApiError(422, 'RESERVED_FOLDER', 'Paso uses this folder for its own data.');
     }
     const workspace: Workspace = { id: randomUUID(), name: name ?? basename(real), path: real };
     this.extra.push(workspace);
@@ -162,10 +162,10 @@ function crumbsTo(target: string, home: string) {
   return crumbs;
 }
 
-const unreadable = () => new ApiError(422, 'FOLDER_UNREADABLE', 'No se puede leer esta carpeta.');
+const unreadable = () => new ApiError(422, 'FOLDER_UNREADABLE', "This folder can't be read.");
 
 /**
- * The folder explorer behind «Nuevo workspace». It lists folder names only: never files, never their contents, and
+ * The folder explorer behind “New workspace”. It lists folder names only: never files, never their contents, and
  * no hidden folders. Links to folders are not followed.
  */
 export async function listFolders(path?: string): Promise<FolderListing> {
@@ -175,7 +175,7 @@ export async function listFolders(path?: string): Promise<FolderListing> {
   let entries;
   try { entries = await readdir(target, { withFileTypes: true }); }
   catch (error) {
-    if (isMissing(error) || (error as NodeJS.ErrnoException).code === 'ENOTDIR') throw new ApiError(404, 'FOLDER_NOT_FOUND', 'La carpeta no existe.');
+    if (isMissing(error) || (error as NodeJS.ErrnoException).code === 'ENOTDIR') throw new ApiError(404, 'FOLDER_NOT_FOUND', "The folder doesn't exist.");
     throw unreadable();
   }
   const folders = entries
@@ -191,16 +191,16 @@ export async function listFolders(path?: string): Promise<FolderListing> {
   return { path: target, parent: parent === target ? null : parent, home, folders, projects, crumbs: crumbsTo(target, home) };
 }
 
-/** Creates one folder inside another, for «Nueva carpeta» in the explorer. */
+/** Creates one folder inside another, for “New folder” in the explorer. */
 export async function createFolder(input: unknown) {
   const { parent, name } = folderNameInput.parse(input);
   if (!isAbsolute(parent)) throw new ApiError(400, 'INVALID_PATH', 'Use an absolute path.');
-  if (name === '.' || name === '..' || /[/\\\0]/.test(name)) throw new ApiError(400, 'INVALID_NAME', 'El nombre no puede contener barras.');
-  if (!await isFolder(parent)) throw new ApiError(404, 'FOLDER_NOT_FOUND', 'La carpeta no existe.');
+  if (name === '.' || name === '..' || /[/\\\0]/.test(name)) throw new ApiError(400, 'INVALID_NAME', "The name can't contain slashes.");
+  if (!await isFolder(parent)) throw new ApiError(404, 'FOLDER_NOT_FOUND', "The folder doesn't exist.");
   const path = join(resolve(parent), name);
   try { await mkdir(path); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new ApiError(409, 'FOLDER_EXISTS', 'Ya hay una carpeta con ese nombre.');
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new ApiError(409, 'FOLDER_EXISTS', 'There is already a folder with that name.');
     throw unreadable();
   }
   return { path };

@@ -69,7 +69,7 @@ export const filesManifestSchema = z.record(idSchema, fileManifestEntrySchema)
   });
 
 /**
- * The part of the drawing Presentar zooms to on this step, in canvas units: x/y is the top-left. Without it the step
+ * The part of the drawing Present zooms to on this step, in canvas units: x/y is the top-left. Without it the step
  * shows the whole scene. Only the presentation reads it; editing and thumbnails ignore it.
  */
 export const stepCameraSchema = z.object({

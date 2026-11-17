@@ -12,25 +12,25 @@ export function IconPicker({ anchor, current, onPick, onClose }: Props) {
   const status = useId();
   const selected = current ?? DEFAULT_ICON;
   return (
-    <Popover anchor={anchor} onClose={onClose} role="dialog" label="Icono del diagrama" className="picker">
-      <div className="picker__title">Icono del diagrama</div>
+    <Popover anchor={anchor} onClose={onClose} role="dialog" label="Project icon" className="picker">
+      <div className="picker__title">Project icon</div>
       <label className="picker__search">
         <Search className="i" aria-hidden="true" />
         <input
           autoFocus
           type="search"
           value={query}
-          placeholder="Buscar icono…"
-          aria-label="Buscar icono"
+          placeholder="Search icons…"
+          aria-label="Search icons"
           aria-describedby={status}
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>
       <p id={status} className="visually-hidden" aria-live="polite">
-        {results.length === 0 ? 'Sin resultados' : `${results.length} iconos`}
+        {results.length === 0 ? 'No results' : `${results.length} icons`}
       </p>
       {results.length === 0 ? (
-        <p className="picker__empty">Ningún icono coincide con «{query.trim()}».</p>
+        <p className="picker__empty">No icon matches “{query.trim()}”.</p>
       ) : (
         <div className="picker__grid">
           {results.map(({ name, icon: Icon, label }) => (

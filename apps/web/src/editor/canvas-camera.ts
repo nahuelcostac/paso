@@ -7,7 +7,7 @@ export type CanvasCamera = { key: string; scrollX: number; scrollY: number; zoom
 
 /**
  * The camera belongs to the scene, not to the step: moving between steps keeps it, so what stays in place on the
- * paper stays in place on the screen, as in Presentar. A new scene, or a new diagram, is framed again.
+ * paper stays in place on the screen, as in Present. A new scene, or a new diagram, is framed again.
  */
 export const cameraKey = (target: Target) => `${target.projectId}/${target.sceneId}`;
 

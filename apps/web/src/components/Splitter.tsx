@@ -74,12 +74,12 @@ type Props = {
   side: 'left' | 'right';
   open: boolean;
   onToggle: () => void;
-  /** The tab's names: «Ocultar …» while the panel is in view, «Mostrar …» while it is folded. */
+  /** The tab's names: “Hide …” while the panel is in view, “Show …” while it is folded. */
   hide: string;
   show: string;
   /** The panel's id, for `aria-controls`. */
   controls?: string;
-  /** The edge's name, «Anchura de …», and the width it moves. Without it there is only the tab: the panel is a drawer. */
+  /** The edge's name, “… width”, and the width it moves. Without it there is only the tab: the panel is a drawer. */
   label?: string;
   resize?: PanelWidth;
 };
@@ -144,8 +144,8 @@ export function Splitter({ side, open, onToggle, hide, show, controls, label, re
       {resize && <div
         className="splitter__edge" role="separator" aria-orientation="vertical" aria-label={label} aria-controls={controls}
         aria-valuenow={open ? resize.width : 0} aria-valuemin={0} aria-valuemax={resize.max}
-        aria-valuetext={open ? `${resize.width} píxeles` : 'Plegado'} tabIndex={0}
-        title="Arrastra para cambiar la anchura. Doble clic: anchura inicial."
+        aria-valuetext={open ? `${resize.width} pixels` : 'Folded'} tabIndex={0}
+        title="Drag to change the width. Double-click: starting width."
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
         onDoubleClick={() => { if (!open) onToggle(); resize.choose(resize.initial); }} onKeyDown={onKeyDown}
       />}

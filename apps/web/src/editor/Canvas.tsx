@@ -20,13 +20,13 @@ import { pad } from '../components/StepFrame';
 import { useLooseStrip } from './loose-strip';
 
 const StepCanvas = lazy(() => import('./StepCanvas'));
-const messages = { failed: 'No se pudo guardar. Tu trabajo sigue en este navegador.', conflict: 'El paso cambió fuera de Paso. Tu trabajo local se conserva.' };
+const messages = { failed: "Couldn't save. Your work is still in this browser.", conflict: 'The step changed outside Paso. Your local work is kept.' };
 
 function download(session: Session) {
   // Recovery includes image bytes as well as the valid shared document.
   const blob = new Blob([JSON.stringify({ document: session.document, revision: session.revision, binaries: session.binaries }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a'); link.href = url; link.download = `paso-recuperacion-${session.target.stepId}.json`; link.click();
+  const link = document.createElement('a'); link.href = url; link.download = `paso-recovery-${session.target.stepId}.json`; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -37,14 +37,14 @@ function keyboardInCarousel() {
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
-export default function Lienzo({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents, loose = false }: {
+export default function Canvas({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents, loose = false }: {
   api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
   scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
   route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
   stepAgentStates?: Record<string, 'working' | 'changed'>;
   /** The app's failures with no place of their own while the sidebar is folded. */
   notices?: React.ReactNode;
-  /** Over the canvas's top right corner, where Excalidraw's library button was: Presentar. */
+  /** Over the canvas's top right corner, where Excalidraw's library button was: Present. */
   corner?: React.ReactNode;
   /** The service's changes, so a camera this step keeps from an earlier one follows it when that one changes. */
   subscribeEvents?: (listener: (event: ServiceEvent) => void) => () => void;
@@ -71,7 +71,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   // Written during render on purpose: the effect below runs after the canvas mounted, and the canvas asks when it loads.
   const routeRef = useRef(route); routeRef.current = route;
   const camera = useRef<CanvasCamera | undefined>(undefined);
-  // What the canvas shows, for «Encuadrar» and for drawing the step's presentation camera over it.
+  // What the canvas shows, for “Frame” and for drawing the step's presentation camera over it.
   const view = useMemo(createViewStore, []);
   // Marking the step's presentation camera by hand: a layer over the canvas. It ends with the step.
   const [framing, setFraming] = useState(false);
@@ -105,7 +105,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   useEffect(() => {
     if (!scene || !stepId) return;
     setError(undefined); setLoadFailed(false);
-    void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => { setError('No se pudo cargar el paso.'); setLoadFailed(true); });
+    void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => { setError("Couldn't load the step."); setLoadFailed(true); });
     return () => { void store.flushAll(); };
   }, [store, projectId, scene?.id, stepId]);
 
@@ -113,13 +113,13 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   const run = useCallback(async <T,>(job: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true); setError(undefined);
     try { return await job(); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'No se pudo completar la acción.'); return undefined; }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "Couldn't complete the action."); return undefined; }
     finally { setBusy(false); }
   }, []);
   // The step is made; only reading the scene again failed. The person is told, and nothing is left unhandled.
   const goTo = async (id: string | undefined) => {
     try { await refreshScenes(); }
-    catch { setError('El paso se creó, pero no se pudo actualizar la escena. Pulsa «Reintentar».'); return; }
+    catch { setError("The step was created, but the scene couldn't be updated. Press “Retry”."); return; }
     navigate({ ...routeRef.current, sceneId: scene?.id, stepId: id });
   };
   const copy = (make: () => Promise<string>) => async () => { const id = await run(make); if (id) await goTo(id); };
@@ -135,7 +135,7 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
   }, [strip.shown]);
   const setStrip = (shown: boolean) => { toggled.current = true; strip.choose(shown ? 'shown' : 'hidden'); };
 
-  // ← → on the canvas move through the scene's steps, as in Presentar. They stop at both ends.
+  // ← → on the canvas move through the scene's steps, as in Present. They stop at both ends.
   const stepIdsRef = useRef(stepIds); stepIdsRef.current = stepIds;
   const stepRef = useRef(stepId); stepRef.current = stepId;
   const stepKey = useCallback((delta: -1 | 1) => {
@@ -144,18 +144,18 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
     if (next) navigate({ ...routeRef.current, stepId: next });
   }, [navigate]);
 
-  return <main className="lienzo" aria-label="Lienzo">
+  return <main className="canvas-page" aria-label="Canvas">
     {/* The page's main heading, for screen readers: the sidebar already shows the open diagram. */}
     <h1 className="visually-hidden">{projectName}</h1>
-    {error && <div className="editor-notice" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); void refreshScenes(); if (scene && stepId) { setLoadFailed(false); void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => { setError('No se pudo cargar el paso.'); setLoadFailed(true); }); } }}>Reintentar</button></div>}
+    {error && <div className="editor-notice" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); void refreshScenes(); if (scene && stepId) { setLoadFailed(false); void store.select({ projectId, sceneId: scene.id, stepId }).catch(() => { setError("Couldn't load the step."); setLoadFailed(true); }); } }}>Retry</button></div>}
     {session && (session.status === 'failed' || session.status === 'conflict' || session.error) && <div className="editor-notice" role="alert">
       <span>{session.error ?? messages[session.status as 'failed' | 'conflict']}</span>
-      <button className="btn" onClick={() => download(session)}>Descargar copia local</button>
-      {session.status === 'failed' && <button className="btn" onClick={() => void store.flush(session.target)}>Reintentar guardado</button>}
+      <button className="btn" onClick={() => download(session)}>Download local copy</button>
+      {session.status === 'failed' && <button className="btn" onClick={() => void store.flush(session.target)}>Retry saving</button>}
       {session.status === 'conflict' && <button className="btn" onClick={() => {
         download(session);
-        void store.useServer(session).catch(() => setError('No se pudo cargar la versión del servicio.'));
-      }}>Descargar copia y cargar versión del servicio</button>}
+        void store.useServer(session).catch(() => setError("Couldn't load the service's version."));
+      }}>Download copy and load the service's version</button>}
     </div>}
     <div className="canvas canvas--editor">
       <div className="canvas__corner">
@@ -168,19 +168,19 @@ export default function Lienzo({ api, store, actions, projectId, projectName, sc
         />}
       </div>
       {/* One canvas for the diagram: moving to another step swaps the drawing in it, with no loading in between. */}
-      {canvasOpen ? <Suspense fallback={<Loading>Cargando editor…</Loading>}>
+      {canvasOpen ? <Suspense fallback={<Loading>Loading editor…</Loading>}>
         <StepCanvas key={projectId} api={api} store={store} session={wanted} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} onShow={setShown} />
-      </Suspense> : <div className="canvas__placeholder"><p className="canvas__placeholder-title" aria-hidden="true">{projectName}</p><p>{scenes === undefined ? 'Cargando…' : scene ? 'Esta escena no tiene pasos. Usa «Añadir paso» para empezar a dibujar.' : 'Crea una escena desde la barra lateral para empezar a dibujar.'}</p></div>}
+      </Suspense> : <div className="canvas__placeholder"><p className="canvas__placeholder-title" aria-hidden="true">{projectName}</p><p>{scenes === undefined ? 'Loading…' : scene ? 'This scene has no steps. Use “Add step” to start drawing.' : 'Create a scene from the sidebar to start drawing.'}</p></div>}
       {typeof session?.document.camera === 'object' && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
       {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: session.target.sceneId, stepId: shownIds?.[kept.number - 1] })} />}
       {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
       {/* Beside Excalidraw's help button. With several steps it shows where you are, as the strip's pager does. */}
-      {scene && !strip.shown && <button ref={showStrip} type="button" className="strip-toggle" aria-label="Mostrar pasos" title="Mostrar pasos" onClick={() => setStrip(true)}>
+      {scene && !strip.shown && <button ref={showStrip} type="button" className="strip-toggle" aria-label="Show steps" title="Show steps" onClick={() => setStrip(true)}>
         <PanelBottomOpen className="i" aria-hidden="true" />
         {stepIds.length > 1 && <span className="strip-toggle__count" aria-hidden="true"><b>{stepId ? pad(stepIds.indexOf(stepId) + 1) : '–'}</b> / {pad(stepIds.length)}</span>}
       </button>}
     </div>
-    {notices && <div className="lienzo__notices">{notices}</div>}
+    {notices && <div className="canvas-page__notices">{notices}</div>}
     {scene && strip.shown && <StepCarousel
       onHide={loose ? () => setStrip(false) : undefined} hideRef={hideStrip}
       stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}

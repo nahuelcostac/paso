@@ -7,7 +7,7 @@ const KEY = 'paso.loose-strip';
 
 /**
  * Whether a loose diagram shows its step strip. With one step it opens as a plain whiteboard; with several it shows
- * them. The person's choice wins, except that a diagram with no steps always shows the strip: «Añadir paso» is there.
+ * them. The person's choice wins, except that a diagram with no steps always shows the strip: “Add step” is there.
  */
 export function stripShown(steps: number, choice: StripChoice | undefined): boolean {
   if (steps === 0) return true;
@@ -22,7 +22,7 @@ function readChoices(): Record<string, StripChoice> {
 }
 
 /**
- * The step strip of the diagram on the Lienzo: always shown for a project's scene, and for a loose diagram (its scene
+ * The step strip of the diagram on the Canvas: always shown for a project's scene, and for a loose diagram (its scene
  * ID given) as `stripShown` says. The choice is remembered per diagram in this browser.
  */
 export function useLooseStrip(looseId: string | undefined, steps: number) {

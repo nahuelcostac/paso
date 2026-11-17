@@ -15,7 +15,7 @@ export async function handleAgentRoute(manager: SessionManager, parts: string[],
     if (method === 'GET') return { status: 200, data: { sessions: await manager.list(url.searchParams.get('projectId') ?? undefined) } };
     if (method === 'POST') {
       const input = await json();
-      if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new ApiError(400, 'INVALID_BODY', 'Se esperaba un objeto JSON.');
+      if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new ApiError(400, 'INVALID_BODY', 'A JSON object was expected.');
       return { status: 201, data: await manager.create(input as { harness: unknown; projectId: unknown; sceneId?: unknown; model?: unknown }) };
     }
     throw notAllowed();

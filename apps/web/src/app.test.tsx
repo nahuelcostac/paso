@@ -10,7 +10,7 @@ import { startServer } from '@paso/server';
 import { App } from './App';
 import type { ClientConfig } from './lib/api';
 
-// jsdom cannot draw Excalidraw: the Lienzo's canvas is a stand-in here, as in the other suites.
+// jsdom cannot draw Excalidraw: the Canvas's canvas is a stand-in here, as in the other suites.
 vi.mock('./editor/StepCanvas', () => import('./editor/canvas-stand-in'));
 
 /**
@@ -24,7 +24,7 @@ let testRoot: string;
 let dataDir: string;
 let config: ClientConfig;
 
-/** Folders «Abrir carpeta» asked to show. A test never opens the real file manager. */
+/** Folders “Open folder” asked to show. A test never opens the real file manager. */
 let opened: string[] = [];
 let openFails = false;
 async function start(port = 0) {
@@ -72,27 +72,27 @@ describe('projects panel against the real service', () => {
     render(<App config={config} />);
 
     // Nothing yet: the empty state offers the way in.
-    expect(await screen.findByRole('heading', { name: 'Crea tu primer diagrama' }, patience)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Create your first project' }, patience)).toBeInTheDocument();
 
     // Create.
-    await user.click(within(screen.getByRole('complementary', { name: 'Diagramas' })).getByRole('button', { name: 'Nuevo proyecto' }));
-    await user.type(screen.getByLabelText('Nombre del diagrama nuevo'), 'Búsqueda binaria{Enter}');
+    await user.click(within(screen.getByRole('complementary', { name: 'Projects and diagrams' })).getByRole('button', { name: 'New project' }));
+    await user.type(screen.getByLabelText('Name of the new project'), 'Búsqueda binaria{Enter}');
     const row = await screen.findByRole('button', { name: /^Búsqueda binaria/ }, patience);
     expect(row).toHaveAttribute('aria-current', 'true');
     // A new diagram is ready to draw on: one scene with one empty step, open on the board.
-    await waitFor(() => expect(row).toHaveTextContent('1 escena · 1 paso'), patience);
+    await waitFor(() => expect(row).toHaveTextContent('1 scene · 1 step'), patience);
     expect(screen.getByRole('heading', { level: 1, name: 'Búsqueda binaria' })).toBeInTheDocument();
     const [id] = await projectFolders();
     const [sceneId] = (await readProject(id)).sceneIds as string[];
-    await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/${id}/lienzo/${sceneId}/[\\w-]+$`)), patience);
-    expect(await screen.findByRole('button', { name: 'Escena 1: Escena 1' }, patience)).toHaveAttribute('aria-current', 'true');
+    await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/${id}/canvas/${sceneId}/[\\w-]+$`)), patience);
+    expect(await screen.findByRole('button', { name: 'Scene 1: Scene 1' }, patience)).toHaveAttribute('aria-current', 'true');
     expect(await readProject(id)).toMatchObject({ name: 'Búsqueda binaria', schemaVersion: 1 });
     expect(await readProject(id)).not.toHaveProperty('icon');
 
     // Rename, from the row's menu.
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Búsqueda binaria' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Renombrar' }));
-    const field = screen.getByLabelText('Nombre de Búsqueda binaria');
+    await user.click(screen.getByRole('button', { name: 'More actions for Búsqueda binaria' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    const field = screen.getByLabelText('Name of Búsqueda binaria');
     await user.clear(field);
     await user.type(field, 'Búsqueda binaria, paso a paso{Enter}');
     await screen.findByRole('button', { name: /^Búsqueda binaria, paso a paso/ }, patience);
@@ -100,35 +100,35 @@ describe('projects panel against the real service', () => {
     expect((await readProject(id)).name).toBe('Búsqueda binaria, paso a paso');
 
     // Escape leaves the name alone.
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Búsqueda binaria, paso a paso' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Renombrar' }));
-    await user.type(screen.getByLabelText('Nombre de Búsqueda binaria, paso a paso'), 'x{Escape}');
-    expect(screen.queryByLabelText(/^Nombre de/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More actions for Búsqueda binaria, paso a paso' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    await user.type(screen.getByLabelText('Name of Búsqueda binaria, paso a paso'), 'x{Escape}');
+    expect(screen.queryByLabelText(/^Name of/)).not.toBeInTheDocument();
     expect((await readProject(id)).name).toBe('Búsqueda binaria, paso a paso');
 
     // Icon: search without accents, pick, and it is stored by its Lucide name.
-    await user.click(screen.getByRole('button', { name: 'Cambiar el icono de Búsqueda binaria, paso a paso' }));
-    const picker = await screen.findByRole('dialog', { name: 'Icono del diagrama' });
-    await user.type(within(picker).getByRole('searchbox', { name: 'Buscar icono' }), 'musica');
-    await user.click(within(picker).getByRole('button', { name: 'Música' }));
+    await user.click(screen.getByRole('button', { name: 'Change the icon of Búsqueda binaria, paso a paso' }));
+    const picker = await screen.findByRole('dialog', { name: 'Project icon' });
+    await user.type(within(picker).getByRole('searchbox', { name: 'Search icons' }), 'music');
+    await user.click(within(picker).getByRole('button', { name: 'Music' }));
     await waitFor(async () => expect((await readProject(id)).icon).toBe('music'), patience);
-    expect(screen.queryByRole('dialog', { name: 'Icono del diagrama' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Project icon' })).not.toBeInTheDocument();
 
     // Delete: it asks, names the project, and Cancel keeps everything.
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Búsqueda binaria, paso a paso' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Eliminar/ }));
-    const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar «Búsqueda binaria, paso a paso»?' });
-    expect(dialog).toHaveTextContent('No se puede deshacer');
-    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
-    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await user.click(screen.getByRole('button', { name: 'More actions for Búsqueda binaria, paso a paso' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Delete/ }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete “Búsqueda binaria, paso a paso”?' });
+    expect(dialog).toHaveTextContent("This can't be undone");
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(await projectFolders()).toEqual([id]);
 
     // Confirm.
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Búsqueda binaria, paso a paso' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Eliminar/ }));
-    await user.click(await screen.findByRole('button', { name: 'Eliminar diagrama' }));
-    expect(await screen.findByRole('heading', { name: 'Crea tu primer diagrama' }, patience)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More actions for Búsqueda binaria, paso a paso' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Delete/ }));
+    await user.click(await screen.findByRole('button', { name: 'Delete project' }));
+    expect(await screen.findByRole('heading', { name: 'Create your first project' }, patience)).toBeInTheDocument();
     expect(await projectFolders()).toEqual([]);
   });
 
@@ -140,12 +140,12 @@ describe('projects panel against the real service', () => {
     render(<App config={config} />);
     // The newest is listed first and opened by default.
     await screen.findByRole('heading', { level: 1, name: 'Segundo' }, patience);
-    expect(window.location.hash).toBe('#/second/lienzo');
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Segundo' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Eliminar/ }));
-    await user.click(await screen.findByRole('button', { name: 'Eliminar diagrama' }));
+    expect(window.location.hash).toBe('#/second/canvas');
+    await user.click(screen.getByRole('button', { name: 'More actions for Segundo' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Delete/ }));
+    await user.click(await screen.findByRole('button', { name: 'Delete project' }));
     await screen.findByRole('heading', { level: 1, name: 'Primero' }, patience);
-    expect(window.location.hash).toBe('#/first/lienzo');
+    expect(window.location.hash).toBe('#/first/canvas');
   });
 
   it('shows size, icon and current marker on every row', async () => {
@@ -155,11 +155,11 @@ describe('projects panel against the real service', () => {
     for (const stepId of ['t1', 't2', 't3']) await fetch(`${service.url}/api/projects/a/scenes/s1/steps`, { method: 'POST', headers: auth, body: JSON.stringify({ id: stepId }) });
     render(<App config={config} />);
     const row = await screen.findByRole('button', { name: /^Con escenas/ }, patience);
-    expect(row).toHaveTextContent('2 escenas · 3 pasos');
+    expect(row).toHaveTextContent('2 scenes · 3 steps');
     expect(row).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Con escenas');
     // The board opens on the first step of the first scene.
-    await waitFor(() => expect(window.location.hash).toBe('#/a/lienzo/s1/t1'), patience);
+    await waitFor(() => expect(window.location.hash).toBe('#/a/canvas/s1/t1'), patience);
   });
 
   it('focuses the first menuitem when opening RowMenu while the popover is visible', async () => {
@@ -177,16 +177,16 @@ describe('projects panel against the real service', () => {
       return origFocus.apply(this, args);
     };
     try {
-      const moreBtn = screen.getByRole('button', { name: 'Más acciones de Diagrama teclado' });
+      const moreBtn = screen.getByRole('button', { name: 'More actions for Diagrama teclado' });
       moreBtn.focus();
       await user.keyboard('{Enter}');
-      const renameItem = await screen.findByRole('menuitem', { name: 'Renombrar' });
+      const renameItem = await screen.findByRole('menuitem', { name: 'Rename' });
       expect(renameItem).toHaveFocus();
       expect(visibilityAtFocus).toBe('');
       await user.keyboard('{ArrowDown}');
-      expect(screen.getByRole('menuitem', { name: 'Abrir carpeta' })).toHaveFocus();
+      expect(screen.getByRole('menuitem', { name: 'Open folder' })).toHaveFocus();
       await user.keyboard('{ArrowDown}');
-      expect(screen.getByRole('menuitem', { name: /Eliminar/ })).toHaveFocus();
+      expect(screen.getByRole('menuitem', { name: /Delete/ })).toHaveFocus();
       await user.keyboard('{Escape}');
       expect(moreBtn).toHaveFocus();
     } finally {
@@ -205,68 +205,68 @@ describe('workspaces in the sidebar', () => {
     await writeFile(join(otherRoot, 'Clases', 'tema', 'project.json'), `${JSON.stringify({ schemaVersion: 1, id: 'tema', name: 'Tema 1', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', sceneIds: [] }, null, 2)}\n`);
     const added = await (await fetch(`${service.url}/api/workspaces`, { method: 'POST', headers: auth, body: JSON.stringify({ path: join(otherRoot, 'Clases') }) })).json() as { id: string };
     render(<App config={config} />);
-    const sidebar = await screen.findByRole('complementary', { name: 'Diagramas' }, patience);
+    const sidebar = await screen.findByRole('complementary', { name: 'Projects and diagrams' }, patience);
     await within(sidebar).findByRole('button', { name: /^En casa/ }, patience);
-    expect(within(sidebar).getByRole('region', { name: 'Hoy' })).toHaveTextContent('En casa');
+    expect(within(sidebar).getByRole('region', { name: 'Today' })).toHaveTextContent('En casa');
 
     // Switch: the list, the address and the board follow the other folder.
-    await user.click(within(sidebar).getByRole('button', { name: 'Workspace: Mis diagramas' }));
+    await user.click(within(sidebar).getByRole('button', { name: 'Workspace: My projects' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'Clases' }, patience));
     await within(sidebar).findByRole('button', { name: 'Workspace: Clases' }, patience);
     await screen.findByRole('heading', { level: 1, name: 'Tema 1' }, patience);
     await waitFor(() => expect(within(sidebar).getByRole('button', { name: 'Workspace: Clases' })).toBeEnabled(), patience);
-    expect(window.location.hash).toBe('#/tema/lienzo');
+    expect(window.location.hash).toBe('#/tema/canvas');
     expect(within(sidebar).queryByRole('button', { name: /^En casa/ })).not.toBeInTheDocument();
-    expect(within(sidebar).getByRole('region', { name: 'Anteriores' })).toHaveTextContent('Tema 1');
+    expect(within(sidebar).getByRole('region', { name: 'Earlier' })).toHaveTextContent('Tema 1');
 
     // Search filters the list in place.
-    await user.click(within(sidebar).getByRole('button', { name: 'Buscar…' }));
-    await user.type(within(sidebar).getByRole('searchbox', { name: 'Buscar diagramas' }), 'nada');
-    expect(within(sidebar).getByText('Ningún diagrama coincide.')).toBeInTheDocument();
+    await user.click(within(sidebar).getByRole('button', { name: 'Search…' }));
+    await user.type(within(sidebar).getByRole('searchbox', { name: 'Search projects and diagrams' }), 'nada');
+    expect(within(sidebar).getByText('No matches.')).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(within(sidebar).getByRole('button', { name: /^Tema 1/ })).toBeInTheDocument();
 
     // A new workspace from the explorer: it opens beside the current one, makes a folder and uses it.
     await user.click(within(sidebar).getByRole('button', { name: 'Workspace: Clases' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Nuevo workspace…' }, patience));
-    const explorer = await screen.findByRole('dialog', { name: 'Nuevo workspace' }, patience);
+    await user.click(await screen.findByRole('menuitem', { name: 'New workspace…' }, patience));
+    const explorer = await screen.findByRole('dialog', { name: 'New workspace' }, patience);
     await within(explorer).findByRole('button', { name: /Clases/ }, patience);
-    expect(within(explorer).getByRole('status')).toHaveTextContent('Sin diagramas todavía');
-    await user.click(within(explorer).getByRole('button', { name: 'Nueva carpeta' }));
-    await user.type(within(explorer).getByLabelText('Nombre de la carpeta nueva'), 'Charlas{Enter}');
-    await waitFor(() => expect(within(explorer).getByRole('navigation', { name: 'Carpeta actual' })).toHaveTextContent('Charlas'), patience);
-    await user.click(within(explorer).getByRole('button', { name: 'Usar esta carpeta' }));
+    expect(within(explorer).getByRole('status')).toHaveTextContent('No projects yet');
+    await user.click(within(explorer).getByRole('button', { name: 'New folder' }));
+    await user.type(within(explorer).getByLabelText('Name of the new folder'), 'Charlas{Enter}');
+    await waitFor(() => expect(within(explorer).getByRole('navigation', { name: 'Current folder' })).toHaveTextContent('Charlas'), patience);
+    await user.click(within(explorer).getByRole('button', { name: 'Use this folder' }));
     await within(sidebar).findByRole('button', { name: 'Workspace: Charlas' }, patience);
-    expect(screen.queryByRole('dialog', { name: 'Nuevo workspace' })).not.toBeInTheDocument();
-    expect(await within(sidebar).findByText('Aún no hay diagramas', undefined, patience)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument();
+    expect(await within(sidebar).findByText('Nothing here yet', undefined, patience)).toBeInTheDocument();
     expect(await readdir(join(otherRoot, 'Charlas'))).toEqual([]);
 
     // Adding the same folder again is refused in the explorer.
     await user.click(within(sidebar).getByRole('button', { name: 'Workspace: Charlas' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Nuevo workspace…' }, patience));
-    const again = await screen.findByRole('dialog', { name: 'Nuevo workspace' }, patience);
+    await user.click(await screen.findByRole('menuitem', { name: 'New workspace…' }, patience));
+    const again = await screen.findByRole('dialog', { name: 'New workspace' }, patience);
     await user.click(await within(again).findByRole('button', { name: /Clases/ }, patience));
-    await waitFor(() => expect(within(again).getByRole('status')).toHaveTextContent('Tiene 1 diagrama'), patience);
-    await user.click(within(again).getByRole('button', { name: 'Usar esta carpeta' }));
-    expect(await within(again).findByRole('alert', undefined, patience)).toHaveTextContent('No se pudo añadir la carpeta. Esta carpeta ya es el workspace «Clases».');
-    await user.click(within(again).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(within(again).getByRole('status')).toHaveTextContent('Has 1 project'), patience);
+    await user.click(within(again).getByRole('button', { name: 'Use this folder' }));
+    expect(await within(again).findByRole('alert', undefined, patience)).toHaveTextContent("Couldn't add the folder. This folder is already the workspace “Clases”.");
+    await user.click(within(again).getByRole('button', { name: 'Cancel' }));
 
     // Off the list: back to the default workspace, and the folder is still there.
     await user.click(within(sidebar).getByRole('button', { name: 'Workspace: Charlas' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Quitar de la lista' }, patience));
-    await within(sidebar).findByRole('button', { name: 'Workspace: Mis diagramas' }, patience);
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove from list' }, patience));
+    await within(sidebar).findByRole('button', { name: 'Workspace: My projects' }, patience);
     await screen.findByRole('heading', { level: 1, name: 'En casa' }, patience);
     expect(await readdir(otherRoot)).toEqual(['Charlas', 'Clases']);
     // The switcher waits for the switch to finish before it opens again.
-    await waitFor(() => expect(within(sidebar).getByRole('button', { name: 'Workspace: Mis diagramas' })).toBeEnabled(), patience);
-    await user.click(within(sidebar).getByRole('button', { name: 'Workspace: Mis diagramas' }));
-    expect((await screen.findAllByRole('menuitemradio', undefined, patience)).map((item) => item.textContent)).toEqual(['Mis diagramas', 'Clases']);
-    expect(screen.queryByRole('menuitem', { name: 'Quitar de la lista' })).not.toBeInTheDocument();
+    await waitFor(() => expect(within(sidebar).getByRole('button', { name: 'Workspace: My projects' })).toBeEnabled(), patience);
+    await user.click(within(sidebar).getByRole('button', { name: 'Workspace: My projects' }));
+    expect((await screen.findAllByRole('menuitemradio', undefined, patience)).map((item) => item.textContent)).toEqual(['My projects', 'Clases']);
+    expect(screen.queryByRole('menuitem', { name: 'Remove from list' })).not.toBeInTheDocument();
     expect(added.id).toBeTruthy();
   }, 20000);
 });
 
-describe('«Nuevo workspace…» in the desktop app', () => {
+describe('“New workspace…” in the desktop app', () => {
   type Bridge = { chooseFolder?: (near?: string) => Promise<string | null> };
   const desktop = window as Window & { pasoDesktop?: Bridge };
   afterEach(() => { delete desktop.pasoDesktop; });
@@ -279,55 +279,55 @@ describe('«Nuevo workspace…» in the desktop app', () => {
     let answer: string | null | Error = null;
     desktop.pasoDesktop = { chooseFolder: async (near) => { asked.push(near); if (answer instanceof Error) throw answer; return answer; } };
     render(<App config={config} />);
-    const sidebar = await screen.findByRole('complementary', { name: 'Diagramas' }, patience);
+    const sidebar = await screen.findByRole('complementary', { name: 'Projects and diagrams' }, patience);
     const openMenu = async (name: string) => {
       await waitFor(() => expect(within(sidebar).getByRole('button', { name: `Workspace: ${name}` })).toBeEnabled(), patience);
       await user.click(within(sidebar).getByRole('button', { name: `Workspace: ${name}` }));
-      await user.click(await screen.findByRole('menuitem', { name: 'Nuevo workspace…' }, patience));
+      await user.click(await screen.findByRole('menuitem', { name: 'New workspace…' }, patience));
     };
 
     // Cancelled: no explorer, no notice, the same workspace.
-    await openMenu('Mis diagramas');
+    await openMenu('My projects');
     await waitFor(() => expect(asked).toEqual([undefined]), patience);
-    expect(screen.queryByRole('dialog', { name: 'Nuevo workspace' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument();
     expect(within(sidebar).queryByRole('alert')).not.toBeInTheDocument();
-    expect(within(sidebar).getByRole('button', { name: 'Workspace: Mis diagramas' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Workspace: My projects' })).toBeInTheDocument();
 
     // Picked: the folder becomes the open workspace.
     answer = join(otherRoot, 'Charlas');
-    await openMenu('Mis diagramas');
+    await openMenu('My projects');
     await within(sidebar).findByRole('button', { name: 'Workspace: Charlas' }, patience);
-    expect(screen.queryByRole('dialog', { name: 'Nuevo workspace' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument();
 
     // From a folder workspace the dialog starts beside it; the service still refuses a folder already on the list.
     await openMenu('Charlas');
     await waitFor(() => expect(asked).toEqual([undefined, undefined, join(otherRoot!, 'Charlas')]), patience);
-    expect(await within(sidebar).findByRole('alert', undefined, patience)).toHaveTextContent('No se pudo añadir la carpeta. Esta carpeta ya es el workspace «Charlas».');
+    expect(await within(sidebar).findByRole('alert', undefined, patience)).toHaveTextContent("Couldn't add the folder. This folder is already the workspace “Charlas”.");
 
     // The dialog itself failing is told too.
     answer = new Error('no dialog');
     await openMenu('Charlas');
-    expect(await within(sidebar).findByRole('alert', undefined, patience)).toHaveTextContent('No se pudo abrir el selector de carpetas.');
+    expect(await within(sidebar).findByRole('alert', undefined, patience)).toHaveTextContent("Couldn't open the folder chooser.");
   }, 20000);
 });
 
-describe('«Abrir carpeta»', () => {
-  it('sits under «Renombrar» and opens the project folder; a failure is told in the panel', async () => {
+describe('“Open folder”', () => {
+  it('sits under “Rename” and opens the project folder; a failure is told in the panel', async () => {
     const user = userEvent.setup();
     await seed('Carpeta', 'carpeta');
     render(<App config={config} />);
-    await user.click(await screen.findByRole('button', { name: 'Más acciones de Carpeta' }, patience));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Carpeta' }, patience));
     const items = (await screen.findAllByRole('menuitem')).map((item) => item.textContent);
-    expect(items).toEqual(['Renombrar', 'Abrir carpeta', 'Eliminar…']);
-    await user.click(screen.getByRole('menuitem', { name: 'Abrir carpeta' }));
+    expect(items).toEqual(['Rename', 'Open folder', 'Delete…']);
+    await user.click(screen.getByRole('menuitem', { name: 'Open folder' }));
     await waitFor(() => expect(opened).toHaveLength(1));
     expect(opened[0].endsWith('carpeta')).toBe(true);
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 
     openFails = true;
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Carpeta' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Abrir carpeta' }));
-    expect(await screen.findByText('No se pudo abrir la carpeta del diagrama.', {}, patience)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More actions for Carpeta' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Open folder' }));
+    expect(await screen.findByText("Couldn't open the project's folder.", {}, patience)).toBeInTheDocument();
     expect(opened).toHaveLength(1);
   });
 });
@@ -343,24 +343,24 @@ describe('corrupt and newer projects', () => {
     render(<App config={config} />);
 
     const broken = await screen.findByRole('button', { name: /^broken/ }, patience);
-    expect(broken).toHaveTextContent('No se puede leer: archivos dañados');
-    expect(screen.getByRole('button', { name: /^future/ })).toHaveTextContent('Creado con una versión más nueva de Paso');
+    expect(broken).toHaveTextContent("Can't be read: damaged files");
+    expect(screen.getByRole('button', { name: /^future/ })).toHaveTextContent('Made with a newer version of Paso');
     // Neither has the edit controls a valid project has.
-    expect(screen.queryByRole('button', { name: /Más acciones de broken/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More actions for broken/ })).not.toBeInTheDocument();
 
     // The valid project is the one opened, and it still renames.
     expect(await screen.findByRole('heading', { level: 1, name: 'Sano' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Sano' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Renombrar' }));
-    await user.type(screen.getByLabelText('Nombre de Sano'), ' y salvo{Enter}');
+    await user.click(screen.getByRole('button', { name: 'More actions for Sano' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    await user.type(screen.getByLabelText('Name of Sano'), ' y salvo{Enter}');
     await screen.findByRole('button', { name: /^Sano y salvo/ }, patience);
 
     // Opening the broken row explains it in the main area.
     await user.click(broken);
-    expect(await screen.findByRole('heading', { name: 'No se puede abrir «broken»' })).toBeInTheDocument();
-    expect(window.location.hash).toBe('#/broken/lienzo');
+    expect(await screen.findByRole('heading', { name: "Can't open “broken”" })).toBeInTheDocument();
+    expect(window.location.hash).toBe('#/broken/canvas');
     await user.click(screen.getByRole('button', { name: /^future/ }));
-    expect(screen.getByRole('main')).toHaveTextContent('Actualiza Paso para abrirlo');
+    expect(screen.getByRole('main')).toHaveTextContent('Update Paso to open it');
   });
 
   it('shows a project that breaks while the app is open, and drops the error when it is repaired', async () => {
@@ -370,11 +370,11 @@ describe('corrupt and newer projects', () => {
     await mkdir(join(dataDir, 'late'));
     await writeFile(projectFile('late'), '{ not json');
     const row = await screen.findByRole('button', { name: /^late/ }, patience);
-    expect(row).toHaveTextContent('archivos dañados');
+    expect(row).toHaveTextContent('damaged files');
     const fixed = { schemaVersion: 1, id: 'late', name: 'Reparado', createdAt: '2026-11-07T12:00:00.000Z', updatedAt: '2026-11-07T12:00:00.000Z', sceneIds: [] };
     await writeFile(projectFile('late'), JSON.stringify(fixed));
     const repaired = await screen.findByRole('button', { name: /^Reparado/ }, patience);
-    expect(repaired).toHaveTextContent('Sin escenas');
+    expect(repaired).toHaveTextContent('No scenes');
     expect(screen.queryByRole('button', { name: /^late/ })).not.toBeInTheDocument();
   });
 });
@@ -394,94 +394,94 @@ describe('the board and its overview', () => {
     await seed('Dos', 'two');
     window.location.hash = '#/one/storyboard';
     render(<App config={config} />);
-    expect(await screen.findByRole('main', { name: 'Estudio' }, patience)).toBeInTheDocument();
+    expect(await screen.findByRole('main', { name: 'Studio' }, patience)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Uno' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Uno/ })).toHaveAttribute('aria-current', 'true');
     // There is no view switch: the board is the place, the overview a way of looking at it.
-    expect(screen.queryByRole('radiogroup', { name: 'Vista' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'View' })).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: /^Dos/ }));
-    expect(await screen.findByRole('main', { name: 'Lienzo' }, patience)).toBeInTheDocument();
-    expect(window.location.hash).toBe('#/two/lienzo');
+    expect(await screen.findByRole('main', { name: 'Canvas' }, patience)).toBeInTheDocument();
+    expect(window.location.hash).toBe('#/two/canvas');
   });
 
-  it('switches between the Lienzo and the Estudio from the same corner, and goes back with Escape and from a step', async () => {
+  it('switches between the Canvas and the Studio from the same corner, and goes back with Escape and from a step', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera', 'Segunda']);
-    window.location.hash = '#/one/lienzo/s2/s2t2';
+    window.location.hash = '#/one/canvas/s2/s2t2';
     render(<App config={config} />);
-    const lienzo = await screen.findByRole('main', { name: 'Lienzo' }, patience);
-    // The switch shows the open view, under Presentar.
-    const views = within(lienzo).getByRole('group', { name: 'Vista' });
-    expect(within(views).getByRole('button', { name: 'Lienzo' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(within(views).getByRole('button', { name: 'Estudio' }));
-    const board = await screen.findByRole('main', { name: 'Estudio' }, patience);
+    const canvas = await screen.findByRole('main', { name: 'Canvas' }, patience);
+    // The switch shows the open view, under Present.
+    const views = within(canvas).getByRole('group', { name: 'View' });
+    expect(within(views).getByRole('button', { name: 'Canvas' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(views).getByRole('button', { name: 'Studio' }));
+    const board = await screen.findByRole('main', { name: 'Studio' }, patience);
     expect(window.location.hash).toBe('#/one/storyboard/s2/s2t2');
     await within(board).findByRole('heading', { level: 2, name: 'Segunda' }, patience);
-    // The Estudio keeps the same corner: Presentar, then the switch, with the Estudio pressed.
-    expect(within(board).getByRole('button', { name: 'Presentar' })).toBeInTheDocument();
-    const back = within(board).getByRole('group', { name: 'Vista' });
-    expect(within(back).getByRole('button', { name: 'Estudio' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(within(back).getByRole('button', { name: 'Lienzo' }));
-    await screen.findByRole('main', { name: 'Lienzo' }, patience);
-    expect(window.location.hash).toBe('#/one/lienzo/s2/s2t2');
+    // The Studio keeps the same corner: Present, then the switch, with the Studio pressed.
+    expect(within(board).getByRole('button', { name: 'Present' })).toBeInTheDocument();
+    const back = within(board).getByRole('group', { name: 'View' });
+    expect(within(back).getByRole('button', { name: 'Studio' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(back).getByRole('button', { name: 'Canvas' }));
+    await screen.findByRole('main', { name: 'Canvas' }, patience);
+    expect(window.location.hash).toBe('#/one/canvas/s2/s2t2');
 
-    await user.click(await screen.findByRole('button', { name: 'Estudio' }, patience));
-    await screen.findByRole('main', { name: 'Estudio' }, patience);
+    await user.click(await screen.findByRole('button', { name: 'Studio' }, patience));
+    await screen.findByRole('main', { name: 'Studio' }, patience);
     await user.keyboard('{Escape}');
-    await screen.findByRole('main', { name: 'Lienzo' }, patience);
-    expect(window.location.hash).toBe('#/one/lienzo/s2/s2t2');
+    await screen.findByRole('main', { name: 'Canvas' }, patience);
+    expect(window.location.hash).toBe('#/one/canvas/s2/s2t2');
 
-    await user.click(await screen.findByRole('button', { name: 'Estudio' }, patience));
-    const again = await screen.findByRole('main', { name: 'Estudio' }, patience);
+    await user.click(await screen.findByRole('button', { name: 'Studio' }, patience));
+    const again = await screen.findByRole('main', { name: 'Studio' }, patience);
     // It shows the selected scene only; another one is chosen in the sidebar.
-    expect(within(again).queryByRole('region', { name: 'Escena 1: Primera' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Escena 1: Primera' }));
-    const first = await within(again).findByRole('region', { name: 'Escena 1: Primera' }, patience);
-    await user.click(within(first).getByRole('button', { name: 'Paso 1' }));
-    await screen.findByRole('main', { name: 'Lienzo' }, patience);
-    expect(window.location.hash).toBe('#/one/lienzo/s1/s1t1');
+    expect(within(again).queryByRole('region', { name: 'Scene 1: Primera' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Scene 1: Primera' }));
+    const first = await within(again).findByRole('region', { name: 'Scene 1: Primera' }, patience);
+    await user.click(within(first).getByRole('button', { name: 'Step 1' }));
+    await screen.findByRole('main', { name: 'Canvas' }, patience);
+    expect(window.location.hash).toBe('#/one/canvas/s1/s1t1');
   });
 
   it('renames and deletes scenes from the sidebar, like pages', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera', 'Segunda']);
-    window.location.hash = '#/one/lienzo/s2/s2t1';
+    window.location.hash = '#/one/canvas/s2/s2t1';
     render(<App config={config} />);
-    const list = () => screen.getByRole('list', { name: 'Escenas de Uno' });
-    const names = () => within(list()).getAllByRole('button', { name: /^Escena \d+: / }).map((button) => button.getAttribute('aria-current') ? `[${button.textContent}]` : button.textContent);
-    await waitFor(() => expect(names()).toEqual(['Escena 1: Primera', '[Escena 2: Segunda]']), patience);
+    const list = () => screen.getByRole('list', { name: 'Scenes of Uno' });
+    const names = () => within(list()).getAllByRole('button', { name: /^Scene \d+: / }).map((button) => button.getAttribute('aria-current') ? `[${button.textContent}]` : button.textContent);
+    await waitFor(() => expect(names()).toEqual(['Scene 1: Primera', '[Scene 2: Segunda]']), patience);
     // Only the unfolded diagram, here the open one, shows its scenes.
-    expect(screen.getAllByRole('list', { name: /^Escenas de / })).toHaveLength(1);
+    expect(screen.getAllByRole('list', { name: /^Scenes of / })).toHaveLength(1);
 
-    await user.click(within(list()).getByRole('button', { name: 'Acciones de la escena «Segunda»' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Renombrar' }));
-    const field = await screen.findByLabelText('Nombre de la escena 2');
+    await user.click(within(list()).getByRole('button', { name: 'Actions for the scene “Segunda”' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    const field = await screen.findByLabelText('Name of scene 2');
     await user.clear(field);
     await user.type(field, 'El final{Enter}');
-    await waitFor(() => expect(names()).toEqual(['Escena 1: Primera', '[Escena 2: El final]']), patience);
+    await waitFor(() => expect(names()).toEqual(['Scene 1: Primera', '[Scene 2: El final]']), patience);
     expect((JSON.parse(await readFile(join(dataDir, 'one', 'scenes', 's2', 'scene.json'), 'utf8')) as { name: string }).name).toBe('El final');
 
-    // Scenes change place by dragging them, so the menu has no «Subir» or «Bajar».
-    await user.click(within(list()).getByRole('button', { name: 'Acciones de la escena «El final»' }));
-    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual(['Renombrar', 'Mover a…', 'Eliminar…']);
+    // Scenes change place by dragging them, so the menu has no “Up” or “Down”.
+    await user.click(within(list()).getByRole('button', { name: 'Actions for the scene “El final”' }));
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual(['Rename', 'Move to…', 'Delete…']);
     await user.keyboard('{Escape}');
 
     // Deleting another scene leaves the board where it is.
-    await user.click(within(list()).getByRole('button', { name: 'Acciones de la escena «Primera»' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Eliminar…' }));
-    const other = await screen.findByRole('alertdialog', { name: '¿Eliminar la escena «Primera»?' });
-    await user.click(within(other).getByRole('button', { name: 'Cancelar' }));
+    await user.click(within(list()).getByRole('button', { name: 'Actions for the scene “Primera”' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    const other = await screen.findByRole('alertdialog', { name: 'Delete the scene “Primera”?' });
+    await user.click(within(other).getByRole('button', { name: 'Cancel' }));
 
     // Deleting the open one opens its neighbour.
-    await user.click(within(list()).getByRole('button', { name: 'Acciones de la escena «El final»' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Eliminar…' }));
-    const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar la escena «El final»?' });
-    expect(dialog).toHaveTextContent('Se borrarán 2 pasos');
-    await user.click(within(dialog).getByRole('button', { name: 'Eliminar escena' }));
-    await waitFor(() => expect(names()).toEqual(['[Escena 1: Primera]']), patience);
-    await waitFor(() => expect(window.location.hash).toBe('#/one/lienzo/s1/s1t1'), patience);
+    await user.click(within(list()).getByRole('button', { name: 'Actions for the scene “El final”' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete the scene “El final”?' });
+    expect(dialog).toHaveTextContent('This deletes 2 steps');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete scene' }));
+    await waitFor(() => expect(names()).toEqual(['[Scene 1: Primera]']), patience);
+    await waitFor(() => expect(window.location.hash).toBe('#/one/canvas/s1/s1t1'), patience);
     expect((await readProject('one')).sceneIds).toEqual(['s1']);
   });
 
@@ -489,20 +489,20 @@ describe('the board and its overview', () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     render(<App config={config} />);
-    await screen.findByRole('main', { name: 'Lienzo' }, patience);
+    await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
-    expect(screen.getByRole('separator', { name: 'Anchura de los diagramas' })).toHaveAttribute('aria-valuenow', '240');
-    const tab = screen.getByRole('button', { name: 'Ocultar diagramas' });
+    expect(screen.getByRole('separator', { name: 'Sidebar width' })).toHaveAttribute('aria-valuenow', '240');
+    const tab = screen.getByRole('button', { name: 'Hide sidebar' });
     expect(tab).toHaveAttribute('aria-controls', 'projects-panel');
     await user.click(tab);
-    expect(screen.queryByRole('complementary', { name: 'Diagramas' })).not.toBeInTheDocument();
-    expect(tab).toHaveAccessibleName('Mostrar diagramas');
-    expect(screen.queryByRole('navigation', { name: 'Diagramas' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Nuevo proyecto' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+    expect(tab).toHaveAccessibleName('Show sidebar');
+    expect(screen.queryByRole('navigation', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New project' })).not.toBeInTheDocument();
     expect(document.querySelector('.app')).toHaveClass('app--panel-closed');
     await user.click(tab);
-    expect(screen.getByRole('complementary', { name: 'Diagramas' })).toBeInTheDocument();
-    expect(tab).toHaveAccessibleName('Ocultar diagramas');
+    expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
+    expect(tab).toHaveAccessibleName('Hide sidebar');
   });
 
   it('opens each diagram again on the step where it was left', async () => {
@@ -511,20 +511,20 @@ describe('the board and its overview', () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
     await seed('Dos', 'two');
     await scenes('one', ['Primera', 'Segunda']);
-    window.location.hash = '#/one/lienzo/s2/s2t2';
+    window.location.hash = '#/one/canvas/s2/s2t2';
     render(<App config={config} />);
-    await screen.findByRole('button', { name: 'Escena 2: Segunda' }, patience);
+    await screen.findByRole('button', { name: 'Scene 2: Segunda' }, patience);
     await user.click(screen.getByRole('button', { name: /^Dos/ }));
-    await waitFor(() => expect(window.location.hash).toBe('#/two/lienzo'), patience);
+    await waitFor(() => expect(window.location.hash).toBe('#/two/canvas'), patience);
     await user.click(screen.getByRole('button', { name: /^Uno/ }));
-    await waitFor(() => expect(window.location.hash).toBe('#/one/lienzo/s2/s2t2'), patience);
+    await waitFor(() => expect(window.location.hash).toBe('#/one/canvas/s2/s2t2'), patience);
   });
 
   it('says so when the project in the address does not exist', async () => {
     await seed('Uno', 'one');
     window.location.hash = '#/gone/storyboard';
     render(<App config={config} />);
-    expect(await screen.findByRole('heading', { name: 'Este diagrama ya no existe' }, patience)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'This project no longer exists' }, patience)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Uno/ })).not.toHaveAttribute('aria-current');
   });
 });
@@ -540,17 +540,17 @@ describe('live updates', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Editado fuera');
     expect(document.title).toBe('Editado fuera · Paso');
     await rm(join(dataDir, 'p'), { recursive: true });
-    expect(await screen.findByRole('heading', { name: 'Crea tu primer diagrama' }, patience)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Create your first project' }, patience)).toBeInTheDocument();
   });
 
   it('counts a scene and a step added by another client', async () => {
     await seed('Vivo', 'p');
     render(<App config={config} />);
-    await screen.findByRole('button', { name: /^Vivo.*Sin escenas/ }, patience);
+    await screen.findByRole('button', { name: /^Vivo.*No scenes/ }, patience);
     const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     await fetch(`${service.url}/api/projects/p/scenes`, { method: 'POST', headers: auth, body: JSON.stringify({ id: 's', name: 'Escena' }) });
     await fetch(`${service.url}/api/projects/p/scenes/s/steps`, { method: 'POST', headers: auth, body: JSON.stringify({ id: 't' }) });
-    await screen.findByRole('button', { name: /^Vivo.*1 escena · 1 paso/ }, patience);
+    await screen.findByRole('button', { name: /^Vivo.*1 scene · 1 step/ }, patience);
   });
 });
 
@@ -561,12 +561,12 @@ describe('when the service is not there', () => {
     const port = service.port;
     await service.close();
     render(<App config={{ baseUrl: `http://127.0.0.1:${port}`, token }} />);
-    expect(await screen.findByRole('heading', { name: 'No se puede conectar con el servicio local' }, patience)).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Reintentar' }).length).toBeGreaterThan(0);
+    expect(await screen.findByRole('heading', { name: "Can't connect to the local service" }, patience)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Retry' }).length).toBeGreaterThan(0);
     await start(port);
-    await user.click(screen.getAllByRole('button', { name: 'Reintentar' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Retry' })[0]);
     expect(await screen.findByRole('button', { name: /^Vuelve/ }, patience)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'No se puede conectar con el servicio local' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: "Can't connect to the local service" })).not.toBeInTheDocument();
   });
 
   it('keeps the list when the service stops, reports a failed action, and recovers', async () => {
@@ -576,18 +576,18 @@ describe('when the service is not there', () => {
     await screen.findByRole('button', { name: /^Sigue/ }, patience);
     const port = service.port;
     await service.close();
-    expect(await screen.findByText(/Sin conexión con el servicio/, undefined, patience)).toBeInTheDocument();
+    expect(await screen.findByText(/No connection to the service/, undefined, patience)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Sigue/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Cambiar el icono de Sigue' }));
-    await user.click(await screen.findByRole('button', { name: 'Hoja' }));
+    await user.click(screen.getByRole('button', { name: 'Change the icon of Sigue' }));
+    await user.click(await screen.findByRole('button', { name: 'Leaf' }));
     const alert = await screen.findByRole('alert', undefined, patience);
-    expect(alert).toHaveTextContent('No se pudo cambiar el icono de «Sigue». No hay conexión con el servicio local.');
-    await user.click(within(alert).getByRole('button', { name: 'Cerrar aviso' }));
+    expect(alert).toHaveTextContent("Couldn't change the icon of “Sigue”. No connection to the local service.");
+    await user.click(within(alert).getByRole('button', { name: 'Dismiss notice' }));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
     await start(port);
-    await waitFor(() => expect(screen.queryByText(/Sin conexión con el servicio/)).not.toBeInTheDocument(), { timeout: 10000 });
+    await waitFor(() => expect(screen.queryByText(/No connection to the service/)).not.toBeInTheDocument(), { timeout: 10000 });
     expect(screen.getByRole('button', { name: /^Sigue/ })).toBeInTheDocument();
   }, 20000);
 });

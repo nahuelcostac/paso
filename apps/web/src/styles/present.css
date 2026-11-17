@@ -1,4 +1,4 @@
-/* Presentar: the drawing on paper, with a minimal frame. The mark and «Salir» on top, the step's title and the
+/* Present: the drawing on paper, with a minimal frame. The mark and “Exit” on top, the step's title and the
    pager below. Everything but the pager fades with the pointer. See docs/design/direction.md. */
 .present { position: fixed; inset: 0; z-index: 40; overflow: hidden; isolation: isolate; background: var(--paper); user-select: none; -webkit-user-select: none; touch-action: pinch-zoom; }
 .present[data-idle='true'] { cursor: none; }
@@ -33,7 +33,7 @@
 .present__exit kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink-3); font: var(--weight-medium) var(--text-11) / 1 var(--font-ui); }
 @media (prefers-reduced-motion: reduce) { .present__bar, .present__stage { transition: none; } }
 
-/* The laser, as the Lienzo's laser tool: its cursor over the drawing, and while the pointer is held a red trail that fades, over the drawing and under the frame. */
+/* The laser, as the Canvas's laser tool: its cursor over the drawing, and while the pointer is held a red trail that fades, over the drawing and under the frame. */
 .present { cursor: var(--laser-cursor, auto); }
 .present__bar, .indicator { cursor: auto; }
 .present[data-pan-ready] { cursor: grab; }

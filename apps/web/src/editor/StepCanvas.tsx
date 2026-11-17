@@ -32,14 +32,14 @@ function Toggle({ on, shortcut, onToggle, children }: { on: boolean; shortcut: s
 }
 
 const THEMES: Array<{ value: ThemeChoice; label: string; icon: typeof Sun }> = [
-  { value: 'light', label: 'Claro', icon: Sun }, { value: 'dark', label: 'Oscuro', icon: Moon }, { value: 'system', label: 'Sistema', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun }, { value: 'dark', label: 'Dark', icon: Moon }, { value: 'system', label: 'System', icon: Monitor },
 ];
-/** «Tema» with Claro, Oscuro and Sistema, in Excalidraw's own radio row markup so it looks like its menu. Its built-in row
- * says «Theme»: es-ES does not translate that label in 0.18.1. */
+/** “Theme” with Light, Dark and System, in Excalidraw's own radio row markup so it looks like its menu. Its built-in row
+ * has no System choice, which leaves the theme to the OS. */
 function ThemeRow({ choice }: { choice: ThemeChoice }) {
   return <div className="dropdown-menu-item-base dropdown-menu-item-bare">
-    <label className="dropdown-menu-item__text" htmlFor="paso-theme">Tema</label>
-    <div className="RadioGroup" role="radiogroup" aria-label="Tema">
+    <label className="dropdown-menu-item__text" htmlFor="paso-theme">Theme</label>
+    <div className="RadioGroup" role="radiogroup" aria-label="Theme">
       {THEMES.map(({ value, label, icon: Icon }) => (
         <div key={value} className={`RadioGroup__choice${value === choice ? ' active' : ''}`} title={label}>
           <input id={value === 'light' ? 'paso-theme' : undefined} name="paso-theme" type="radio" checked={value === choice} aria-label={label} onChange={() => chooseTheme(value)} />
@@ -50,24 +50,24 @@ function ThemeRow({ choice }: { choice: ThemeChoice }) {
   </div>;
 }
 
-const failure = 'No se pudo preparar el guardado. Conserva esta ventana abierta.';
+const failure = "Couldn't prepare the save. Keep this window open.";
 
 /**
- * The Lienzo's one Excalidraw. Moving to another step does not mount it again: the next step is prepared beside the
+ * The Canvas's one Excalidraw. Moving to another step does not mount it again: the next step is prepared beside the
  * one on screen (its images, its fonts, its text measured) and then swapped in with a single update, so the drawing
  * on screen stays until the next one is ready. Only the first step opened, a canvas that failed, or a canvas that is
  * still starting are mounted afresh.
  */
 export default function StepCanvas({ api, store, session, theme, keepFocus, camera, onStepKey, view, onShow }: {
   api: ApiClient; store: StepStore;
-  /** The step the Lienzo asks for. Undefined while the store is still reading it: the canvas keeps what it shows. */
+  /** The step the Canvas asks for. Undefined while the store is still reading it: the canvas keeps what it shows. */
   session: Session | undefined;
   theme: 'light' | 'dark'; keepFocus: () => boolean; camera: RefObject<CanvasCamera | undefined>;
   /** ← → (and Page Up, Page Down) on the canvas, when they would do nothing in the drawing: the previous or next step. */
   onStepKey?: (delta: -1 | 1) => void;
-  /** Told what the canvas shows on every change: the Lienzo draws the step's presentation camera from it. */
+  /** Told what the canvas shows on every change: the Canvas draws the step's presentation camera from it. */
   view?: ViewStore;
-  /** Told which step is on screen, once it is: the Lienzo's camera controls and notices belong to that one. */
+  /** Told which step is on screen, once it is: the Canvas's camera controls and notices belong to that one. */
   onShow?: (session: Session | undefined) => void;
 }) {
   const mounted = useRef(false);
@@ -103,7 +103,7 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
     try { store.change(owner, app.getSceneElementsIncludingDeleted(), app.getAppState(), app.getFiles()); }
     catch { store.fail(owner, failure); }
   };
-  // A canvas that goes (a failed load, another diagram) shows no step any more: the Lienzo's controls go with it.
+  // A canvas that goes (a failed load, another diagram) shows no step any more: the Canvas's controls go with it.
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; onShowRef.current?.(undefined); }; }, []);
   useEffect(() => {
     // Undefined while the store reads the step; the same session when it is already on screen.
@@ -157,7 +157,7 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
       if (app && previous && ready.current) capture(app, previous);
       ready.current = false; excalidrawRef.current = null;
       setData(undefined); show(undefined);
-      setError('No se pudo cargar el dibujo o una de sus imágenes.');
+      setError("Couldn't load the drawing or one of its images.");
     });
     return () => { cancelled = true; };
   }, [api, session, retry]);
@@ -167,7 +167,7 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
     if (!onStepKey) return;
     const press = (event: KeyboardEvent) => {
       const app = excalidrawRef.current;
-      // Presentar has the keys while it is open.
+      // Present has the keys while it is open.
       if (!app || document.querySelector('.present')) return;
       const target = event.target instanceof HTMLElement ? event.target : null;
       const delta = canvasStepKey(event, target, target === document.body, app.getAppState());
@@ -179,10 +179,10 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
     window.addEventListener('keydown', press, true);
     return () => window.removeEventListener('keydown', press, true);
   }, [onStepKey]);
-  if (error) return <div className="editor-message" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); setRetry((value) => value + 1); }}>Reintentar</button></div>;
-  if (!data) return <Loading>Cargando dibujo…</Loading>;
+  if (error) return <div className="editor-message" role="alert">{error}<button className="btn" onClick={() => { setError(undefined); setRetry((value) => value + 1); }}>Retry</button></div>;
+  if (!data) return <Loading>Loading drawing…</Loading>;
   return <div className="step-canvas" ref={wrapper} data-step-id={shown?.target.stepId}>
-    <Excalidraw key={data.key} initialData={data.initial} theme={theme} langCode="es-ES" autoFocus={focusCanvas.current} handleKeyboardGlobally={false}
+    <Excalidraw key={data.key} initialData={data.initial} theme={theme} langCode="en" autoFocus={focusCanvas.current} handleKeyboardGlobally={false}
       validateEmbeddable={false} UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, toggleTheme: true, export: false } }} /* toggleTheme: Alt+Shift+D */
       excalidrawAPI={(instance) => { excalidrawRef.current = instance; setExcalidraw(instance); }}
       onChange={(elements, appState, files) => {
@@ -214,15 +214,15 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
       <MainMenu>
         <MainMenu.DefaultItems.SaveAsImage />
         <MainMenu.Separator />
-        <MainMenu.Group title="Preferencias">
-          <Toggle on={modes.grid} shortcut={mac ? "Cmd+'" : "Ctrl+'"} onToggle={() => toggle('grid')}>Mostrar cuadrícula</Toggle>
-          <Toggle on={modes.zen} shortcut="Alt+Z" onToggle={() => toggle('zen')}>Modo zen</Toggle>
-          <Toggle on={modes.view} shortcut="Alt+R" onToggle={() => toggle('view')}>Modo vista</Toggle>
+        <MainMenu.Group title="Preferences">
+          <Toggle on={modes.grid} shortcut={mac ? "Cmd+'" : "Ctrl+'"} onToggle={() => toggle('grid')}>Show grid</Toggle>
+          <Toggle on={modes.zen} shortcut="Alt+Z" onToggle={() => toggle('zen')}>Zen mode</Toggle>
+          <Toggle on={modes.view} shortcut="Alt+R" onToggle={() => toggle('view')}>View mode</Toggle>
           <ThemeRow choice={themeChoice} />
         </MainMenu.Group>
         <MainMenu.Separator />
-        {/* The library's own button gave its corner to Presentar: the library opens from here. */}
-        <MainMenu.Item icon={<Library aria-hidden="true" />} onSelect={() => excalidrawRef.current?.toggleSidebar({ name: 'default', tab: 'library' })}>Biblioteca</MainMenu.Item>
+        {/* The library's own button gave its corner to Present: the library opens from here. */}
+        <MainMenu.Item icon={<Library aria-hidden="true" />} onSelect={() => excalidrawRef.current?.toggleSidebar({ name: 'default', tab: 'library' })}>Library</MainMenu.Item>
         <MainMenu.DefaultItems.ChangeCanvasBackground />
       </MainMenu>
     </Excalidraw>

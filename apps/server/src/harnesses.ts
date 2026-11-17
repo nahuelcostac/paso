@@ -46,7 +46,7 @@ async function find(id: HarnessId, options: DetectionOptions) {
 }
 export async function detectHarness(id: HarnessId, options: DetectionOptions = {}) {
   const path = await find(id, options);
-  if (!path) return { id, found: false, path: null, version: null, session: 'unknown' as Status, message: 'Instala este asistente y vuelve a buscarlo.' };
+  if (!path) return { id, found: false, path: null, version: null, session: 'unknown' as Status, message: 'Install this agent and detect it again.' };
   const timeout = options.timeoutMs ?? 3000;
   const [versionResult, auth] = await Promise.all([
     run(path, ['--version'], timeout),
@@ -64,7 +64,7 @@ export async function detectHarness(id: HarnessId, options: DetectionOptions = {
     else if (auth.ok && /logged in/i.test(auth.output)) session = 'signed_in';
   }
   return { id, found: true, path, version: match?.[0] ?? null, session,
-    ...(session === 'signed_out' ? { message: 'Inicia sesión en este asistente y vuelve a buscarlo.' } : {}) };
+    ...(session === 'signed_out' ? { message: 'Sign in to this agent and detect it again.' } : {}) };
 }
 export class HarnessRegistry {
   private queue: Promise<unknown> = Promise.resolve();
@@ -103,13 +103,13 @@ export class HarnessRegistry {
     } finally { await unlink(temp).catch(() => {}); }
   }
   async add(value: unknown) {
-    if (!validId(value)) throw new ApiError(400, 'INVALID_HARNESS', 'Asistente desconocido.');
+    if (!validId(value)) throw new ApiError(400, 'INVALID_HARNESS', 'Unknown agent.');
     const detected = await detectHarness(value, this.options);
-    if (!detected.found) throw new ApiError(422, 'HARNESS_NOT_FOUND', 'No se ha encontrado el asistente. Instálalo y vuelve a intentarlo.');
+    if (!detected.found) throw new ApiError(422, 'HARNESS_NOT_FOUND', "The agent wasn't found. Install it and try again.");
     return this.change(async () => { const current = await this.read(); if (!current.includes(value)) await this.write([...current, value]); return detected; });
   }
   async remove(value: unknown) {
-    if (!validId(value)) throw new ApiError(400, 'INVALID_HARNESS', 'Asistente desconocido.');
+    if (!validId(value)) throw new ApiError(400, 'INVALID_HARNESS', 'Unknown agent.');
     return this.change(async () => { const current = await this.read(); await this.write(current.filter((id) => id !== value)); });
   }
 }

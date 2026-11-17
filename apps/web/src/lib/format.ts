@@ -1,36 +1,36 @@
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** "4 escenas · 17 pasos". A project with no scenes says so instead of showing two zeros. */
+/** "4 scenes · 17 steps". A project with no scenes says so instead of showing two zeros. */
 export function formatSize(scenes: number, steps: number) {
-  if (scenes === 0) return 'Sin escenas';
-  return `${plural(scenes, 'escena', 'escenas')} · ${plural(steps, 'paso', 'pasos')}`;
+  if (scenes === 0) return 'No scenes';
+  return `${plural(scenes, 'scene', 'scenes')} · ${plural(steps, 'step', 'steps')}`;
 }
 
-/** "4 escenas y 17 pasos", for sentences. */
-export const describeContents = (scenes: number, steps: number) => `${plural(scenes, 'escena', 'escenas')} y ${plural(steps, 'paso', 'pasos')}`;
+/** "4 scenes and 17 steps", for sentences. */
+export const describeContents = (scenes: number, steps: number) => `${plural(scenes, 'scene', 'scenes')} and ${plural(steps, 'step', 'steps')}`;
 
-/** Lower case without accents, so "dibujo" finds "Dibujo" and "diseño" finds "diseno". */
+/** Lower case without accents, so "cafe" finds "Café". */
 export const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 /** The service's own message for a project it cannot open, in terms a person can act on. */
 export function explainProjectError(message: string) {
   if (/newer than supported version/i.test(message)) {
-    return { short: 'Creado con una versión más nueva de Paso', long: 'Este diagrama se creó con una versión más nueva de Paso. Actualiza Paso para abrirlo.' };
+    return { short: 'Made with a newer version of Paso', long: 'This project was made with a newer version of Paso. Update Paso to open it.' };
   }
-  return { short: 'No se puede leer: archivos dañados', long: 'Los archivos de este diagrama no son válidos. Repáralos en el disco o restaura una copia; el resto de diagramas siguen funcionando.' };
+  return { short: "Can't be read: damaged files", long: "This project's files aren't valid. Repair them on disk or restore a copy; your other projects keep working." };
 }
 
-/** "4 pasos" for a scene's heading. An empty scene says so. */
-export const formatSteps = (count: number) => count === 0 ? 'Sin pasos' : plural(count, 'paso', 'pasos');
+/** "4 steps" for a scene's heading. An empty scene says so. */
+export const formatSteps = (count: number) => count === 0 ? 'No steps' : plural(count, 'step', 'steps');
 
-export type RecencyGroup<T> = { label: 'Hoy' | 'Este mes' | 'Anteriores'; items: T[] };
+export type RecencyGroup<T> = { label: 'Today' | 'This month' | 'Earlier'; items: T[] };
 
 /**
  * The sidebar's groups, by when each project last changed: today, earlier this month, and before. Dates are compared on
  * the person's own calendar. A date in the future, from another computer's clock, counts as today. Empty groups are left out.
  */
 export function groupByRecency<T>(items: T[], changedAt: (item: T) => string, now = new Date()): RecencyGroup<T>[] {
-  const groups: RecencyGroup<T>[] = [{ label: 'Hoy', items: [] }, { label: 'Este mes', items: [] }, { label: 'Anteriores', items: [] }];
+  const groups: RecencyGroup<T>[] = [{ label: 'Today', items: [] }, { label: 'This month', items: [] }, { label: 'Earlier', items: [] }];
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const month = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   for (const item of items) {

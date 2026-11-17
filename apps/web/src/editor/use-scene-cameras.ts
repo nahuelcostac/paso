@@ -7,7 +7,7 @@ import type { ServiceEvent } from '../state/projects-store';
 const RELOAD_DELAY_MS = 150;
 
 /**
- * What each step of a scene says about the presentation camera, as the service has it, by step ID. The Lienzo needs it
+ * What each step of a scene says about the presentation camera, as the service has it, by step ID. The Canvas needs it
  * to draw the camera a step keeps from an earlier one. It is read again when `version` changes and, given events,
  * whenever a step of this scene changes on the service, so an agent moving an earlier camera shows at once.
  */

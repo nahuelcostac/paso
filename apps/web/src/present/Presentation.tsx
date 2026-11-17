@@ -122,13 +122,13 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
     try { next = await loadDeck(api, projectId, sceneId); }
     catch (error) {
       if (mine !== reads.current) return;
-      if (signature.current === undefined) exit('No se pudo preparar la presentación.');
-      else if (error instanceof ApiRequestError && error.status === 404) exit('La escena que presentabas ya no existe.');
+      if (signature.current === undefined) exit("Couldn't prepare the presentation.");
+      else if (error instanceof ApiRequestError && error.status === 404) exit('The scene you were presenting no longer exists.');
       // Otherwise the service is away for now. What is ready can still be presented.
       return;
     }
     if (mine !== reads.current) return;
-    if (next.steps.length === 0) { exit('La escena que presentabas se quedó sin pasos.'); return; }
+    if (next.steps.length === 0) { exit('The scene you were presenting has no steps left.'); return; }
     const nextSignature = deckSignature(next);
     if (nextSignature === signature.current) return;
     signature.current = nextSignature;
@@ -189,7 +189,7 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const [motion, setMotion] = useState<'none' | 'zoom' | 'camera'>('none');
   const directMotion = useCallback(() => setMotion('none'), []);
   const { panReady, panning } = useCameraGestures(root, zoom, setZoom, directMotion);
-  // The laser draws while the pointer is held down on the drawing, as the Lienzo's laser tool does, and fades after the
+  // The laser draws while the pointer is held down on the drawing, as the Canvas's laser tool does, and fades after the
   // release. A press never changes the step: the pager's arrows and the keys do. Space + drag and the middle button pan
   // instead. Each press is its own trail, so one still fading stays while the next one draws.
   const [lasers, setLasers] = useState<Array<{ pointerId: number; press: number; held: boolean }>>([]);
@@ -270,7 +270,7 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
   const control = (action: PresentAction) => () => act(action);
   const zoomed = zoom.scale !== 1 || zoom.x !== 0 || zoom.y !== 0;
   return <div
-    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentación" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={holding || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
+    ref={root} className="present" role="dialog" aria-modal="true" aria-label="Presentation" tabIndex={-1} data-idle={idle && !panReady && !panning} data-laser={holding || undefined} data-pan-ready={panReady || undefined} data-panning={panning || undefined}
     style={{ '--laser-cursor': laserCursor(theme) } as React.CSSProperties}
     onPointerDown={holdLaser} onPointerUp={dropLaser} onPointerCancel={dropLaser} onLostPointerCapture={dropLaser}
   >
@@ -281,29 +281,29 @@ export default function Presentation({ api, projectId, sceneId, startStepId, sub
         <div className="present__paper" style={{ background: page.paper }} />
         <img src={page.url} alt="" draggable={false} style={frameOf(page)} />
       </div>)}
-      {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">No se pudo dibujar este paso.</p></div>}
+      {shown?.result.failed && <div className="present__page" data-state="current"><p className="present__message" role="alert">Couldn't draw this step.</p></div>}
     </div>
     {lasers.map((laser) => <Laser key={laser.press} start={pointer.current} held={laser.held} />)}
     {/* A minimal frame: the mark and the way out on top, the step and where you are below. It fades with the pointer. */}
     <div className="present__bar present__bar--top">
       <Brand />
       <button type="button" className="present__exit" tabIndex={-1} onClick={() => exit()}>
-        <X className="i" aria-hidden="true" />Salir<kbd>Esc</kbd>
+        <X className="i" aria-hidden="true" />Exit<kbd>Esc</kbd>
       </button>
     </div>
     <div className="present__bar present__bar--bottom">
       <p className="present__title">{step?.document.title}</p>
-      <p className="present__hint" aria-hidden="true" title="Pellizca o usa Ctrl/Cmd + rueda para zoom. Desplaza con dos dedos, la rueda o Espacio + arrastrar.">← → pasos · mantén pulsado: láser · + − zoom{zoomed && zoom !== home.current ? ` · ${Math.round(zoom.scale * 100)}%, 0 vuelve` : ''}</p>
+      <p className="present__hint" aria-hidden="true" title="Pinch or use Ctrl/Cmd + wheel to zoom. Pan with two fingers, the wheel or Space + drag.">← → steps · hold: laser · + − zoom{zoomed && zoom !== home.current ? ` · ${Math.round(zoom.scale * 100)}%, 0 resets` : ''}</p>
     </div>
     {count > 0 && <div className="indicator">
-      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Primer paso" title="Primer paso (Inicio)" disabled={index === 0} onClick={control('first')}><ChevronFirst className="i" aria-hidden="true" /></button>
-      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Paso anterior" title="Paso anterior (←)" disabled={index === 0} onClick={control('previous')}><ChevronLeft className="i" aria-hidden="true" /></button>
-      <span className="indicator__where" role="status" aria-label={`Paso ${index + 1} de ${count}`}>
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="First step" title="First step (Home)" disabled={index === 0} onClick={control('first')}><ChevronFirst className="i" aria-hidden="true" /></button>
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Previous step" title="Previous step (←)" disabled={index === 0} onClick={control('previous')}><ChevronLeft className="i" aria-hidden="true" /></button>
+      <span className="indicator__where" role="status" aria-label={`Step ${index + 1} of ${count}`}>
         {count <= MAX_TICKS && <span className="indicator__ticks" aria-hidden="true">{deck!.steps.map((item, position) => <i key={item.id} className={position === index ? 'on' : undefined} />)}</span>}
         <span aria-hidden="true">{pad(index + 1)} / {pad(count)}</span>
       </span>
-      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Paso siguiente" title="Paso siguiente (→)" disabled={index === count - 1} onClick={control('next')}><ChevronRight className="i" aria-hidden="true" /></button>
-      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Último paso" title="Último paso (Fin)" disabled={index === count - 1} onClick={control('last')}><ChevronLast className="i" aria-hidden="true" /></button>
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Next step" title="Next step (→)" disabled={index === count - 1} onClick={control('next')}><ChevronRight className="i" aria-hidden="true" /></button>
+      <button type="button" className="indicator__btn" tabIndex={-1} aria-label="Last step" title="Last step (End)" disabled={index === count - 1} onClick={control('last')}><ChevronLast className="i" aria-hidden="true" /></button>
     </div>}
   </div>;
 }
