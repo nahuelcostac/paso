@@ -22,7 +22,7 @@
 .carousel__add:hover:not(:disabled) { color: var(--ink); background: var(--surface-sunken); border-color: var(--ink-3); }
 
 /* The strip and its bar, under one thin line. The bar stays when the strip is hidden, at the same height and place,
-   so “Steps” never moves under the pointer. Over it, the strip is a little shorter: the bar holds the pager. */
+   so its chevron never moves under the pointer. Over it, the strip is a little shorter: the bar holds the pager. */
 .step-dock { --surface: var(--paper); --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus); flex: none; display: flex; flex-direction: column; background: var(--paper); border-top: var(--border); container: dock / inline-size; }
 .step-dock .carousel { border-top: 0; }
 .step-dock .carousel:not(:last-child) { height: var(--carousel-over-bar-h); align-items: flex-end; }
@@ -37,9 +37,8 @@
 .step-bar__arrow { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-sm); color: var(--ink-3); }
 .step-bar__arrow:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
 .step-bar__arrow:disabled { opacity: 0.35; }
-.step-bar__toggle { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-left: auto; padding: 0 var(--space-3) 0 10px; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); font-size: var(--text-12); font-weight: var(--weight-medium); }
+/* Shows and hides the strip: an outlined chevron, down to fold the strip and up to bring it back. */
+.step-bar__toggle { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-left: auto; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); }
 .step-bar__toggle:hover { background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink); }
-.step-bar__toggle[aria-expanded='true'] { color: var(--ink); }
-.step-bar__toggle svg.i { width: 14px; height: 14px; }
 /* A narrow board keeps the numbers and drops the ticks, which would reach the pager. */
 @container dock (max-width: 900px) { .step-bar__ticks { display: none; } }

@@ -7,10 +7,12 @@ import { StepBar } from './StepBar';
 
 afterEach(cleanup);
 const ids = (n: number) => Array.from({ length: n }, (_, i) => `s${i}`);
-function setup(props: Partial<Parameters<typeof StepBar>[0]> = {}) {
-  const all = { stepIds: ids(3), currentId: 's1' as string | undefined, stripShown: true, onToggle: vi.fn<() => void>(), onStep: vi.fn<(delta: -1 | 1) => void>(), ...props };
+type Data = { stepIds: string[]; currentId: string | undefined; stripShown: boolean };
+function setup(props: Partial<Data> = {}) {
+  const onToggle = vi.fn<() => void>(), onStep = vi.fn<(delta: -1 | 1) => void>();
+  const all = { stepIds: ids(3), currentId: 's1' as string | undefined, stripShown: true, ...props, onToggle, onStep };
   const view = render(<StepBar {...all} />);
-  return { ...all, rerender: (changes: Partial<typeof all>) => view.rerender(<StepBar {...all} {...changes} />), container: view.container };
+  return { onToggle, onStep, rerender: (changes: Partial<Data>) => view.rerender(<StepBar {...all} {...changes} />), container: view.container };
 }
 
 describe('step bar', () => {
@@ -28,18 +30,19 @@ describe('step bar', () => {
     expect(screen.getByRole('button', { name: 'Next step' })).toBeDisabled();
   });
 
-  it('keeps one toggle whose label follows the strip, without changing its text', async () => {
+  it('keeps one toggle, a chevron with no text, whose label follows the strip', async () => {
     const user = userEvent.setup();
     const { onToggle, rerender } = setup();
     const toggle = screen.getByRole('button', { name: 'Hide steps' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(toggle).toHaveTextContent(/^Steps$/);
+    expect(toggle).toHaveTextContent(/^$/);
+    expect(toggle.querySelector('svg.lucide-chevron-down')).not.toBeNull();
     await user.click(toggle);
     expect(onToggle).toHaveBeenCalledOnce();
     rerender({ stripShown: false });
     expect(screen.getByRole('button', { name: 'Show steps' })).toBe(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveTextContent(/^Steps$/);
+    expect(toggle.querySelector('svg.lucide-chevron-up')).not.toBeNull();
   });
 
   it('shows the steps as ticks only while the strip is hidden, and only up to 24', () => {

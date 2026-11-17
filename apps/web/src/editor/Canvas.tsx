@@ -171,7 +171,7 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
       {session && framing && <CameraDraw view={view} onCancel={() => setFraming(false)} onDone={(next) => { setFraming(false); store.setCamera(session, next); }} />}
     </div>
     {notices && <div className="canvas-page__notices">{notices}</div>}
-    {/* The strip, then its bar, which stays when the strip is hidden: “Steps” in it never moves under the pointer. */}
+    {/* The strip, then its bar, which stays when the strip is hidden: its chevron never moves under the pointer. */}
     {scene && <div className="step-dock">
       {strip.shown && <StepCarousel
         stepIds={stepIds} currentId={stepId} svgs={svgs} titles={titles} stepAgentStates={stepAgentStates} busy={busy}
