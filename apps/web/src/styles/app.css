@@ -31,8 +31,6 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 }
 .app--panel-closed { --left: 0px; }
 .app--agent { --right: var(--panel-agent); }
-.app--agent-folded { --right: var(--agent-rail-w); }
-.app--agent-drawer { --agent-rail-w: 56px; }
 
 /* A side's inner edge, as in Overleaf: a small tab with a chevron folds and unfolds it, and the edge drags to change its
    width. It sits on the line between the side and the board, at the middle of the window. A thin ink line shows the
@@ -59,7 +57,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* Folded, the side is only a thin strip on the chrome's grey, edged with a line, with the tab to open it filling its
    middle. The edge inside the window still drags it open.
    On a narrow window the strip stays while the side opens over the content. */
-.splitter[data-folded]::before, .app--agent-folded .splitter--right::before {
+.splitter[data-folded]::before {
   content: ''; position: absolute; top: 0; bottom: 0; width: var(--fold-w); background: var(--surface);
 }
 .splitter--left::before { right: 0; border-right: var(--border); }
@@ -99,8 +97,9 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* In the Studio the page starts under the toggle's row instead: the title and the notices keep clear of it. */
 .app--left-floating .board { padding-top: 60px; }
 .app--left-floating .board__top { margin-top: 0; }
-/* The folded chat's rail: the chrome's grey, edged with a line, holding only its toggle. */
-.agent-rail { grid-column: 3; grid-row: 1; background: var(--surface); border-left: var(--border); }
+/* Folded, the chat leaves nothing, as in T3 Code: its toggle stays where it was, and the Studio's top right corner
+   (Present and the view switch) moves left to leave it room. */
+.app--agent-folded .board__corner { right: calc(var(--space-4) + 32px); }
 /* Without a title bar (the desktop app on macOS), the window moves by the sidebar's head, the chat's head, or the
    corner by its buttons while the sidebar is folded. Over the board nothing moves it: the drawing needs the pointer. */
 .window-grip { display: none; }
@@ -127,9 +126,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .brand__tile { fill: var(--ink); }
 .brand__step { fill: none; stroke: var(--on-ink); }
 .brand__name { font-size: 21px; font-weight: var(--weight-bold); letter-spacing: -0.04em; line-height: 1; }
-/* In the sidebar's head the mark is small, as T3 Code's name beside the window's buttons. */
+/* In the sidebar's head the mark is small, as T3 Code's name beside the window's buttons: the tile as large as the
+   toggle's icon before it. */
 .projects__head .brand { gap: var(--space-2); }
-.projects__head .brand__mark { width: 22px; height: 22px; }
+.projects__head .brand__mark { width: 18px; height: 18px; }
 .projects__head .brand__name { font-size: var(--text-15); letter-spacing: -0.02em; }
 
 .menu--scenes { min-width: 220px; max-width: min(320px, calc(100vw - 16px)); }

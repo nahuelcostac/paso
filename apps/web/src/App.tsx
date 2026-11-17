@@ -318,9 +318,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setSceneError(undefined)}>×</button>
     </div>}
   </> : undefined;
-  // The agent folds into a narrow rail on the right, which keeps its toggle; on a narrow window the rail stays, and the
-  // panel is a drawer.
-  const rightRail = Boolean(openProject && overview && (narrow || !agentDocked));
+  // The agent folds away entirely, leaving only its toggle; on a narrow window it stays folded and opens as a drawer.
+  const agentFolded = Boolean(openProject && overview && (narrow || !agentDocked));
   const toggleAgent = () => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(!agentDocked);
   const hideAgent = () => {
     if (narrow) setAgentOpen(false); else setAgentDocked(false);
@@ -337,10 +336,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
 
   return (
     <div
-      className={`app${panelOpen ? '' : ' app--panel-closed'}${leftDocked ? '' : ' app--left-floating'}${openProject && overview && agentDocked && !narrow ? ' app--agent' : ''}${rightRail ? ' app--agent-folded' : ''}${openProject && overview && narrow ? ' app--agent-drawer' : ''}`}
+      className={`app${panelOpen ? '' : ' app--panel-closed'}${leftDocked ? '' : ' app--left-floating'}${openProject && overview && agentDocked && !narrow ? ' app--agent' : ''}${agentFolded ? ' app--agent-folded' : ''}${openProject && overview && narrow ? ' app--agent-drawer' : ''}`}
       style={{ '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
-      {rightRail && <div className="agent-rail" aria-hidden="true" />}
       {/* A docked side's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
       {leftDocked && <Splitter
         side="left" open onToggle={() => setPanelOpen(false)} hide="Hide sidebar" show="Show sidebar"
@@ -350,7 +348,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         side="right" open onToggle={() => setAgentDocked(false)} hide="Hide agent" show="Show agent" controls="agent-panel"
         label="Chat width" resize={agentWidth} tab={false}
       />}
-      {rightRail && openProject && statusShown && working && <AgentWorking
+      {agentFolded && openProject && statusShown && working && <AgentWorking
         working={{
           sentence: `${HARNESS_NAMES[working.turn.harness]} is ${workingAt ? 'changing a step' : 'working'}`,
           step: workingAt ? {

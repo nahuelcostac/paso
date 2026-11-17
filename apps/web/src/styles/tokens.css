@@ -130,7 +130,6 @@
   --panel-projects: 240px;
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
   --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
-  --agent-rail-w: 48px; /* a folded chat: the rail that keeps its toggle */
   --window-controls-w: 0px; /* the window's own buttons over the sidebar's head: none in a browser */
   --carousel-h: 108px;
   --carousel-over-bar-h: 100px; /* the strip above its bar */
