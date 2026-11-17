@@ -6,6 +6,7 @@ import { createServer as createSocket } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { isDevRequestAllowed } from './dev-network.mjs';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
+import { windowChrome } from './lib/app-shell.mjs';
 import { createServer as createVite } from '../web/node_modules/vite/dist/node/index.js';
 
 const root = resolve(import.meta.dirname, '../..');
@@ -43,7 +44,7 @@ async function start() {
   await vite.listen();
   const origin = `http://127.0.0.1:${port}`;
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  const window = new BrowserWindow({ width: 1400, height: 900, webPreferences: { preload: join(root, 'apps/desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  const window = new BrowserWindow({ width: 1400, height: 900, ...windowChrome(process.platform), webPreferences: { preload: join(root, 'apps/desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   ipcMain.on('paso-session', (event) => { if (event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame) event.returnValue = service.sessionToken; });
   registerFolderBridge({ ipcMain, dialog, parent: () => window, trusted: (event) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && new URL(event.senderFrame.url).origin === origin });
   const external = (url) => { try { const parsed = new URL(url); if (parsed.protocol === 'https:' || parsed.protocol === 'http:') void shell.openExternal(url); } catch { /* invalid URL */ } };

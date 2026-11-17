@@ -48,7 +48,8 @@
   align-items: center;
   gap: var(--space-1);
   height: 48px;
-  padding: var(--space-1) var(--space-2) 0 var(--space-3);
+  /* The right end is the chat's toggle (.panel-toggle--right), which sits over it. */
+  padding: var(--space-1) 48px 0 var(--space-3);
   flex: none;
 }
 .agent__target {

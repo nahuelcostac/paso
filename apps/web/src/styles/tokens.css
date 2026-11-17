@@ -129,7 +129,9 @@
   /* -------------------------------------------------------------------- layout */
   --panel-projects: 240px;
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
-  --fold-w: 16px; /* a folded sidebar or agent panel: a thin strip that holds the tab to open it */
+  --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
+  --agent-rail-w: 48px; /* a folded chat: the rail that keeps its toggle */
+  --window-controls-w: 0px; /* the window's own buttons over the sidebar's head: none in a browser */
   --carousel-h: 108px;
   --carousel-over-bar-h: 100px; /* the strip above its bar */
   --step-bar-h: 36px; /* the bar under the strip, which stays when it is hidden */
@@ -157,6 +159,9 @@
   /* Thumbnails in the light theme are the drawing as is. */
   --thumb-filter: none;
 }
+
+/* The desktop app on macOS: close, minimise and zoom sit over the sidebar's head, 16px in, and take 72px with their gap. */
+:root[data-window-controls='mac'] { --window-controls-w: 72px; }
 
 /* Non-colour theme values cannot use light-dark(). This filter is Excalidraw's own
    dark-mode filter, so a thumbnail always matches the canvas it came from. */

@@ -32,8 +32,6 @@ type Props = {
   onDeleted: (id: string) => void;
   /** Opens another workspace. The app saves the open step first. */
   onSwitchWorkspace: (open: () => Promise<void>) => Promise<void>;
-  /** Over the content on a narrow window, a close button in the head; otherwise the tab on the edge folds it. */
-  onHide?: () => void;
   /** A project's scenes, shown under its row while it is expanded. `transfer` lets each be moved elsewhere. */
   sceneList?: (row: Extract<Row, { kind: 'ok' }>, transfer: SceneTransfer) => ReactNode;
   /** The open step's save state, said in the footer. */
@@ -76,7 +74,7 @@ const reasonText = (error: unknown) => error instanceof ActionError ? error.mess
  * The sidebar, laid out like tldraw's: the mark, the workspace switcher, search and “New project”, then the projects
  * grouped by when they last changed. Each workspace is a folder on this computer.
  */
-export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
+export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [picker, setPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null);
@@ -312,10 +310,8 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   return (
     <aside id="projects-panel" className="projects" aria-label="Projects and diagrams" aria-busy={switching || undefined} data-dragging={drag ? 'true' : undefined}>
       <div className="projects__head">
+        {/* The window's buttons (in the desktop app) and the sidebar's toggle sit before the mark, over the head. */}
         <Brand />
-        {onHide && <button type="button" className="icon-btn" aria-label="Close sidebar" title="Close sidebar" onClick={onHide}>
-          <X className="i" aria-hidden="true" />
-        </button>}
       </div>
 
       <div className="projects__nav">

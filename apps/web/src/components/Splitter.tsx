@@ -82,6 +82,8 @@ type Props = {
   /** The edge's name, “… width”, and the width it moves. Without it there is only the tab: the panel is a drawer. */
   label?: string;
   resize?: PanelWidth;
+  /** False when the side has its own toggle elsewhere (PanelToggle): only the edge to drag is left. */
+  tab?: boolean;
 };
 
 /**
@@ -90,7 +92,7 @@ type Props = {
  * edge is a focusable separator: the arrow keys move it (Shift for bigger steps), Home and End go to the narrowest and
  * widest, Enter folds and unfolds, and a double click goes back to the starting width.
  */
-export function Splitter({ side, open, onToggle, hide, show, controls, label, resize }: Props) {
+export function Splitter({ side, open, onToggle, hide, show, controls, label, resize, tab = true }: Props) {
   // `open` is the panel's state as this drag left it, ahead of the next render.
   const drag = useRef<{ x: number; from: number; open: boolean } | undefined>(undefined);
   const now = useRef({ onToggle, resize });
@@ -149,12 +151,12 @@ export function Splitter({ side, open, onToggle, hide, show, controls, label, re
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
         onDoubleClick={() => { if (!open) onToggle(); resize.choose(resize.initial); }} onKeyDown={onKeyDown}
       />}
-      <button
+      {tab && <button
         type="button" className="splitter__tab" aria-label={open ? hide : show} title={open ? hide : show}
         aria-expanded={open} aria-controls={controls} onClick={onToggle}
       >
         <Chevron aria-hidden="true" />
-      </button>
+      </button>}
     </div>
   );
 }

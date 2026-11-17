@@ -14,7 +14,8 @@ import { ThumbnailCache } from './editor/thumbnails';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { SceneList } from './components/SceneList';
 import { AgentWorking } from './components/AgentWorking';
-import { AGENT_WIDTH, BOARD_MIN, FOLDED, Splitter, chatRoom, useAgentWidth, useProjectsWidth } from './components/Splitter';
+import { AGENT_WIDTH, BOARD_MIN, Splitter, chatRoom, useAgentWidth, useProjectsWidth } from './components/Splitter';
+import { PanelToggle } from './components/PanelToggle';
 import { PresentButton } from './present/PresentButton';
 import { useScenes } from './state/scenes';
 import { ActionError, ProjectsStore, useProjects, type ProjectRow } from './state/projects-store';
@@ -88,15 +89,17 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const [route, navigate] = useRoute();
   const [panelOpen, setPanelOpen] = usePanelOpen();
   const [creating, setCreating] = useState(false);
-  // Under this the sidebar opens over the content, and its folded column stays in place.
+  // Under this the sidebar opens over the content.
   const leftNarrow = useMediaQuery(NARROW);
   // The chat lives in the overview, beside the scenes it changes. It docks while the cards keep their minimum;
   // otherwise it folds into its strip and opens as a drawer. The board has the whole width to itself.
   const boardMin = BOARD_MIN.storyboard;
   const overview = route.view === 'storyboard';
-  // The sidebar's width, which the person drags. Folded, or over the content on a narrow window, it leaves a thin strip.
+  // The sidebar's width, which the person drags. Folded, or over the content on a narrow window, it leaves nothing: only
+  // its toggle stays, over the board's top left corner.
   const projectsWidth = useProjectsWidth(boardMin);
-  const left = panelOpen && !leftNarrow ? projectsWidth.width : FOLDED;
+  const leftDocked = panelOpen && !leftNarrow;
+  const left = leftDocked ? projectsWidth.width : 0;
   const narrow = chatRoom(useWindowWidth(), left, boardMin) < AGENT_WIDTH.min;
   // The agent panel: a drawer on a narrow window, otherwise a column the person can hide.
   const [agentOpen, setAgentOpen] = useState(false);
@@ -315,12 +318,14 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setSceneError(undefined)}>×</button>
     </div>}
   </> : undefined;
-  // The agent folds into a narrow column on the right; on a narrow window that column stays, and the panel is a drawer.
+  // The agent folds into a narrow rail on the right, which keeps its toggle; on a narrow window the rail stays, and the
+  // panel is a drawer.
   const rightRail = Boolean(openProject && overview && (narrow || !agentDocked));
+  const toggleAgent = () => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(!agentDocked);
   const hideAgent = () => {
     if (narrow) setAgentOpen(false); else setAgentDocked(false);
-    // Focus goes back to the tab that opened it, on the panel's edge.
-    document.querySelector<HTMLElement>('.splitter--right .splitter__tab')?.focus();
+    // Focus goes back to the toggle that opened it.
+    document.querySelector<HTMLElement>('.panel-toggle--right')?.focus();
   };
 
   // Present, in the top right corner of both views, above the Canvas | Studio switch. Leaving it keeps the view.
@@ -332,17 +337,23 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
 
   return (
     <div
-      className={`app${panelOpen ? '' : ' app--panel-closed'}${openProject && overview && agentDocked && !narrow ? ' app--agent' : ''}${rightRail ? ' app--agent-folded' : ''}`}
+      className={`app${panelOpen ? '' : ' app--panel-closed'}${leftDocked ? '' : ' app--left-floating'}${openProject && overview && agentDocked && !narrow ? ' app--agent' : ''}${rightRail ? ' app--agent-folded' : ''}${openProject && overview && narrow ? ' app--agent-drawer' : ''}`}
       style={{ '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
-      {/* Each side's inner edge: a tab folds and unfolds it, and a drag changes its width. Over the content, only the tab. */}
-      <Splitter
-        side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Hide sidebar" show="Show sidebar"
-        controls="projects-panel" label="Sidebar width" resize={leftNarrow ? undefined : projectsWidth}
-      />
-      {openProject && overview && <Splitter
-        side="right" open={agentShown} onToggle={() => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(!agentDocked)}
-        hide="Hide agent" show="Show agent" controls="agent-panel" label="Chat width" resize={narrow ? undefined : agentWidth}
+      {/* Each side's toggle, as in Notion: one place on the page whether the side shows or not. The sidebar's sits at the
+          top left, after the window's own buttons in the desktop app; the chat's in its head, or its rail when folded. */}
+      <div className="window-grip" aria-hidden="true" />
+      <PanelToggle side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Hide sidebar" show="Show sidebar" controls="projects-panel" />
+      {openProject && overview && <PanelToggle side="right" open={agentShown} onToggle={toggleAgent} hide="Hide agent" show="Show agent" controls="agent-panel" />}
+      {rightRail && <div className="agent-rail" aria-hidden="true" />}
+      {/* A docked side's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
+      {leftDocked && <Splitter
+        side="left" open onToggle={() => setPanelOpen(false)} hide="Hide sidebar" show="Show sidebar"
+        controls="projects-panel" label="Sidebar width" resize={projectsWidth} tab={false}
+      />}
+      {openProject && overview && agentDocked && !narrow && <Splitter
+        side="right" open onToggle={() => setAgentDocked(false)} hide="Hide agent" show="Show agent" controls="agent-panel"
+        label="Chat width" resize={agentWidth} tab={false}
       />}
       {rightRail && openProject && statusShown && working && <AgentWorking
         working={{
@@ -363,7 +374,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           api={api}
           store={store}
           onSwitchWorkspace={switchWorkspace}
-          onHide={leftNarrow ? () => setPanelOpen(false) : undefined}
           notices={notices}
           // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
           sceneList={(projectRow, transfer) => {

@@ -2,7 +2,7 @@ import { brandMark, brandMarkLayout } from '@paso/shared';
 
 const mark = brandMarkLayout();
 
-/** Paso's mark: a rising step on an ink tile, and the name with its full stop.
+/** Paso's mark: a rising step on an ink tile, and the name.
  *  The mark's geometry comes from @paso/shared's brandMark, like the tab and desktop icons.
  *  Its colours are --ink and --on-ink, so the tile inverts in the dark theme. */
 export function Brand() {
@@ -13,7 +13,7 @@ export function Brand() {
         <path className="brand__step" d={mark.step.d} transform={mark.step.transform} strokeWidth={brandMark.strokeWidth}
           strokeLinecap={brandMark.strokeLinecap} strokeLinejoin={brandMark.strokeLinejoin} />
       </svg>
-      <span className="brand__name">Paso<span className="brand__dot">.</span></span>
+      <span className="brand__name">Paso</span>
     </div>
   );
 }

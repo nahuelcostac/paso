@@ -376,9 +376,14 @@ describe('a turn as it happens', () => {
     expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument();
 
     // Folded, the panel leaves it to a small floating status.
-    expect(within(panel).queryByRole('button', { name: 'Close agent' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Hide agent' }));
+    // One toggle, outside the panel, which stays in the rail at the same spot.
+    const toggle = screen.getByRole('button', { name: 'Hide agent' });
+    expect(within(panel).queryByRole('button', { name: 'Hide agent' })).not.toBeInTheDocument();
+    expect(toggle.querySelector('svg')).toHaveClass('lucide-panel-right');
+    await user.click(toggle);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show agent' })).toBe(toggle);
+    expect(document.querySelector('.agent-rail')).not.toBeNull();
     const status = await screen.findByRole('status', { name: 'Agent working' }, patience);
     expect(status).toHaveTextContent('Claude Code is changing a step');
     expect(within(status).getByRole('button', { name: 'Go to step 1 of scene 1' })).toHaveTextContent('1');

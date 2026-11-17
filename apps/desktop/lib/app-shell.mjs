@@ -31,3 +31,17 @@ export function allowsPermission(permission, requestingUrl, origin) {
   if (permission !== 'fullscreen' || typeof requestingUrl !== 'string') return false;
   try { return new URL(requestingUrl).origin === origin; } catch { return false; }
 }
+
+/** Where macOS draws the window's close, minimise and zoom buttons: in the sidebar's head, its centre 30px down. */
+export const TRAFFIC_LIGHTS = { x: 16, y: 24 };
+
+/**
+ * The window's frame. On macOS it has no title bar: the window's buttons sit in the sidebar's head, with the sidebar's
+ * toggle after them, and the page leaves them room (see “Sidebar” in docs/design/direction.md). Elsewhere the system's
+ * frame stays.
+ * @param {NodeJS.Platform} platform
+ * @returns {Partial<import('electron').BrowserWindowConstructorOptions>}
+ */
+export function windowChrome(platform) {
+  return platform === 'darwin' ? { titleBarStyle: 'hidden', trafficLightPosition: TRAFFIC_LIGHTS } : {};
+}

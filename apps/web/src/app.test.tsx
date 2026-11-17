@@ -81,7 +81,8 @@ describe('projects panel against the real service', () => {
     expect(row).toHaveAttribute('aria-current', 'true');
     // A new diagram is ready to draw on: one scene with one empty step, open on the board.
     await waitFor(() => expect(row).toHaveTextContent('1 scene · 1 step'), patience);
-    expect(screen.getByRole('heading', { level: 1, name: 'Búsqueda binaria' })).toBeInTheDocument();
+    // The Canvas, lazily loaded, carries the heading: under load it can come after the row.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Búsqueda binaria' }, patience)).toBeInTheDocument();
     const [id] = await projectFolders();
     const [sceneId] = (await readProject(id)).sceneIds as string[];
     await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/${id}/canvas/${sceneId}/[\\w-]+$`)), patience);
@@ -485,24 +486,30 @@ describe('the board and its overview', () => {
     expect((await readProject('one')).sceneIds).toEqual(['s1']);
   });
 
-  it('has no header: the tab on the sidebar\'s edge folds it away, leaving only the tab, which opens it again', async () => {
+  it('has no header: one toggle at the top left folds the sidebar away and stays there to open it again', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     render(<App config={config} />);
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    const sidebar = screen.getByRole('complementary', { name: 'Projects and diagrams' });
+    expect(sidebar).toHaveTextContent(/^Paso(?!\.)/);
     expect(screen.getByRole('separator', { name: 'Sidebar width' })).toHaveAttribute('aria-valuenow', '240');
-    const tab = screen.getByRole('button', { name: 'Hide sidebar' });
-    expect(tab).toHaveAttribute('aria-controls', 'projects-panel');
-    await user.click(tab);
+    const toggle = screen.getByRole('button', { name: 'Hide sidebar' });
+    expect(toggle).toHaveAttribute('aria-controls', 'projects-panel');
+    expect(toggle.querySelector('svg')).toHaveClass('lucide-panel-left');
+    await user.click(toggle);
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
-    expect(tab).toHaveAccessibleName('Show sidebar');
-    expect(screen.queryByRole('navigation', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+    // The same button, in the same place: nothing else is left of the sidebar, not even the edge to drag.
+    expect(screen.getByRole('button', { name: 'Show sidebar' })).toBe(toggle);
+    expect(toggle).toHaveFocus();
+    expect(screen.queryByRole('separator', { name: 'Sidebar width' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New project' })).not.toBeInTheDocument();
-    expect(document.querySelector('.app')).toHaveClass('app--panel-closed');
-    await user.click(tab);
+    expect(document.querySelector('.app')).toHaveClass('app--panel-closed', 'app--left-floating');
+    await user.click(toggle);
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
-    expect(tab).toHaveAccessibleName('Hide sidebar');
+    expect(toggle).toHaveAccessibleName('Hide sidebar');
+    expect(document.querySelector('.app')).not.toHaveClass('app--left-floating');
   });
 
   it('opens each diagram again on the step where it was left', async () => {

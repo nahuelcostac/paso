@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { menuTemplate } from './lib/menu.mjs';
 import { placeWindow, readState, trackWindowState } from './lib/window-state.mjs';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
-import { allowsPermission, claimSingleInstance } from './lib/app-shell.mjs';
+import { allowsPermission, claimSingleInstance, windowChrome } from './lib/app-shell.mjs';
 
 let service;
 let closing = false;
@@ -45,7 +45,7 @@ async function start() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate({ packaged: app.isPackaged, openDataFolder: () => void shell.openPath(dirname(resolve(dataDir))) })));
   const stateFile = join(app.getPath('userData'), 'window-state.json');
   const placement = placeWindow(readState(stateFile), screen.getAllDisplays(), screen.getPrimaryDisplay());
-  const window = new BrowserWindow({ ...placement.bounds, webPreferences: { preload: join(root, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  const window = new BrowserWindow({ ...placement.bounds, ...windowChrome(process.platform), webPreferences: { preload: join(root, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   if (placement.maximized) window.maximize();
   trackWindowState(window, stateFile);
   registerFolderBridge({ ipcMain, dialog, parent: () => window, trusted: (event) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && new URL(event.senderFrame.url).origin === origin });
