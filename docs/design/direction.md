@@ -84,7 +84,7 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 - Current step: a 2px ink edge and a solid ink number badge. Agent changed it: a pink `agente` chip after the title. Agent is changing it now: a 2px pink edge and a chip reading `cambiando…` (`agente…` in the carousel). Current and agent states can coexist; the pink edge wins and the ink edge goes outside it.
 - In the carousel, which has no room for a title, the number sits under the thumbnail and the title goes in the tooltip.
 
-**Lienzo.** The canvas and the carousel under it fill the space right of the sidebar, edge to edge, on `--paper`: no card, no gutter.
+**Lienzo.** The canvas and the carousel under it fill the space right of the sidebar, edge to edge, on `--paper`: no card, no gutter A loose diagram can hide the carousel (see «Step strip of a loose diagram»).
 
 **Camera on the Lienzo.** The camera belongs to the scene, not the step. Opening a scene fits the union of all its steps (the frame Presentar uses), capped at 100%, in the clear area between Excalidraw's controls. Moving to another step of the same scene keeps the camera as it is, including any pan or zoom the person made, so what stays still between steps stays still on screen. A new scene or diagram is framed again.
 
@@ -103,6 +103,13 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 - *Duplicar paso* is an exact copy, title and notes included.
 - Arrow keys, Home and End move between steps while focus is in the strip. Alt and the arrows move the step; Delete asks before removing it; a thumbnail can also be dragged. A new canvas does not take focus from the keyboard while the strip is in use.
 - Deleting the open step opens the next one, or the previous one when it was the last. Deleting the last step leaves an empty scene with *Añadir paso* ready.
+
+**Step strip of a loose diagram.** A loose diagram («Nuevo diagrama» in the sidebar) is usually one drawing, so it opens on the Lienzo as a plain whiteboard: no carousel, and the canvas takes its height. A diagram with more than one step shows the strip from the start, and one with no steps always shows it, since «Añadir paso» is there.
+- «Mostrar pasos» is one small island 8px to the left of Excalidraw's help button, as tall as it (40px, `--radius-card`, `--paper` with a thin line and `--shadow-sm`), with Lucide `panel-bottom-open`. With several steps it also carries the pager's «02 / 03» (current number in bold ink), so a hidden strip still says where you are.
+- With the strip shown, «Ocultar pasos» (`panel-bottom-close`, a 34px ghost button) follows the pager at the strip's right end. Hiding the strip never touches the steps.
+- The choice is remembered per diagram in this browser (`paso.loose-strip` in `localStorage`); without one, the number of steps decides. Toggling moves the focus to the other button, and never mounts Excalidraw again.
+- While the strip is hidden, ← → and Page Up, Page Down on the canvas still move between the steps, as in Presentar.
+- A project's scenes always show their strip, with no way to hide it; a loose diagram moved into a project gets it back.
 
 **Agent chat.** A column on the right of the Estudio, 360px to start, flush with the window's edges like the sidebar: the chrome's grey, square corners and a thin line on its left. As a drawer on a narrow window it floats instead, with 20px corners. Its head names the scene the agent works on, the one selected in the sidebar (or the whole diagram while it has no scenes); there is nothing to pick there. Then «Historial de conversaciones» and «Nueva conversación» (and «Cerrar» as a drawer). No rule under it: space separates.
 - Its left edge is the splitter described under «No header»: its tab folds the chat, and a drag changes the width between 320px and 720px; the board always keeps 440px, and a wider sidebar leaves the chat less. A double click goes back to 360px. The width is remembered in this browser, and the narrow drawer uses it too.
@@ -165,6 +172,6 @@ Measured by running the real component in a 1184×724 container, positioned as i
 - Heavy shadows on things that rest on the page. Cards get `--shadow-sm` at most; lift is for hover and for what floats.
 - Cards inside cards. Use a thin line or space.
 - Sketchy or hand-drawn styling in the chrome.
-- Overlays on the canvas beyond Excalidraw's own and Presentar, which takes the library button's corner. New controls go in the sidebar, the step strip, the chat, or Excalidraw's main menu.
+- Overlays on the canvas beyond Excalidraw's own and Presentar, which takes the library button's corner, and the «Mostrar pasos» island of a loose diagram, which stands in for its hidden strip. New controls go in the sidebar, the step strip, the chat, or Excalidraw's main menu.
 - Text below 12px, except the uppercase eyebrow.
 - Absolutely placed elements, such as visually hidden live regions, inside a scroll container that is not positioned. Their containing block becomes the window, and they make the whole document scroll. `.board` is `position: relative` for this reason.

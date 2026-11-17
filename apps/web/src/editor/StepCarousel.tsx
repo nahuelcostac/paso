@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { Copy, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type Ref } from 'react';
+import { Copy, PanelBottomClose, Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
 import { pad, StepFrame } from '../components/StepFrame';
 import '../styles/carousel.css';
@@ -22,6 +22,9 @@ type Props = {
   onMove: (stepId: string, index: number) => Promise<void>;
   /** Resolves when the step is gone. A rejection is shown in the dialog. */
   onDelete: (stepId: string) => Promise<void>;
+  /** A loose diagram can hide the strip: a button after the pager. Its steps stay. */
+  onHide?: () => void;
+  hideRef?: Ref<HTMLButtonElement>;
 };
 
 const HINT = 'Flechas: cambiar de paso. Alt y flechas: mover el paso. Supr: eliminar el paso.';
@@ -30,7 +33,7 @@ const HINT = 'Flechas: cambiar de paso. Alt y flechas: mover el paso. Supr: elim
  * The strip of steps under the canvas. It is not inside the Excalidraw container and never overlaps it.
  * Keys act only while focus is in here: Excalidraw uses bare keys, so nothing is bound on the window.
  */
-export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates, busy, onSelect, onAdd, onDuplicate, onNudge, onMove, onDelete }: Props) {
+export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates, busy, onSelect, onAdd, onDuplicate, onNudge, onMove, onDelete, onHide, hideRef }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const frames = useRef(new Map<string, HTMLElement>());
   const refocus = useRef<string | undefined>(undefined);
@@ -149,6 +152,9 @@ export function StepCarousel({ stepIds, currentId, svgs, titles, stepAgentStates
     {stepIds.length > 0 && <p className="carousel__pager" aria-hidden="true">
       <span className="carousel__pager-now">{currentAt >= 0 ? pad(currentAt + 1) : '–'}</span> / {pad(stepIds.length)}
     </p>}
+    {onHide && <button type="button" ref={hideRef} className="carousel__hide" aria-label="Ocultar pasos" title="Ocultar pasos" onClick={onHide}>
+      <PanelBottomClose className="i" aria-hidden="true" />
+    </button>}
     {confirming && <Dialog title={`¿Eliminar el paso ${confirmingAt + 1}?`} onClose={() => { if (!deleteBusy) setConfirming(undefined); }}>
       <p className="dialog__text">Se borra su dibujo y no se puede deshacer.{stepIds.length === 1 ? ' Es el último paso de la escena: quedará vacía.' : ''}</p>
       {deleteError && <p className="dialog__error" role="alert">{deleteError}</p>}

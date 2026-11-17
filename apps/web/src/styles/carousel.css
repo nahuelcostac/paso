@@ -23,3 +23,6 @@
 /* The plus follows the last thumbnail and scrolls with the steps. Its height matches the drawing above the number. */
 .carousel__add { flex: none; display: grid; place-items: center; width: 40px; height: 65px; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); color: var(--ink-3); background: transparent; }
 .carousel__add:hover:not(:disabled) { color: var(--ink); background: var(--surface-sunken); border-color: var(--ink-3); }
+/* A loose diagram hides its strip from here, after the pager. On the canvas, «Mostrar pasos» brings it back. */
+.carousel__hide { flex: none; display: grid; place-items: center; width: 34px; height: 34px; margin-left: calc(-1 * var(--space-2)); border-radius: var(--radius-md); color: var(--ink-3); background: transparent; }
+.carousel__hide:hover { color: var(--ink); background: var(--surface-sunken); }
