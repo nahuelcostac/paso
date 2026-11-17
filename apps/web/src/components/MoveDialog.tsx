@@ -16,24 +16,24 @@ type Props = {
   onMove: (projectId: string) => Promise<void>;
 };
 
-/** «Mover a proyecto…» and «Mover a…»: the keyboard's way to do what dragging a loose diagram or a scene does. */
+/** “Move to project…” and “Move to…”: the keyboard's way to do what dragging a loose diagram or a scene does. */
 export function MoveDialog({ name, kind, projects, onClose, onMove }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const move = async (projectId: string) => {
     setBusy(true); setError(null);
     try { await onMove(projectId); onClose(); }
-    catch (failed) { setError(failed instanceof Error ? failed.message : 'No se pudo mover.'); setBusy(false); }
+    catch (failed) { setError(failed instanceof Error ? failed.message : "Couldn't move it."); setBusy(false); }
   };
   const text = kind === 'scene'
-    ? 'Irá con todos sus pasos al final del proyecto que elijas, o quedará como un diagrama suelto.'
-    : projects.length ? 'Será la última escena del proyecto, con todos sus pasos.' : 'Aún no hay proyectos. Crea uno con «Nuevo proyecto» y vuelve a intentarlo.';
+    ? 'It goes with all its steps to the end of the project you choose, or becomes a loose diagram.'
+    : projects.length ? "It becomes the project's last scene, with all its steps." : 'There are no projects yet. Create one with “New project” and try again.';
   const empty = kind === 'loose' && projects.length === 0;
   return (
-    <Dialog title={kind === 'scene' ? `Mover «${name}»` : `Mover «${name}» a un proyecto`} role="dialog" onClose={() => { if (!busy) onClose(); }}>
+    <Dialog title={kind === 'scene' ? `Move “${name}”` : `Move “${name}” to a project`} role="dialog" onClose={() => { if (!busy) onClose(); }}>
       <p className="dialog__text">{text}</p>
       {!empty && (
-        <ul className="move-list" aria-label="Destinos">
+        <ul className="move-list" aria-label="Destinations">
           {projects.map((row) => (
             <li key={row.id}>
               <button type="button" className="move-list__item" disabled={busy} onClick={() => void move(row.id)}>
@@ -46,7 +46,7 @@ export function MoveDialog({ name, kind, projects, onClose, onMove }: Props) {
             <li>
               <button type="button" className="move-list__item" disabled={busy} onClick={() => void move(LOOSE_PROJECT_ID)}>
                 <Shapes className="i" aria-hidden="true" />
-                <span className="move-list__name">Diagramas sueltos</span>
+                <span className="move-list__name">Loose diagrams</span>
               </button>
             </li>
           )}
@@ -54,7 +54,7 @@ export function MoveDialog({ name, kind, projects, onClose, onMove }: Props) {
       )}
       {error && <p className="dialog__error" role="alert">{error}</p>}
       <div className="dialog__actions">
-        <button type="button" className="btn btn--soft" data-autofocus disabled={busy} onClick={onClose}>Cancelar</button>
+        <button type="button" className="btn btn--soft" data-autofocus disabled={busy} onClick={onClose}>Cancel</button>
       </div>
     </Dialog>
   );

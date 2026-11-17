@@ -57,7 +57,7 @@ web package alone does not supply a session. Restart root `pnpm dev` to rotate i
 ## Workspaces
 
 A workspace is a folder on this computer that holds project folders. The data
-directory (`PASO_DATA_DIR`) is the default workspace, «Mis diagramas». It is
+directory (`PASO_DATA_DIR`) is the default workspace, “My projects”. It is
 always listed and cannot be removed. The person can add other folders.
 
 The service has one open workspace at a time. Every project route, the event
@@ -268,7 +268,7 @@ All harness routes require the session token. `GET /api/harnesses/detect`
 returns `{ harnesses: [...] }` for Claude Code (`claude`), Codex (`codex`)
 and Antigravity (`agy`). Each entry has `id`, `found`, `path`, `version` and
 `session` (`signed_in`, `signed_out` or `unknown`). `path` and `version` can
-be null. A missing or signed-out harness also has a Spanish `message`.
+be null. A missing or signed-out harness also has a `message` a person can act on.
 Detection runs asynchronous, time-limited commands and never starts a session.
 Claude provides `auth status --json`; Codex provides `login status`; agy has
 no status command in its help. A failed or unrecognised status is `unknown`.
@@ -295,7 +295,7 @@ installed and signed in on this machine with the user's own login. Paso never
 stores API keys, and `ANTHROPIC_*`, `CLAUDE_CODE_*` and other variables of the
 service's environment are not handed to the harness.
 
-All routes need the session token. Errors and messages are in Spanish.
+All routes need the session token. Errors and messages are in English, written for the person using the app.
 
 | Method | Route | Input or result |
 | --- | --- | --- |
@@ -351,7 +351,7 @@ output are never forwarded.
 | `tool_use` | `id`, `tool` (board tool name, such as `add_elements`), `readOnly`, `target?` (`projectId`, `sceneId`, `stepId` when the call names them). |
 | `tool_result` | `id`, `ok`. |
 | `finished` | `reason`: `completed` or `cancelled`. |
-| `failed` | `code` and a Spanish `message`. |
+| `failed` | `code` and a `message` for the person. |
 
 Every run ends with exactly one `finished` or `failed`, and it is sent only
 after the harness process tree is gone, so the next message can start at once.

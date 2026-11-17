@@ -6,28 +6,28 @@ const items = (menu) => menu.submenu.filter((item) => item.type !== 'separator')
 const byRole = (template, role) => template.flatMap((menu) => menu.submenu).find((item) => item.role === role);
 
 describe('the application menu', () => {
-  it('has the Spanish menus, in macOS order', () => {
-    expect(menuTemplate({ platform: 'darwin' }).map((menu) => menu.label)).toEqual(['Paso', 'Archivo', 'Edición', 'Visualización', 'Ventana', 'Ayuda']);
+  it('has the English menus, in macOS order', () => {
+    expect(menuTemplate({ platform: 'darwin' }).map((menu) => menu.label)).toEqual(['Paso', 'File', 'Edit', 'View', 'Window', 'Help']);
   });
 
-  it('labels every item in Spanish, with no Electron default left in English', () => {
+  it('labels every item itself, with no Electron default left to the system language', () => {
     for (const menu of menuTemplate({ platform: 'darwin', packaged: false })) {
-      for (const item of items(menu)) expect(item.label, `${menu.label} › ${item.role}`).toMatch(/[a-záéíóúñ]/i);
+      for (const item of items(menu)) expect(item.label, `${menu.label} › ${item.role}`).toMatch(/^[A-Z][A-Za-z ]+$/);
     }
-    expect(items(menuTemplate({ platform: 'darwin' })[0]).map((item) => item.label)).toEqual(['Acerca de Paso', 'Servicios', 'Ocultar Paso', 'Ocultar otros', 'Mostrar todo', 'Salir de Paso']);
+    expect(items(menuTemplate({ platform: 'darwin' })[0]).map((item) => item.label)).toEqual(['About Paso', 'Services', 'Hide Paso', 'Hide Others', 'Show All', 'Quit Paso']);
   });
 
   it('quits with ⌘Q and closes the window with ⌘W through their native roles', () => {
     const template = menuTemplate({ platform: 'darwin' });
     // The roles carry macOS's own accelerators; setting none keeps them.
-    expect(byRole(template, 'quit')).toEqual({ role: 'quit', label: 'Salir de Paso' });
-    expect(byRole(template, 'close')).toEqual({ role: 'close', label: 'Cerrar ventana' });
-    expect(template[1].label).toBe('Archivo');
+    expect(byRole(template, 'quit')).toEqual({ role: 'quit', label: 'Quit Paso' });
+    expect(byRole(template, 'close')).toEqual({ role: 'close', label: 'Close Window' });
+    expect(template[1].label).toBe('File');
     expect(template[1].submenu).toContain(byRole(template, 'close'));
   });
 
   it('edits through native roles, so Excalidraw and text fields keep their own copy, paste and undo', () => {
-    const edit = menuTemplate({ platform: 'darwin' }).find((menu) => menu.label === 'Edición');
+    const edit = menuTemplate({ platform: 'darwin' }).find((menu) => menu.label === 'Edit');
     expect(items(edit).map((item) => item.role)).toEqual(['undo', 'redo', 'cut', 'copy', 'paste', 'pasteAndMatchStyle', 'delete', 'selectAll']);
     // No custom accelerator and no click handler: nothing here can take a key from the page.
     for (const item of items(edit)) { expect(item.accelerator).toBeUndefined(); expect(item.click).toBeUndefined(); }
@@ -41,16 +41,16 @@ describe('the application menu', () => {
   });
 
   it('offers full screen, and reload and developer tools only outside the packaged app', () => {
-    const view = (packaged) => menuTemplate({ platform: 'darwin', packaged }).find((menu) => menu.label === 'Visualización');
+    const view = (packaged) => menuTemplate({ platform: 'darwin', packaged }).find((menu) => menu.label === 'View');
     expect(items(view(true)).map((item) => item.role)).toEqual(['togglefullscreen']);
     expect(items(view(false)).map((item) => item.role)).toEqual(['togglefullscreen', 'reload', 'toggleDevTools']);
   });
 
-  it('marks Ventana and Ayuda for macOS and opens the data folder from Ayuda', () => {
+  it('marks Window and Help for macOS and opens the data folder from Help', () => {
     const openDataFolder = vi.fn();
     const template = menuTemplate({ platform: 'darwin', openDataFolder });
-    expect(template[4]).toMatchObject({ label: 'Ventana', role: 'window' });
-    expect(template[5]).toMatchObject({ label: 'Ayuda', role: 'help' });
+    expect(template[4]).toMatchObject({ label: 'Window', role: 'window' });
+    expect(template[5]).toMatchObject({ label: 'Help', role: 'help' });
     const open = template[5].submenu[0];
     expect(open.enabled).toBe(true);
     open.click();
@@ -58,9 +58,9 @@ describe('the application menu', () => {
     expect(menuTemplate({ platform: 'darwin' })[5].submenu[0].enabled).toBe(false);
   });
 
-  it('has no app menu elsewhere and quits from Archivo', () => {
+  it('has no app menu elsewhere and quits from File', () => {
     const template = menuTemplate({ platform: 'win32' });
-    expect(template.map((menu) => menu.label)).toEqual(['Archivo', 'Edición', 'Visualización', 'Ventana', 'Ayuda']);
+    expect(template.map((menu) => menu.label)).toEqual(['File', 'Edit', 'View', 'Window', 'Help']);
     expect(items(template[0]).map((item) => item.role)).toEqual(['close', 'quit']);
   });
 });

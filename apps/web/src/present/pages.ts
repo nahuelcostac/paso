@@ -28,7 +28,7 @@ export const pageKey = (deck: Deck, step: DeckStep, theme: Theme) => JSON.string
 
 /**
  * Draws one step and waits until the browser can paint it, so the swap to it cannot flash. The drawing has no
- * background: Presentar paints the paper across the whole screen, and the export would stop at its own edge.
+ * background: Present paints the paper across the whole screen, and the export would stop at its own edge.
  * Fonts and images travel inside the SVG. A dark export keeps images from inverting, as thumbnails do.
  */
 export async function renderPage(api: ApiClient, projectId: string, deck: Deck, step: DeckStep, theme: Theme): Promise<Page> {

@@ -27,8 +27,8 @@ export function EffortBars({ harness, effort }: { harness: HarnessId; effort: st
 /** Why an agent's models cannot be picked. While detection runs nothing is known yet, and the models stay available. */
 function harnessStatus(info: HarnessInfo | undefined) {
   if (!info) return undefined;
-  if (!info.found) return `No se encuentra ${HARNESS_NAMES[info.id]} en este equipo.`;
-  if (!info.supported) return `${HARNESS_NAMES[info.id]} todavía no se puede usar desde Paso.`;
+  if (!info.found) return `${HARNESS_NAMES[info.id]} isn't on this computer.`;
+  if (!info.supported) return `${HARNESS_NAMES[info.id]} can't be used from Paso yet.`;
   return undefined;
 }
 
@@ -56,12 +56,12 @@ export function AgentPicker({ harnesses, loading, harness, model, effort, onPick
   const modelLabel = models.find((option) => option.id === model)?.label ?? model;
   const effortOption = HARNESS_EFFORTS[harness].find((option) => option.id === effort);
   const named = effortOption && NAMED_LEVELS.has(effortOption.id);
-  const label = [HARNESS_NAMES[harness], modelLabel, effortOption?.id ? `razonamiento ${effortOption.label.toLowerCase()}` : ''].filter(Boolean).join(', ');
+  const label = [HARNESS_NAMES[harness], modelLabel, effortOption?.id ? `${effortOption.label.toLowerCase()} reasoning` : ''].filter(Boolean).join(', ');
   return (
     <>
       <button
         ref={trigger} type="button" className="composer__control agent-picker__trigger" aria-haspopup="dialog" aria-expanded={open}
-        aria-label={`Agente y modelo: ${label}`} title="Agente, modelo y razonamiento"
+        aria-label={`Agent and model: ${label}`} title="Agent, model and reasoning"
         onClick={() => setOpen(!open)}
       >
         <ProviderIcon id={harness} />
@@ -119,9 +119,9 @@ function PickerPopup({ anchor, harnesses, loading, harness, model, effort, onClo
   const efforts = effortOptions(harness, model, harnesses.find((item) => item.id === harness));
   const modelLabel = modelOptions(harness, harnesses.find((item) => item.id === harness)).find((option) => option.id === model)?.label ?? model;
   return (
-    <Popover anchor={anchor} onClose={onClose} role="dialog" label="Elegir agente y modelo" className="agent-picker" onKeyDown={columnKeys}>
+    <Popover anchor={anchor} onClose={onClose} role="dialog" label="Choose agent and model" className="agent-picker" onKeyDown={columnKeys}>
       <div ref={root} className="agent-picker__columns">
-        <div className="agent-picker__rail" role="radiogroup" aria-label="Agente" data-picker-column="harnesses">
+        <div className="agent-picker__rail" role="radiogroup" aria-label="Agent" data-picker-column="harnesses">
           {(harnesses.length ? harnesses.map((item) => item.id) : (['claude', 'codex', 'agy'] as HarnessId[])).map((id) => (
             <button
               key={id} type="button" role="radio" aria-checked={id === viewing} aria-label={HARNESS_NAMES[id]} title={HARNESS_NAMES[id]}
@@ -137,11 +137,11 @@ function PickerPopup({ anchor, harnesses, loading, harness, model, effort, onClo
             <div className="agent-picker__status">
               <p>{status}</p>
               <button type="button" className="btn btn--soft" disabled={loading} onClick={onRefresh}>
-                <RefreshCw className={`i${loading ? ' i--spin' : ''}`} aria-hidden="true" />Detectar de nuevo
+                <RefreshCw className={`i${loading ? ' i--spin' : ''}`} aria-hidden="true" />Detect again
               </button>
             </div>
           ) : (
-            <div role="radiogroup" aria-label="Modelo" className="agent-picker__list">
+            <div role="radiogroup" aria-label="Model" className="agent-picker__list">
               {modelOptions(viewing, info).map((option) => {
                 const chosen = viewing === harness && option.id === model;
                 return (
@@ -161,13 +161,13 @@ function PickerPopup({ anchor, harnesses, loading, harness, model, effort, onClo
               })}
             </div>
           )}
-          {!status && <button type="button" className="btn btn--soft" disabled={loading} onClick={onRefresh}><RefreshCw className={`i${loading ? ' i--spin' : ''}`} aria-hidden="true" />Detectar de nuevo</button>}
-          {info && !status && !info.added && <p className="agent-picker__hint">Al elegirlo, Paso te pedirá permiso para usarlo con tu sesión.</p>}
+          {!status && <button type="button" className="btn btn--soft" disabled={loading} onClick={onRefresh}><RefreshCw className={`i${loading ? ' i--spin' : ''}`} aria-hidden="true" />Detect again</button>}
+          {info && !status && !info.added && <p className="agent-picker__hint">When you choose it, Paso asks for permission to use it with your session.</p>}
         </div>
         <div className="agent-picker__efforts" data-picker-column="efforts">
-          <div className="agent-picker__head"><span>Razonamiento</span><span className="agent-picker__note">{modelLabel}</span></div>
+          <div className="agent-picker__head"><span>Reasoning</span><span className="agent-picker__note">{modelLabel}</span></div>
           {efforts.length ? (
-            <div role="radiogroup" aria-label="Razonamiento" className="agent-picker__list">
+            <div role="radiogroup" aria-label="Reasoning" className="agent-picker__list">
               {efforts.map((option) => {
                 const chosen = option.id === effort;
                 return (
@@ -181,7 +181,7 @@ function PickerPopup({ anchor, harnesses, loading, harness, model, effort, onClo
                 );
               })}
             </div>
-          ) : <p className="agent-picker__empty">Sin niveles de razonamiento</p>}
+          ) : <p className="agent-picker__empty">No reasoning levels</p>}
         </div>
       </div>
     </Popover>

@@ -106,7 +106,7 @@ describe('Claude Code session: arguments, environment and isolation', () => {
     const mcp = JSON.parse(call.argv[mcpIndex + 1]);
     expect(mcp).toEqual({ mcpServers: { paso: { type: 'stdio', command: process.execPath, args: ['/fake/mcp/cli.js'], env: { PASO_SERVICE_URL: '${PASO_SERVICE_URL}', PASO_SESSION_TOKEN: '${PASO_SESSION_TOKEN}' } } } });
     // The complete list, in order. Anything added or loosened must change this test.
-    expect(call.argv.map((a, i) => i === mcpIndex + 1 ? '<mcp>' : a.startsWith('Eres el asistente') ? '<prompt>' : a)).toEqual([
+    expect(call.argv.map((a, i) => i === mcpIndex + 1 ? '<mcp>' : a.startsWith("You are Paso's assistant") ? '<prompt>' : a)).toEqual([
       '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
       '--tools', '',
       '--strict-mcp-config', '--mcp-config', '<mcp>',
@@ -182,9 +182,11 @@ describe('Claude Code session: arguments, environment and isolation', () => {
     const id = await session('_loose', { sceneId: 'loose-scene' });
     const { end } = await run(id, 'Dibuja una caja');
     expect(end).toEqual({ type: 'finished', reason: 'completed' });
-    const prompt = runs()[0].argv.find((arg) => arg.startsWith('Eres el asistente'))!;
-    expect(prompt).toContain('diagrama suelto: proyecto reservado «_loose», escena «loose-scene»');
-    expect(prompt).toContain('no crees escenas nuevas');
+    const prompt = runs()[0].argv.find((arg) => arg.startsWith("You are Paso's assistant"))!;
+    expect(prompt).toContain('loose diagram: reserved project "_loose", scene "loose-scene"');
+    expect(prompt).toContain('do not create new scenes');
+    // The instructions are in English, and the agent answers in the person's own language.
+    expect(prompt).toContain("Reply briefly, in the language of the user's message.");
   });
   it('builds the same arguments without a scene and with browser support', () => {
     const args = claudeArguments({ context: { projectId: 'p' }, board: { serviceUrl: 'http://127.0.0.1:1', sessionToken: 'x'.repeat(40), mcp: { command: 'node', args: ['a'], browserExecutable: '/b' } } });
@@ -255,10 +257,10 @@ describe('event normalization', () => {
   });
 });
 
-describe('failures surface as failed events with Spanish messages', () => {
+describe('failures surface as failed events with messages a person can act on', () => {
   it.each([
-    ['signed-out', 'signed_out', /sesión/], ['quota', 'quota', /límite/], ['model', 'model_unavailable', /modelo/],
-    ['crash', 'crashed', /inesperada/], ['silent-exit', 'crashed', /inesperada/], ['unknown-flag', 'unsupported_version', /Actualiza/],
+    ['signed-out', 'signed_out', /signed in/], ['quota', 'quota', /usage limit/], ['model', 'model_unavailable', /model/],
+    ['crash', 'crashed', /unexpectedly/], ['silent-exit', 'crashed', /unexpectedly/], ['unknown-flag', 'unsupported_version', /Update Claude Code/],
   ] as const)('%s -> %s', async (scenario, code, message) => {
     const { end } = await run(await session(await project()), `SCENARIO:${scenario}`);
     expect(end).toMatchObject({ type: 'failed', code });
@@ -274,7 +276,7 @@ describe('failures surface as failed events with Spanish messages', () => {
     await service.close(); await start({ idleTimeoutMs: 400 });
     const started = Date.now();
     const { end } = await run(await session(await project()), 'SCENARIO:hang');
-    expect(end).toMatchObject({ type: 'failed', code: 'timeout', message: expect.stringMatching(/dejó de responder/) });
+    expect(end).toMatchObject({ type: 'failed', code: 'timeout', message: expect.stringMatching(/stopped responding/) });
     expect(Date.now() - started).toBeLessThan(8000);
     expect(alive(runs()[0].pid)).toBe(false);
   });
@@ -344,7 +346,7 @@ describe('sessions, limits and resume', () => {
     expect((await api(`/api/agent/sessions/${a}/messages`, 'POST', { text: 'otra' })).data.error.code).toBe('SESSION_BUSY');
     const refused = await api(`/api/agent/sessions/${b}/messages`, 'POST', { text: 'hola' });
     expect(refused.status).toBe(409);
-    expect(refused.data.error).toMatchObject({ code: 'PROJECT_BUSY', message: expect.stringMatching(/Ya hay un asistente/) });
+    expect(refused.data.error).toMatchObject({ code: 'PROJECT_BUSY', message: expect.stringMatching(/already working on this project/) });
     // Another project is independent.
     const other = await session(await project('Otro'));
     expect((await api(`/api/agent/sessions/${other}/messages`, 'POST', { text: 'SCENARIO:slow' })).status).toBe(202);

@@ -16,7 +16,7 @@ let current: ThemeChoice = typeof window === 'undefined' ? 'system' : read();
 
 /**
  * Applies a theme to the whole window: data-theme on <html>, which tokens.css and useTheme already follow.
- * «Sistema» removes it, so the OS decides. The choice is remembered in this browser only.
+ * “System” removes it, so the OS decides. The choice is remembered in this browser only.
  */
 export function chooseTheme(choice: ThemeChoice) {
   current = choice;

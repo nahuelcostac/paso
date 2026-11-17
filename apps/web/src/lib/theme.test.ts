@@ -6,7 +6,7 @@ import { chooseTheme, restoreTheme, useThemeChoice } from './theme';
 afterEach(() => { chooseTheme('system'); window.localStorage.clear(); });
 
 describe('the theme choice', () => {
-  it('sets data-theme on the window and remembers it; «Sistema» hands the choice back to the OS', () => {
+  it('sets data-theme on the window and remembers it; “System” hands the choice back to the OS', () => {
     chooseTheme('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(window.localStorage.getItem('paso.theme')).toBe('dark');

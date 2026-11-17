@@ -11,7 +11,7 @@ import { App } from './App';
 import type { Draft, Recovery } from './editor/step-store';
 import type { ClientConfig } from './lib/api';
 
-// jsdom has no canvas: Excalidraw is a stand-in whose «Dibujar» button edits the step the way its onChange would.
+// jsdom has no canvas: Excalidraw is a stand-in whose “Draw” button edits the step the way its onChange would.
 vi.mock('./editor/StepCanvas', () => import('./editor/canvas-stand-in'));
 vi.mock('./editor/use-thumbnails', () => ({ useThumbnails: () => ({ svgs: {}, titles: {} }) }));
 // jsdom has no PointerEvent: without it, a pointer event fired in a test carries no coordinates.
@@ -19,7 +19,7 @@ if (typeof window.PointerEvent === 'undefined') {
   class TestPointerEvent extends MouseEvent { pointerId: number; constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; } }
   window.PointerEvent = TestPointerEvent as unknown as typeof PointerEvent;
 }
-// The first test pays for loading the lazy Lienzo.
+// The first test pays for loading the lazy Canvas.
 vi.setConfig({ testTimeout: 30_000 });
 const memory = (): Recovery => { const drafts = new Map<string, Draft>(); return { read: async (key) => drafts.get(key), write: async (key, draft) => { drafts.set(key, structuredClone(draft)); }, remove: async (key) => { drafts.delete(key); } }; };
 
@@ -48,7 +48,7 @@ const seedLoose = async (id: string, name: string, steps = 1) => {
   for (let n = 0; n < steps; n += 1) await call(`/api/projects/_loose/scenes/${id}/steps`, 'POST', { id: `${id}-step-${n}` });
 };
 const looseScenes = async () => (JSON.parse(await readFile(join(dataDir, '.loose', 'project.json'), 'utf8')) as { sceneIds: string[] }).sceneIds;
-const sidebar = () => screen.getByRole('complementary', { name: 'Diagramas' });
+const sidebar = () => screen.getByRole('complementary', { name: 'Projects and diagrams' });
 
 beforeEach(async () => {
   testRoot = await mkdtemp(join(tmpdir(), 'paso-web-loose-'));
@@ -72,69 +72,69 @@ describe('loose diagrams in the sidebar', () => {
     await seedProject('p', 'Proyecto');
     render(<App config={config} recovery={memory()} />);
     await screen.findByRole('button', { name: /^Proyecto/ }, patience);
-    expect(within(sidebar()).queryByRole('list', { name: 'Diagramas sueltos' })).not.toBeInTheDocument();
-    expect(within(sidebar()).getByRole('button', { name: 'Nuevo diagrama' })).toBeInTheDocument();
+    expect(within(sidebar()).queryByRole('list', { name: 'Loose diagrams' })).not.toBeInTheDocument();
+    expect(within(sidebar()).getByRole('button', { name: 'New diagram' })).toBeInTheDocument();
   });
 
-  it('creates one with «Nuevo diagrama», opens it, renames and deletes it', async () => {
+  it('creates one with “New diagram”, opens it, renames and deletes it', async () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
     render(<App config={config} recovery={memory()} />);
     await screen.findByRole('button', { name: /^Proyecto/ }, patience);
-    // «Nuevo diagrama» sits right above «Nuevo proyecto».
+    // “New diagram” sits right above “New project”.
     const navButtons = within(sidebar()).getAllByRole('button').map((button) => button.textContent);
-    expect(navButtons.indexOf('Nuevo diagrama')).toBe(navButtons.indexOf('Nuevo proyecto') - 1);
+    expect(navButtons.indexOf('New diagram')).toBe(navButtons.indexOf('New project') - 1);
 
-    await user.click(within(sidebar()).getByRole('button', { name: 'Nuevo diagrama' }));
-    await user.type(screen.getByLabelText('Nombre del diagrama suelto nuevo'), 'Pizarra rápida{Enter}');
-    const row = await screen.findByRole('button', { name: /^Pizarra rápida ?, diagrama suelto/ }, patience);
+    await user.click(within(sidebar()).getByRole('button', { name: 'New diagram' }));
+    await user.type(screen.getByLabelText('Name of the new diagram'), 'Pizarra rápida{Enter}');
+    const row = await screen.findByRole('button', { name: /^Pizarra rápida ?, loose diagram/ }, patience);
     expect(row).toHaveAttribute('aria-current', 'true');
     await waitFor(() => expect(row).toHaveTextContent('Pizarra rápida'), patience);
     // Below the projects, with no heading of its own, and never as a project.
-    const list = within(sidebar()).getByRole('list', { name: 'Diagramas sueltos' });
+    const list = within(sidebar()).getByRole('list', { name: 'Loose diagrams' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
     expect(within(sidebar()).queryByRole('heading', { name: /suelto/i })).not.toBeInTheDocument();
     const [sceneId] = await looseScenes();
-    await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/_loose/lienzo/${sceneId}/[\\w-]+$`)), patience);
+    await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/_loose/canvas/${sceneId}/[\\w-]+$`)), patience);
     expect(screen.getByRole('heading', { level: 1, name: 'Pizarra rápida' })).toBeInTheDocument();
     expect((await readdir(dataDir)).sort()).toEqual(['.loose', 'p']);
     expect(((await call('/api/projects')) as { projects: Array<{ id: string }> }).projects.map((item) => item.id)).toEqual(['p']);
 
     // Its menu has no folder to open, and offers the move.
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Pizarra rápida' }));
-    expect(screen.queryByRole('menuitem', { name: 'Abrir carpeta' })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Mover a proyecto…' })).toBeInTheDocument();
-    await user.click(screen.getByRole('menuitem', { name: 'Renombrar' }));
-    const field = screen.getByLabelText('Nombre de Pizarra rápida');
+    await user.click(screen.getByRole('button', { name: 'More actions for Pizarra rápida' }));
+    expect(screen.queryByRole('menuitem', { name: 'Open folder' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Move to project…' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const field = screen.getByLabelText('Name of Pizarra rápida');
     await user.clear(field);
     await user.type(field, 'Boceto{Enter}');
-    await screen.findByRole('button', { name: /^Boceto ?, diagrama suelto/ }, patience);
+    await screen.findByRole('button', { name: /^Boceto ?, loose diagram/ }, patience);
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Boceto'), patience);
 
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Boceto' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Eliminar/ }));
-    const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar «Boceto»?' });
-    expect(dialog).toHaveTextContent('Se borrará el diagrama con 1 paso. No se puede deshacer.');
-    await user.click(within(dialog).getByRole('button', { name: 'Eliminar diagrama' }));
-    await waitFor(() => expect(within(sidebar()).queryByRole('list', { name: 'Diagramas sueltos' })).not.toBeInTheDocument(), patience);
+    await user.click(screen.getByRole('button', { name: 'More actions for Boceto' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Delete/ }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete “Boceto”?' });
+    expect(dialog).toHaveTextContent("This deletes the diagram and its 1 step. This can't be undone.");
+    await user.click(within(dialog).getByRole('button', { name: 'Delete diagram' }));
+    await waitFor(() => expect(within(sidebar()).queryByRole('list', { name: 'Loose diagrams' })).not.toBeInTheDocument(), patience);
     expect(await looseScenes()).toEqual([]);
     // The diagram on screen went away: the project opens.
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/p\/lienzo/), patience);
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/p\/canvas/), patience);
   });
 
   it('opens a new loose diagram created while another one is open', async () => {
     const user = userEvent.setup();
     await seedLoose('d', 'Primero');
-    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     render(<App config={config} recovery={memory()} />);
     await screen.findByRole('heading', { level: 1, name: 'Primero' }, patience);
-    await user.click(within(sidebar()).getByRole('button', { name: 'Nuevo diagrama' }));
-    await user.type(screen.getByLabelText('Nombre del diagrama suelto nuevo'), 'Segundo{Enter}');
+    await user.click(within(sidebar()).getByRole('button', { name: 'New diagram' }));
+    await user.type(screen.getByLabelText('Name of the new diagram'), 'Segundo{Enter}');
     expect(await screen.findByRole('heading', { level: 1, name: 'Segundo' }, patience)).toBeInTheDocument();
     const [, created] = await looseScenes();
-    await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/_loose/lienzo/${created}/[\\w-]+$`)), patience);
+    await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/_loose/canvas/${created}/[\\w-]+$`)), patience);
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(window.location.hash).toMatch(new RegExp(`^#/_loose/lienzo/${created}/`));
+    expect(window.location.hash).toMatch(new RegExp(`^#/_loose/canvas/${created}/`));
   });
 
   it('finds loose diagrams by name in the search', async () => {
@@ -144,28 +144,28 @@ describe('loose diagrams in the sidebar', () => {
     await seedLoose('b', 'Cola de prioridad');
     render(<App config={config} recovery={memory()} />);
     await screen.findByRole('button', { name: /^Árbol binario/ }, patience);
-    await user.click(within(sidebar()).getByRole('button', { name: 'Buscar…' }));
-    await user.type(within(sidebar()).getByRole('searchbox', { name: 'Buscar diagramas' }), 'arbol');
+    await user.click(within(sidebar()).getByRole('button', { name: 'Search…' }));
+    await user.type(within(sidebar()).getByRole('searchbox', { name: 'Search projects and diagrams' }), 'arbol');
     expect(screen.getByRole('button', { name: /^Árbol binario/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Cola de prioridad/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Proyecto/ })).not.toBeInTheDocument();
   });
 
-  it('moves one into a project from «Mover a proyecto…», and the open step follows', async () => {
+  it('moves one into a project from “Move to project…”, and the open step follows', async () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
     await seedLoose('d', 'Suelto', 2);
-    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-1');
+    window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-1');
     render(<App config={config} recovery={memory()} />);
     expect(await screen.findByRole('heading', { level: 1, name: 'Suelto' }, patience)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Suelto' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Mover a proyecto…' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Mover «Suelto» a un proyecto' });
+    await user.click(screen.getByRole('button', { name: 'More actions for Suelto' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move to project…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move “Suelto” to a project' });
     await user.click(within(dialog).getByRole('button', { name: 'Proyecto' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), patience);
-    await waitFor(() => expect(window.location.hash).toBe('#/p/lienzo/d/d-step-1'), patience);
-    expect(await screen.findByRole('button', { name: /^Proyecto ?, 2 escenas · 3 pasos/ }, patience)).toBeInTheDocument();
-    expect(within(sidebar()).queryByRole('list', { name: 'Diagramas sueltos' })).not.toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toBe('#/p/canvas/d/d-step-1'), patience);
+    expect(await screen.findByRole('button', { name: /^Proyecto ?, 2 scenes · 3 steps/ }, patience)).toBeInTheDocument();
+    expect(within(sidebar()).queryByRole('list', { name: 'Loose diagrams' })).not.toBeInTheDocument();
     expect(await looseScenes()).toEqual([]);
     expect((JSON.parse(await readFile(join(dataDir, 'p', 'project.json'), 'utf8')) as { sceneIds: string[] }).sceneIds).toEqual(['p-scene', 'd']);
   });
@@ -174,14 +174,14 @@ describe('loose diagrams in the sidebar', () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
     await seedLoose('d', 'Suelto');
-    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     render(<App config={config} recovery={memory()} />);
-    await user.click(await screen.findByRole('button', { name: 'Dibujar' }, patience));
+    await user.click(await screen.findByRole('button', { name: 'Draw' }, patience));
     // Moved at once, before the autosave would have written it.
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Suelto' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Mover a proyecto…' }));
+    await user.click(screen.getByRole('button', { name: 'More actions for Suelto' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move to project…' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Proyecto' }));
-    await waitFor(() => expect(window.location.hash).toBe('#/p/lienzo/d/d-step-0'), patience);
+    await waitFor(() => expect(window.location.hash).toBe('#/p/canvas/d/d-step-0'), patience);
     const step = JSON.parse(await readFile(join(dataDir, 'p', 'scenes', 'd', 'steps', 'd-step-0.json'), 'utf8')) as { elements: Array<{ id: string }> };
     expect(step.elements.map((element) => element.id)).toEqual(['drawn-0']);
     await waitFor(() => expect(screen.getByTestId('elements')).toHaveTextContent('drawn-0'), patience);
@@ -192,7 +192,7 @@ describe('loose diagrams in the sidebar', () => {
     await seedProject('q', 'Otro');
     await seedLoose('d', 'Suelto');
     render(<App config={config} recovery={memory()} />);
-    const row = await screen.findByRole('button', { name: /^Suelto ?, diagrama suelto/ }, patience);
+    const row = await screen.findByRole('button', { name: /^Suelto ?, loose diagram/ }, patience);
     const target = screen.getByRole('button', { name: /^Proyecto ?,/ }).closest('li')!;
     // jsdom has no layout: the point under the pointer is the project's row.
     const original = document.elementFromPoint;
@@ -215,7 +215,7 @@ describe('loose diagrams in the sidebar', () => {
       await waitFor(async () => expect(await looseScenes()).toEqual([]), patience);
     } finally { document.elementFromPoint = original; }
     expect(document.querySelector('.drag-ghost')).not.toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /^Proyecto ?, 2 escenas · 2 pasos/ }, patience)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Proyecto ?, 2 scenes · 2 steps/ }, patience)).toBeInTheDocument();
     expect((JSON.parse(await readFile(join(dataDir, 'p', 'project.json'), 'utf8')) as { sceneIds: string[] }).sceneIds).toEqual(['p-scene', 'd']);
   });
 
@@ -224,39 +224,39 @@ describe('loose diagrams in the sidebar', () => {
     await seedProject('p', 'Proyecto');
     await seedLoose('d', 'Suelto');
     render(<App config={config} recovery={memory()} />);
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene\/[\w-]+$/), patience);
-    await user.click(await screen.findByRole('button', { name: /^Suelto ?, diagrama suelto/ }, patience));
-    await waitFor(() => expect(window.location.hash).toBe('#/_loose/lienzo/d/d-step-0'), patience);
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/p\/canvas\/p-scene\/[\w-]+$/), patience);
+    await user.click(await screen.findByRole('button', { name: /^Suelto ?, loose diagram/ }, patience));
+    await waitFor(() => expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0'), patience);
     expect(await screen.findByRole('heading', { level: 1, name: 'Suelto' }, patience)).toBeInTheDocument();
   });
 });
 
 describe('projects fold and unfold in the sidebar', () => {
-  const sceneList = (name: string) => within(sidebar()).queryByRole('list', { name: `Escenas de ${name}` });
+  const sceneList = (name: string) => within(sidebar()).queryByRole('list', { name: `Scenes of ${name}` });
 
   it('keeps an unfolded project unfolded while a new loose diagram opens', async () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
-    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneList('Proyecto')).toBeInTheDocument(), patience);
 
-    await user.click(within(sidebar()).getByRole('button', { name: 'Nuevo diagrama' }));
-    await user.type(screen.getByLabelText('Nombre del diagrama suelto nuevo'), 'Pizarra{Enter}');
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/_loose\/lienzo\/[\w-]+\/[\w-]+$/), patience);
+    await user.click(within(sidebar()).getByRole('button', { name: 'New diagram' }));
+    await user.type(screen.getByLabelText('Name of the new diagram'), 'Pizarra{Enter}');
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/_loose\/canvas\/[\w-]+\/[\w-]+$/), patience);
     expect(sceneList('Proyecto')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Proyecto ?,/ })).toHaveAttribute('aria-expanded', 'true');
 
     // From there a scene of the project opens it.
-    await user.click(within(sceneList('Proyecto')!).getByRole('button', { name: /^Escena 1: / }));
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene\/[\w-]+$/), patience);
+    await user.click(within(sceneList('Proyecto')!).getByRole('button', { name: /^Scene 1: / }));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/p\/canvas\/p-scene\/[\w-]+$/), patience);
   });
 
   it('folds and unfolds the open project with a press on its row, and leaves the others as they were', async () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
     await seedProject('q', 'Otro');
-    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneList('Proyecto')).toBeInTheDocument(), patience);
     const proyecto = screen.getByRole('button', { name: /^Proyecto ?,/ });
@@ -266,13 +266,13 @@ describe('projects fold and unfold in the sidebar', () => {
     await user.click(proyecto);
     expect(sceneList('Proyecto')).not.toBeInTheDocument();
     expect(proyecto).toHaveAttribute('aria-expanded', 'false');
-    expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene/);
+    expect(window.location.hash).toMatch(/^#\/p\/canvas\/p-scene/);
     await user.click(proyecto);
     expect(sceneList('Proyecto')).toBeInTheDocument();
 
     // Another project opens unfolded; the first stays unfolded, and folds without being opened.
     await user.click(otro);
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/lienzo/), patience);
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/canvas/), patience);
     await waitFor(() => expect(sceneList('Otro')).toBeInTheDocument(), patience);
     expect(sceneList('Proyecto')).toBeInTheDocument();
     await user.click(otro);
@@ -281,7 +281,7 @@ describe('projects fold and unfold in the sidebar', () => {
 
     // A scene added to a project that is not open shows under it, and the state survives a reload.
     await call('/api/projects/p/scenes', 'POST', { id: 'p-second', name: 'Escena 2' });
-    await waitFor(() => expect(within(sceneList('Proyecto')!).getByRole('button', { name: /^Escena 2: / })).toBeInTheDocument(), patience);
+    await waitFor(() => expect(within(sceneList('Proyecto')!).getByRole('button', { name: /^Scene 2: / })).toBeInTheDocument(), patience);
     cleanup();
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneList('Proyecto')).toBeInTheDocument(), patience);
@@ -290,7 +290,7 @@ describe('projects fold and unfold in the sidebar', () => {
 });
 
 describe('moving a scene out of a project, or to another one', () => {
-  const sceneButton = (project: string, n: number) => within(screen.getByRole('list', { name: `Escenas de ${project}` })).getByRole('button', { name: new RegExp(`^Escena ${n}: `) });
+  const sceneButton = (project: string, n: number) => within(screen.getByRole('list', { name: `Scenes of ${project}` })).getByRole('button', { name: new RegExp(`^Scene ${n}: `) });
   const sceneIds = async (id: string) => (JSON.parse(await readFile(join(dataDir, id, 'project.json'), 'utf8')) as { sceneIds: string[] }).sceneIds;
   const dragTo = async (from: HTMLElement, onto: () => Element, pointerId: number) => {
     const original = document.elementFromPoint;
@@ -307,29 +307,29 @@ describe('moving a scene out of a project, or to another one', () => {
     await seedProject('p', 'Proyecto');
     await call('/api/projects/p/scenes', 'POST', { id: 'p-two', name: 'Segunda' });
     await call('/api/projects/p/scenes/p-two/steps', 'POST', { id: 'p-two-step' });
-    window.history.replaceState(null, '', '#/p/lienzo/p-two/p-two-step');
+    window.history.replaceState(null, '', '#/p/canvas/p-two/p-two-step');
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneButton('Proyecto', 2)).toHaveAttribute('aria-current', 'true'), patience);
     // While there are no loose diagrams, nothing shows for them until a scene is dragged.
-    expect(within(sidebar()).queryByRole('list', { name: 'Diagramas sueltos' })).not.toBeInTheDocument();
+    expect(within(sidebar()).queryByRole('list', { name: 'Loose diagrams' })).not.toBeInTheDocument();
     const from = sceneButton('Proyecto', 2);
     // Its own project does not take it.
     const original = document.elementFromPoint;
     document.elementFromPoint = () => screen.getByRole('button', { name: /^Proyecto ?,/ }).closest('li');
     fireEvent.pointerDown(from, { pointerId: 1, isPrimary: true, button: 0, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 80 });
-    const zone = await within(sidebar()).findByRole('list', { name: 'Diagramas sueltos' });
-    expect(zone).toHaveTextContent('Suelta aquí');
+    const zone = await within(sidebar()).findByRole('list', { name: 'Loose diagrams' });
+    expect(zone).toHaveTextContent('Drop here');
     expect(screen.getByRole('button', { name: /^Proyecto ?,/ }).closest('li')).not.toHaveAttribute('data-drop');
     fireEvent.pointerUp(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 80 });
-    await waitFor(() => expect(within(sidebar()).queryByRole('list', { name: 'Diagramas sueltos' })).not.toBeInTheDocument());
+    await waitFor(() => expect(within(sidebar()).queryByRole('list', { name: 'Loose diagrams' })).not.toBeInTheDocument());
     expect(await sceneIds('p')).toEqual(['p-scene', 'p-two']);
 
     // Onto the loose diagrams' place: it leaves the project with its steps, and the step on screen follows.
     document.elementFromPoint = () => null;
     fireEvent.pointerDown(from, { pointerId: 2, isPrimary: true, button: 0, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(from, { pointerId: 2, isPrimary: true, clientX: 40, clientY: 200 });
-    const place = await within(sidebar()).findByRole('list', { name: 'Diagramas sueltos' });
+    const place = await within(sidebar()).findByRole('list', { name: 'Loose diagrams' });
     document.elementFromPoint = () => place;
     try {
       fireEvent.pointerMove(from, { pointerId: 2, isPrimary: true, clientX: 40, clientY: 210 });
@@ -337,8 +337,8 @@ describe('moving a scene out of a project, or to another one', () => {
       expect(document.querySelector('.drag-ghost')).toHaveTextContent('Segunda');
       fireEvent.pointerUp(from, { pointerId: 2, isPrimary: true, clientX: 40, clientY: 210 });
     } finally { document.elementFromPoint = original; }
-    await waitFor(() => expect(window.location.hash).toBe('#/_loose/lienzo/p-two/p-two-step'), patience);
-    expect(await screen.findByRole('button', { name: /^Segunda ?, diagrama suelto, 1 paso/ }, patience)).toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toBe('#/_loose/canvas/p-two/p-two-step'), patience);
+    expect(await screen.findByRole('button', { name: /^Segunda ?, loose diagram, 1 step/ }, patience)).toBeInTheDocument();
     expect(await sceneIds('p')).toEqual(['p-scene']);
     expect(await looseScenes()).toEqual(['p-two']);
     expect(await screen.findByRole('heading', { level: 1, name: 'Segunda' }, patience)).toBeInTheDocument();
@@ -347,7 +347,7 @@ describe('moving a scene out of a project, or to another one', () => {
   it('moves a scene to another project by dragging it, and the click that ends the drag opens nothing', async () => {
     await seedProject('p', 'Proyecto');
     await seedProject('q', 'Otro');
-    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneButton('Proyecto', 1)).toBeInTheDocument(), patience);
     const from = sceneButton('Proyecto', 1);
@@ -357,7 +357,7 @@ describe('moving a scene out of a project, or to another one', () => {
     await waitFor(async () => expect(await sceneIds('q')).toEqual(['q-scene', 'p-scene']), patience);
     // The target is written first, as the commit; the source follows a moment later.
     await waitFor(async () => expect(await sceneIds('p')).toEqual([]), patience);
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/lienzo\/p-scene\/[\w-]+$/), patience);
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/canvas\/p-scene\/[\w-]+$/), patience);
   });
 
   it('puts a dragged scene above or below the scene of the target it is dropped on', async () => {
@@ -365,7 +365,7 @@ describe('moving a scene out of a project, or to another one', () => {
     await seedProject('q', 'Otro');
     await call('/api/projects/q/scenes', 'POST', { id: 'q-two', name: 'Segunda' });
     await seedLoose('d', 'Suelto');
-    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneButton('Proyecto', 1)).toBeInTheDocument(), patience);
     // Unfold the other project, then come back: both lists show.
@@ -379,25 +379,25 @@ describe('moving a scene out of a project, or to another one', () => {
     });
     const original = document.elementFromPoint;
     try {
-      // The upper half of «Segunda»: above it, so between the two scenes.
+      // The upper half of “Segunda”: above it, so between the two scenes.
       document.elementFromPoint = () => row(2);
       const from = sceneButton('Proyecto', 1);
       fireEvent.pointerDown(from, { pointerId: 1, isPrimary: true, button: 0, clientX: 10, clientY: 10 });
       fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 135 });
       await waitFor(() => expect(row(2)).toHaveAttribute('data-insert', 'before'));
       expect(screen.getByRole('button', { name: /^Otro ?,/ }).closest('li')).toHaveAttribute('data-drop', 'true');
-      expect(document.body).toHaveTextContent('Suelta para mover «Escena 1» a «Otro», encima de «Segunda».');
+      expect(document.body).toHaveTextContent('Drop to move “Escena 1” to “Otro”, above “Segunda”.');
       // Its lower half: below it.
       fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 155 });
       await waitFor(() => expect(row(2)).toHaveAttribute('data-insert', 'after'));
-      expect(document.body).toHaveTextContent('Suelta para mover «Escena 1» a «Otro», debajo de «Segunda».');
+      expect(document.body).toHaveTextContent('Drop to move “Escena 1” to “Otro”, below “Segunda”.');
       fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 135 });
       await waitFor(() => expect(row(2)).toHaveAttribute('data-insert', 'before'));
       fireEvent.pointerUp(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 135 });
       await waitFor(async () => expect(await sceneIds('q')).toEqual(['q-scene', 'p-scene', 'q-two']), patience);
 
       // A loose diagram dropped on the first scene's upper half goes first.
-      const loose = await screen.findByRole('button', { name: /^Suelto ?, diagrama suelto/ });
+      const loose = await screen.findByRole('button', { name: /^Suelto ?, loose diagram/ });
       await waitFor(() => expect(sceneButton('Otro', 1)).toBeInTheDocument(), patience);
       document.elementFromPoint = () => row(1);
       fireEvent.pointerDown(loose, { pointerId: 2, isPrimary: true, button: 0, clientX: 10, clientY: 10 });
@@ -413,7 +413,7 @@ describe('moving a scene out of a project, or to another one', () => {
     await seedProject('p', 'Proyecto');
     await call('/api/projects/p/scenes', 'POST', { id: 'p-two', name: 'Segunda' });
     await call('/api/projects/p/scenes', 'POST', { id: 'p-three', name: 'Tercera' });
-    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneButton('Proyecto', 3)).toBeInTheDocument(), patience);
     const row = (n: number) => sceneButton('Proyecto', n).closest('li')!;
@@ -430,18 +430,18 @@ describe('moving a scene out of a project, or to another one', () => {
       fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 135 });
       await waitFor(() => expect(document.querySelector('.drag-ghost')).toBeInTheDocument());
       expect(document.querySelector('[data-insert]')).not.toBeInTheDocument();
-      // The lower half of «Tercera»: last. Only the line shows, not the project as a target.
+      // The lower half of “Tercera”: last. Only the line shows, not the project as a target.
       document.elementFromPoint = () => row(3);
       fireEvent.pointerMove(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 185 });
       await waitFor(() => expect(row(3)).toHaveAttribute('data-insert', 'after'));
       expect(screen.getByRole('button', { name: /^Proyecto ?,/ }).closest('li')).not.toHaveAttribute('data-drop');
-      expect(document.body).toHaveTextContent('Suelta para colocar «Escena 1» debajo de «Tercera».');
+      expect(document.body).toHaveTextContent('Drop to place “Escena 1” below “Tercera”.');
       fireEvent.pointerUp(from, { pointerId: 1, isPrimary: true, clientX: 40, clientY: 185 });
       fireEvent.click(from);
       await waitFor(async () => expect(await sceneIds('p')).toEqual(['p-two', 'p-three', 'p-scene']), patience);
       await waitFor(() => expect(sceneButton('Proyecto', 3)).toHaveAttribute('aria-current', 'true'), patience);
 
-      // «Tercera», now second, onto the upper half of the first: first.
+      // “Tercera”, now second, onto the upper half of the first: first.
       document.elementFromPoint = () => row(1);
       const third = sceneButton('Proyecto', 2);
       fireEvent.pointerDown(third, { pointerId: 2, isPrimary: true, button: 0, clientX: 10, clientY: 135 });
@@ -450,9 +450,9 @@ describe('moving a scene out of a project, or to another one', () => {
       fireEvent.pointerUp(third, { pointerId: 2, isPrimary: true, clientX: 40, clientY: 105 });
       await waitFor(async () => expect(await sceneIds('p')).toEqual(['p-three', 'p-two', 'p-scene']), patience);
     } finally { document.elementFromPoint = original; boxes.mockRestore(); }
-    expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene/);
-    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Escenas de Proyecto' })).getAllByRole('button', { name: /^Escena \d: / }).map((button) => button.textContent))
-      .toEqual(['Escena 1: Tercera', 'Escena 2: Segunda', 'Escena 3: Escena 1']), patience);
+    expect(window.location.hash).toMatch(/^#\/p\/canvas\/p-scene/);
+    await waitFor(() => expect(within(screen.getByRole('list', { name: 'Scenes of Proyecto' })).getAllByRole('button', { name: /^Scene \d: / }).map((button) => button.textContent))
+      .toEqual(['Scene 1: Tercera', 'Scene 2: Segunda', 'Scene 3: Escena 1']), patience);
   });
 
   it('moves a scene from its menu, to the loose diagrams or to another project', async () => {
@@ -460,112 +460,112 @@ describe('moving a scene out of a project, or to another one', () => {
     await seedProject('p', 'Proyecto');
     await seedProject('q', 'Otro');
     await call('/api/projects/p/scenes', 'POST', { id: 'p-two', name: 'Segunda' });
-    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(sceneButton('Proyecto', 2)).toBeInTheDocument(), patience);
 
-    await user.click(screen.getByRole('button', { name: 'Acciones de la escena «Segunda»' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Mover a…' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Mover «Segunda»' });
+    await user.click(screen.getByRole('button', { name: 'Actions for the scene “Segunda”' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Move to…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move “Segunda”' });
     // Its own project is not offered.
-    expect(within(dialog).getAllByRole('button').map((button) => button.textContent)).toEqual(['Otro', 'Diagramas sueltos', 'Cancelar']);
-    await user.click(within(dialog).getByRole('button', { name: 'Diagramas sueltos' }));
+    expect(within(dialog).getAllByRole('button').map((button) => button.textContent)).toEqual(['Otro', 'Loose diagrams', 'Cancel']);
+    await user.click(within(dialog).getByRole('button', { name: 'Loose diagrams' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), patience);
-    expect(await screen.findByRole('button', { name: /^Segunda ?, diagrama suelto/ }, patience)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Segunda ?, loose diagram/ }, patience)).toBeInTheDocument();
     expect(await looseScenes()).toEqual(['p-two']);
     // The scene on screen did not move, so the board stays where it was.
-    expect(window.location.hash).toMatch(/^#\/p\/lienzo\/p-scene/);
+    expect(window.location.hash).toMatch(/^#\/p\/canvas\/p-scene/);
 
-    await user.click(screen.getByRole('button', { name: 'Acciones de la escena «Escena 1»' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Mover a…' }));
-    await user.click(within(await screen.findByRole('dialog', { name: 'Mover «Escena 1»' })).getByRole('button', { name: 'Otro' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for the scene “Escena 1”' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Move to…' }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'Move “Escena 1”' })).getByRole('button', { name: 'Otro' }));
     await waitFor(async () => expect(await sceneIds('q')).toEqual(['q-scene', 'p-scene']), patience);
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/lienzo\/p-scene/), patience);
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/q\/canvas\/p-scene/), patience);
   });
 });
 
 describe('the step strip of a loose diagram', () => {
-  const strip = () => screen.queryByRole('contentinfo', { name: 'Pasos de la escena' }) ?? screen.queryByLabelText('Pasos de la escena');
-  const frames = () => screen.getAllByRole('button', { name: /^Paso \d+/ });
+  const strip = () => screen.queryByRole('contentinfo', { name: 'Steps of the scene' }) ?? screen.queryByLabelText('Steps of the scene');
+  const frames = () => screen.getAllByRole('button', { name: /^Step \d+/ });
   const stepsOf = async (id: string) => ((await call(`/api/projects/_loose/scenes/${id}`)) as { document: { stepIds: string[] } }).document.stepIds;
 
   it('opens a new one as a plain whiteboard, shows and hides the strip, and remembers the choice', async () => {
     const user = userEvent.setup();
     await seedLoose('d', 'Pizarra');
-    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     const { unmount } = render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
     expect(strip()).not.toBeInTheDocument();
-    const show = screen.getByRole('button', { name: 'Mostrar pasos' });
+    const show = screen.getByRole('button', { name: 'Show steps' });
     expect(show).not.toHaveTextContent('/');             // one step: no counter
 
     await user.click(show);
     expect(strip()).toBeInTheDocument();
     expect(frames()).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Ocultar pasos' })).toHaveFocus();
-    await user.click(screen.getByRole('button', { name: 'Añadir paso' }));
+    expect(screen.getByRole('button', { name: 'Hide steps' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Add step' }));
     await waitFor(async () => expect(await stepsOf('d')).toHaveLength(2), patience);
     await waitFor(() => expect(frames()).toHaveLength(2), patience);
     const [, second] = await stepsOf('d');
-    await waitFor(() => expect(window.location.hash).toBe(`#/_loose/lienzo/d/${second}`), patience);
+    await waitFor(() => expect(window.location.hash).toBe(`#/_loose/canvas/d/${second}`), patience);
 
     // Hidden again, the steps stay, the counter says where you are, and ← → on the canvas still move between them.
-    await user.click(screen.getByRole('button', { name: 'Ocultar pasos' }));
+    await user.click(screen.getByRole('button', { name: 'Hide steps' }));
     expect(strip()).not.toBeInTheDocument();
     expect(await stepsOf('d')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveFocus();
-    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveTextContent('02 / 02');
+    expect(screen.getByRole('button', { name: 'Show steps' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Show steps' })).toHaveTextContent('02 / 02');
     await waitFor(() => expect(screen.getByTestId('canvas')).toHaveAttribute('data-step-id', second), patience);
     screen.getByTestId('canvas').focus();
     await user.keyboard('{ArrowLeft}');
-    await waitFor(() => expect(window.location.hash).toBe('#/_loose/lienzo/d/d-step-0'), patience);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveTextContent('01 / 02'), patience);
+    await waitFor(() => expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0'), patience);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show steps' })).toHaveTextContent('01 / 02'), patience);
 
     // The choice is kept for this diagram, in this browser, even though it now has several steps.
     unmount();
     render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
     expect(strip()).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();
   });
 
   it('shows the strip from the start when the diagram has several steps', async () => {
     const user = userEvent.setup();
     await seedLoose('d', 'Varios', 3);
-    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
     expect(strip()).toBeInTheDocument();
     expect(frames()).toHaveLength(3);
-    expect(screen.queryByRole('button', { name: 'Mostrar pasos' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Ocultar pasos' }));
-    expect(screen.getByRole('button', { name: 'Mostrar pasos' })).toHaveTextContent('01 / 03');
+    expect(screen.queryByRole('button', { name: 'Show steps' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hide steps' }));
+    expect(screen.getByRole('button', { name: 'Show steps' })).toHaveTextContent('01 / 03');
   });
 
   it('leaves a project\'s strip as it was, also for a loose diagram moved into one', async () => {
     const user = userEvent.setup();
     await seedProject('p', 'Proyecto');
     await seedLoose('d', 'Suelto');
-    window.history.replaceState(null, '', '#/p/lienzo/p-scene');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
     const { unmount } = render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
     // One step in a project's scene: the strip is there, with nothing to hide it.
     expect(strip()).toBeInTheDocument();
     expect(frames()).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: 'Ocultar pasos' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Mostrar pasos' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hide steps' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show steps' })).not.toBeInTheDocument();
     unmount();
 
-    window.history.replaceState(null, '', '#/_loose/lienzo/d/d-step-0');
+    window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
     expect(strip()).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Más acciones de Suelto' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Mover a proyecto…' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Mover «Suelto» a un proyecto' });
+    await user.click(screen.getByRole('button', { name: 'More actions for Suelto' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move to project…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move “Suelto” to a project' });
     await user.click(within(dialog).getByRole('button', { name: 'Proyecto' }));
-    await waitFor(() => expect(window.location.hash).toBe('#/p/lienzo/d/d-step-0'), patience);
+    await waitFor(() => expect(window.location.hash).toBe('#/p/canvas/d/d-step-0'), patience);
     await waitFor(() => expect(strip()).toBeInTheDocument(), patience);
-    expect(screen.queryByRole('button', { name: 'Ocultar pasos' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hide steps' })).not.toBeInTheDocument();
   });
 });

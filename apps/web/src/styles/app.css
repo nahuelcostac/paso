@@ -19,7 +19,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 :focus-visible { outline: none; box-shadow: var(--focus-ring) !important; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* The small spaced uppercase label above a title: «ESCENA 1 DE 3», «PASO 01». */
+/* The small spaced uppercase label above a title: “SCENE 1 OF 3”, “STEP 01”. */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
 /* Shell: no header. Three columns: the sidebar (or its folded strip), the board, and the agent (or its folded strip).
@@ -69,10 +69,10 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 .splitter--right[data-folded] .splitter__tab { left: 0; }
 .splitter--left[data-folded] .splitter__edge { left: -2px; width: 8px; }
 .splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
-.board, .main-message, .lienzo, .canvas { grid-column: 2; grid-row: 1; }
+.board, .main-message, .canvas-page, .canvas { grid-column: 2; grid-row: 1; }
 
-/* The agent at work with its panel folded: a floating pill at the foot of the Estudio, by the chat's tab, with a pink
-   pulse, the step it is changing as a pink chip, and Detener. */
+/* The agent at work with its panel folded: a floating pill at the foot of the Studio, by the chat's tab, with a pink
+   pulse, the step it is changing as a pink chip, and Stop. */
 .agent-working {
   position: absolute; z-index: 5; right: calc(var(--right) + var(--space-4)); bottom: var(--space-4);
   display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
@@ -106,7 +106,7 @@ svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor;
 /* The secondary button: a surface with a thin border. */
 .btn--soft, .btn--outline { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
 .btn--soft:hover:not(:disabled), .btn--outline:hover:not(:disabled) { background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--line-strong); }
-/* The one primary action on a screen (Presentar): ink, like the chosen view in the selector. */
+/* The one primary action on a screen (Present): ink, like the chosen view in the selector. */
 .btn--primary { flex: none; height: 38px; padding: 0 var(--space-4) 0 var(--space-3); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-sm); }
 .btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 84%, var(--surface)); }
 .btn--primary svg.i { fill: currentColor; }
@@ -194,7 +194,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 }
 .drag-ghost svg.i { flex: none; color: var(--ink-3); }
 
-/* «Mover a proyecto…»: the projects to choose from. */
+/* “Move to project…”: the projects to choose from. */
 .move-list { display: flex; flex-direction: column; gap: 1px; max-height: 280px; margin-top: var(--space-3); overflow-y: auto; }
 .move-list__item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-md); color: var(--ink-2); font-weight: var(--weight-medium); text-align: left; }
 .move-list__item svg.i { flex: none; color: var(--ink-3); }
@@ -226,7 +226,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .scene-list__error { margin: 0 0 var(--space-2) 25px; color: var(--danger-ink); font-size: var(--text-12); }
 
 /* With the sidebar folded, its notices sit above the step strip. */
-.lienzo__notices { flex: none; display: flex; flex-direction: column; gap: 6px; padding: var(--space-2); border-top: var(--border); }
+.canvas-page__notices { flex: none; display: flex; flex-direction: column; gap: 6px; padding: var(--space-2); border-top: var(--border); }
 
 /* The workspace switcher's menu: the open workspace is checked. */
 .popover.menu--workspaces { min-width: 224px; max-width: min(320px, calc(100vw - 16px)); }
@@ -238,7 +238,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .menu--workspaces button[aria-disabled='true'] { color: var(--ink-3); cursor: not-allowed; }
 .menu__meta { flex: none; color: var(--ink-3); font-size: var(--text-12); }
 
-/* «Nuevo workspace»: the folder explorer. */
+/* “New workspace”: the folder explorer. */
 .dialog--folders { width: min(520px, 100%); }
 .folders { margin-top: var(--space-4); border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
 .folders__bar { display: flex; align-items: center; gap: 2px; padding: var(--space-1); border-bottom: var(--border); }
@@ -317,7 +317,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 
 /* Main area. The Storyboard scrolls inside its own column. It contains its absolutely placed live regions: placed by the
    window instead, they sat at the foot of a long board and made the whole document scroll. */
-/* The Estudio is the white workspace: its cards and lines take the --work-* layer, while the panels around it keep the
+/* The Studio is the white workspace: its cards and lines take the --work-* layer, while the panels around it keep the
    chrome's grey. Tokens that are built from others are rebuilt here, or they would keep the chrome's values. */
 .board {
   --surface: var(--work-surface); --surface-sunken: var(--work-sunken); --surface-hover: var(--work-hover);
@@ -330,7 +330,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
   border-right: 8px solid transparent;
 }
 .board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: 180px; }
-/* In the Estudio the corner scrolls with the page, and the title keeps clear of it. */
+/* In the Studio the corner scrolls with the page, and the title keeps clear of it. */
 .board__corner { z-index: 2; }
 .board__head { display: flex; padding-right: 180px; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
 .board__heading { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
@@ -351,8 +351,8 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .main-message__details p { margin-top: var(--space-2); color: var(--ink-3); overflow-wrap: anywhere; text-align: left; max-height: 160px; overflow: auto; }
 
 
-/* The Lienzo fills everything right of the sidebar, edge to edge: the canvas, then its step strip. No card, no gutter. */
-.lienzo { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
+/* The Canvas fills everything right of the sidebar, edge to edge: the canvas, then its step strip. No card, no gutter. */
+.canvas-page { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
 .editor-notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--danger-soft); color: var(--ink); border-bottom: var(--border); }
 .editor-notice .btn { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
 .canvas--editor > .canvas__placeholder { height: 100%; justify-content: center; padding: var(--space-5); }
@@ -372,9 +372,9 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 }
 
 
-/* Presentar sits over the top right corner, where Excalidraw's library button was, at the height of its islands. Under it,
-   the Lienzo | Estudio switch. Both views keep this corner, so the switch never moves. The column is as wide as the
-   switch, and Presentar fills it. */
+/* Present sits over the top right corner, where Excalidraw's library button was, at the height of its islands. Under it,
+   the Canvas | Studio switch. Both views keep this corner, so the switch never moves. The column is as wide as the
+   switch, and Present fills it. */
 .canvas__corner { position: absolute; z-index: 4; top: var(--space-4); right: var(--space-4); display: grid; grid-template-columns: max-content; gap: var(--space-2); }
 .canvas__corner .btn--primary { height: 36px; justify-content: center; }
 /* The switch: a white island like Excalidraw's own controls. The open view is a grey fill with ink. */
@@ -383,7 +383,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .view-toggle__option:hover { background: var(--surface-sunken); color: var(--ink); }
 .view-toggle__option[aria-pressed='true'] { background: var(--accent-soft); color: var(--ink); cursor: default; }
 .view-toggle__option:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-/* «Encuadrar», under the switch, and the cross that removes the step's camera once there is one. */
+/* “Frame”, under the switch, and the cross that removes the step's camera once there is one. */
 .camera-control { display: flex; height: 36px; border-radius: var(--radius-md); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); overflow: hidden; }
 .camera-control button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: var(--text-13); font-weight: var(--weight-medium); cursor: pointer; }
 .camera-control button:hover { background: var(--surface-sunken); color: var(--ink); }
@@ -428,14 +428,14 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .camera-draw__hint { position: absolute; left: 50%; top: 72px; translate: -50% 0; margin: 0; padding: 6px 12px; border-radius: var(--radius-md); background: var(--ink); color: var(--on-ink); font-size: var(--text-12); font-weight: var(--weight-medium); white-space: nowrap; pointer-events: none; box-shadow: var(--shadow-md); }
 .camera-draw__box { position: absolute; border: 1.5px solid var(--ink); border-radius: 4px; background: color-mix(in srgb, var(--paper) 20%, transparent); pointer-events: none; }
 /* A loose diagram without its step strip: one small island 8px left of Excalidraw's help button (right 16, bottom 16,
-   40px with Paso's theme), as tall as it. With several steps it carries the pager's «02 / 03». */
+   40px with Paso's theme), as tall as it. With several steps it carries the pager's “02 / 03”. */
 .strip-toggle { position: absolute; z-index: 4; right: 64px; bottom: var(--space-4); display: inline-flex; align-items: center; gap: 6px; height: 40px; min-width: 40px; padding: 0 11px; border: 0; border-radius: var(--radius-card); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); color: var(--ink-2); font: inherit; font-size: var(--text-12); font-variant-numeric: tabular-nums; cursor: pointer; }
 .strip-toggle:hover { background: var(--surface-sunken); color: var(--ink); }
 .strip-toggle__count { color: var(--ink-3); white-space: nowrap; }
 .strip-toggle__count b { color: var(--accent-ink); font-weight: var(--weight-bold); }
 .camera-control__take[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
-/* Excalidraw's toolbar stays centred: on a narrower board Presentar and the switch keep only their icons, so the two
-   never meet. The Estudio has no toolbar, so it keeps the labels until it is much narrower. */
+/* Excalidraw's toolbar stays centred: on a narrower board Present and the switch keep only their icons, so the two
+   never meet. The Studio has no toolbar, so it keeps the labels until it is much narrower. */
 .canvas--editor { container: board / inline-size; }
 .board { container: studio / inline-size; }
 @container board (max-width: 860px) {
@@ -449,6 +449,6 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
   .canvas__corner .btn--primary svg.i { margin: 0; }
   .view-toggle__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
-/* Why Presentar could not start: beside it, to its left, so the corner's column keeps its width. */
+/* Why Present could not start: beside it, to its left, so the corner's column keeps its width. */
 .present-error { position: absolute; top: 0; right: calc(100% + var(--space-2)); display: inline-flex; align-items: center; gap: var(--space-1); width: max-content; max-width: 320px; padding: 0 var(--space-1) 0 var(--space-3); height: 36px; border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); font-size: var(--text-12); box-shadow: var(--shadow-sm); }
 .present-error__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

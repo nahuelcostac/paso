@@ -59,7 +59,7 @@ export class StepStore {
     const pending = (this.recoveries.get(key) ?? Promise.resolve()).catch(() => {}).then(() => this.recovery.write(key, draft));
     this.recoveries.set(key, pending);
     // Local storage failure is visible and leaves the in-memory drawing intact.
-    void pending.catch(() => { session.error = 'No se pudo guardar la copia de recuperación en este navegador.'; this.emit(); });
+    void pending.catch(() => { session.error = "Couldn't save the recovery copy in this browser."; this.emit(); });
   }
   async select(target: Target) {
     const previous = this.current();
@@ -120,9 +120,9 @@ export class StepStore {
       const id = element.fileId;
       if (!id || files[id]) continue;
       const binary = binaries[id];
-      if (!binary) throw new Error('Faltan los datos de una imagen.');
+      if (!binary) throw new Error("An image's data is missing.");
       const ext = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/svg+xml': 'svg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif' } as Record<string, string>)[binary.mimeType];
-      if (!ext) throw new Error('Formato de imagen no compatible.');
+      if (!ext) throw new Error('Unsupported image format.');
       files[id] = { path: `assets/${id}.${ext}`, mimeType: binary.mimeType, created: binary.created, ...(binary.version === undefined ? {} : { version: binary.version }) };
       retained[id] = structuredClone(binary);
     }
@@ -178,7 +178,7 @@ export class StepStore {
     this.schedule(session);
   }
   /**
-   * Names a step from outside the Lienzo, such as the Estudio. A step this window has open is named through its own
+   * Names a step from outside the Canvas, such as the Studio. A step this window has open is named through its own
    * session, so its unsaved drawing goes with it; any other step is read and written back with only the title changed.
    * Rejects with words for the person when it could not be saved.
    */
@@ -187,8 +187,8 @@ export class StepStore {
     if (session && !this.removed.has(targetKey(target))) {
       this.retitle(session, title);
       await this.flush(target);
-      if (session.status === 'conflict') throw new Error('El paso cambió fuera de Paso. Ábrelo para resolverlo.');
-      if (session.status === 'failed') throw new Error('No se pudo guardar el título.');
+      if (session.status === 'conflict') throw new Error('The step changed outside Paso. Open it to resolve it.');
+      if (session.status === 'failed') throw new Error("Couldn't save the title.");
       return;
     }
     try {
@@ -198,7 +198,7 @@ export class StepStore {
       if (next) named.title = next; else delete named.title;
       await this.api.saveStep(target, revision, named);
     } catch (error) {
-      throw new Error(error instanceof ApiRequestError && error.status === 404 ? 'El paso ya no existe.' : 'No se pudo guardar el título.');
+      throw new Error(error instanceof ApiRequestError && error.status === 404 ? 'The step no longer exists.' : "Couldn't save the title.");
     }
   }
   fail(session: Session, message: string) { session.status = 'failed'; session.error = message; this.emit(); }
@@ -241,7 +241,7 @@ export class StepStore {
         await pending;
       } catch (error) {
         session.status = error instanceof ApiRequestError && error.status === 409 ? 'conflict' : 'failed';
-        session.error = session.status === 'failed' ? 'No se pudo guardar. Tu trabajo sigue en este navegador.' : undefined;
+        session.error = session.status === 'failed' ? "Couldn't save. Your work is still in this browser." : undefined;
         this.persist(session);
       } finally { this.saves.delete(key); this.emit(); }
       if (this.deferredEvents.has(key)) {
@@ -308,7 +308,7 @@ export class StepStore {
     // Invalidate a GET started before this explicit choice.
     this.loads.set(key, (this.loads.get(key) ?? 0) + 1);
     const unchanged = () => session.generation === generation && this.sessions.get(key) === session && this.eventVersions.get(key) === events;
-    const changed = () => new Error('El dibujo cambió durante la carga. Descarga una copia nueva e inténtalo de nuevo.');
+    const changed = () => new Error('The drawing changed while loading. Download a new copy and try again.');
     const fresh = await this.api.getStep(session.target);
     if (!unchanged()) throw changed();
     const removal = (this.recoveries.get(key) ?? Promise.resolve()).catch(() => {}).then(async () => {

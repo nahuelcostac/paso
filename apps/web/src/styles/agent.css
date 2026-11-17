@@ -13,7 +13,7 @@
   color: var(--ink-2);
   white-space: nowrap;
 }
-/* The top bar has no room for the sentence under 1160px: the chip and Detener carry it */
+/* The top bar has no room for the sentence under 1160px: the chip and Stop carry it */
 @media (max-width: 1160px) {
   .agent-status__text {
     display: none;
@@ -29,7 +29,7 @@
   height: 12px;
 }
 
-/* Agent panel on the Estudio: a column flush with the window's edges, like the sidebar, on the chrome's grey and edged
+/* Agent panel on the Studio: a column flush with the window's edges, like the sidebar, on the chrome's grey and edged
    with a thin line. No rule under its head: space separates. As a drawer it floats, with rounded corners. */
 .agent {
   grid-column: 3;
@@ -263,7 +263,7 @@ button.chip:hover {
   width: 14px;
   height: 14px;
 }
-.composer__send[aria-label='Enviar'] svg.i {
+.composer__send[aria-label='Send'] svg.i {
   fill: none;
 }
 
@@ -280,7 +280,7 @@ button.chip:hover {
 .menu__empty { padding: var(--space-2) 10px; color: var(--ink-3); font-size: var(--text-12); }
 .notice__error { color: var(--danger-ink); }
 
-/* A run from before this conversation, which "Deshacer ejecución" still reaches. */
+/* A run from before this conversation, which "Undo run" still reaches. */
 .run-end--earlier { margin-top: 0; }
 
 .i--spin { animation: agent-spin 1s linear infinite; }
@@ -296,7 +296,7 @@ button.chip:hover {
 .undo__confirm input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
 
 /* Under 1100px the Storyboard keeps no column for the panel: it opens over the board, from the top bar. */
-/* Shows or hides the agent. With the panel in view it is a selected option, a grey fill: ink stays for Presentar. */
+/* Shows or hides the agent. With the panel in view it is a selected option, a grey fill: ink stays for Present. */
 .agent-toggle { height: 38px; padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
 .agent-toggle[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--surface-hover); box-shadow: inset 0 0 0 1px var(--accent-line); }

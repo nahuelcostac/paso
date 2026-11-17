@@ -21,7 +21,7 @@ function setup(extra: Partial<ReturnType<typeof handlers> & { stepIds: string[];
   const redraw = (changes: Partial<typeof props>) => view.rerender(tree({ ...props, ...changes }));
   return { props, redraw, ...view };
 }
-const frame = (n: number) => screen.getByRole('button', { name: new RegExp(`^Paso ${n}`) });
+const frame = (n: number) => screen.getByRole('button', { name: new RegExp(`^Step ${n}`) });
 
 describe('step carousel', () => {
   it('marks the current step, numbers every frame and keeps one tab stop', () => {
@@ -34,7 +34,7 @@ describe('step carousel', () => {
     // No room for a title in the strip: it goes in the tooltip.
     expect(frame(3)).toHaveAttribute('title', 'Tercero'); expect(screen.queryByText('Tercero')).not.toBeInTheDocument();
   });
-  it('says where you are as «02 / 04», for the eye only: the current frame already says it to screen readers', () => {
+  it('says where you are as “02 / 04”, for the eye only: the current frame already says it to screen readers', () => {
     const { redraw } = setup();
     const pager = document.querySelector('.carousel__pager')!;
     expect(pager).toHaveTextContent('02 / 04'); expect(pager).toHaveAttribute('aria-hidden', 'true');
@@ -61,7 +61,7 @@ describe('step carousel', () => {
     frame(2).focus();
     await user.keyboard('{Alt>}{ArrowLeft}{/Alt}');
     expect(props.onNudge).toHaveBeenCalledWith('b', -1);
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Paso movido a la posición 1 de 4.'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Step moved to position 1 of 4.'));
     // The parent draws the new order: b moves to the front, and the focus follows it.
     redraw({ stepIds: ['b', 'a', 'c', 'd'] });
     await waitFor(() => expect(frame(1)).toHaveFocus());
@@ -91,46 +91,46 @@ describe('step carousel', () => {
   it('asks before deleting, and nothing is deleted until the person confirms', async () => {
     const { props } = setup(); const user = userEvent.setup();
     frame(3).focus(); await user.keyboard('{Delete}');
-    const dialog = screen.getByRole('alertdialog', { name: '¿Eliminar el paso 3?' });
-    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus();   // the safe choice has focus
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete step 3?' });
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();   // the safe choice has focus
     await user.keyboard('{Enter}'); expect(props.onDelete).not.toHaveBeenCalled(); expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Eliminar el paso 4' }));
-    expect(screen.getByRole('alertdialog', { name: '¿Eliminar el paso 4?' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete step 4' }));
+    expect(screen.getByRole('alertdialog', { name: 'Delete step 4?' })).toBeInTheDocument();
     await user.keyboard('{Escape}'); expect(props.onDelete).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Eliminar el paso 4' }));
-    await user.click(screen.getByRole('button', { name: 'Eliminar paso' }));
+    await user.click(screen.getByRole('button', { name: 'Delete step 4' }));
+    await user.click(screen.getByRole('button', { name: 'Delete step' }));
     expect(props.onDelete).toHaveBeenCalledWith('d'); await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
   });
   it('keeps the dialog open and says why when the delete fails', async () => {
-    const { props } = setup({ onDelete: vi.fn<(stepId: string) => Promise<void>>(async () => { throw new Error('El paso cambió fuera de Paso.'); }) }); const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Eliminar el paso 1' }));
-    await user.click(screen.getByRole('button', { name: 'Eliminar paso' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('El paso cambió fuera de Paso.');
+    const { props } = setup({ onDelete: vi.fn<(stepId: string) => Promise<void>>(async () => { throw new Error('The step changed outside Paso.'); }) }); const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Delete step 1' }));
+    await user.click(screen.getByRole('button', { name: 'Delete step' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The step changed outside Paso.');
     expect(screen.getByRole('alertdialog')).toBeInTheDocument(); expect(props.onDelete).toHaveBeenCalledTimes(1);
   });
   it('warns that the last step leaves the scene empty', async () => {
     setup({ stepIds: ['a'], currentId: 'a' }); const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Eliminar el paso 1' }));
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('quedará vacía');
+    await user.click(screen.getByRole('button', { name: 'Delete step 1' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('the scene will be empty');
   });
   it('adds after the last thumbnail and duplicates the chosen item without selecting it first', async () => {
     const { props, redraw } = setup(); const user = userEvent.setup();
-    const add = screen.getByRole('button', { name: 'Añadir paso' });
+    const add = screen.getByRole('button', { name: 'Add step' });
     expect(add.parentElement).toBe(document.querySelector('.carousel__frames'));
     expect(add.previousElementSibling).toBe(frame(4).parentElement);
-    const duplicate = screen.getByRole('button', { name: 'Duplicar el paso 3' });
-    expect(duplicate.parentElement).toBe(screen.getByRole('button', { name: 'Eliminar el paso 3' }).parentElement);
+    const duplicate = screen.getByRole('button', { name: 'Duplicate step 3' });
+    expect(duplicate.parentElement).toBe(screen.getByRole('button', { name: 'Delete step 3' }).parentElement);
     await user.click(add); await user.click(duplicate);
     expect(props.onAdd).toHaveBeenCalledTimes(1); expect(props.onDuplicate).toHaveBeenCalledTimes(1);
     expect(props.onDuplicate).toHaveBeenCalledWith('c');
     expect(props.onSelect).not.toHaveBeenCalled();
     expect(document.querySelector('.carousel__actions')).toBeNull();
     redraw({ busy: true });
-    expect(screen.getByRole('button', { name: 'Añadir paso' })).toBeDisabled();
-    for (const button of screen.getAllByRole('button', { name: /^Duplicar el paso/ })) expect(button).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add step' })).toBeDisabled();
+    for (const button of screen.getAllByRole('button', { name: /^Duplicate step/ })) expect(button).toBeDisabled();
     redraw({ stepIds: [], currentId: undefined });
-    expect(screen.queryByRole('button', { name: /^Duplicar el paso/ })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Añadir paso' })).toBeEnabled();
-    expect(screen.getByText('Sin pasos')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Duplicate step/ })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Add step' })).toBeEnabled();
+    expect(screen.getByText('No steps')).toBeInTheDocument();
   });
   it('does not pre-empt keys that carry a modifier', () => {
     const { props } = setup(); frame(2).focus();

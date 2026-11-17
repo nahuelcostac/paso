@@ -14,10 +14,10 @@ type Props = {
   onClose: () => void;
 };
 
-const plural = (count: number) => count === 1 ? '1 diagrama' : `${count} diagramas`;
+const plural = (count: number) => count === 1 ? '1 project' : `${count} projects`;
 
 /**
- * «Nuevo workspace»: a folder explorer served by the local service. Clicking a folder goes into it; the folder on show
+ * “New workspace”: a folder explorer served by the local service. Clicking a folder goes into it; the folder on show
  * is the one chosen. It lists folder names only, and a new folder can be made where the person is.
  */
 export function FolderPicker({ api, near, onChoose, onClose }: Props) {
@@ -29,7 +29,7 @@ export function FolderPicker({ api, near, onChoose, onClose }: Props) {
   const go = useCallback(async (path?: string) => {
     setError(null); setCreating(false);
     try { setListing(await api.listFolders(path)); }
-    catch (failure) { setError(`No se pudo abrir la carpeta. ${workspaceErrorText(failure)}`); }
+    catch (failure) { setError(`Couldn't open the folder. ${workspaceErrorText(failure)}`); }
   }, [api]);
   useEffect(() => {
     void (async () => {
@@ -42,24 +42,24 @@ export function FolderPicker({ api, near, onChoose, onClose }: Props) {
     if (!listing) return;
     setBusy(true); setError(null);
     try { await onChoose(listing.path); }
-    catch (failure) { setError(`No se pudo añadir la carpeta. ${workspaceErrorText(failure)}`); setBusy(false); }
+    catch (failure) { setError(`Couldn't add the folder. ${workspaceErrorText(failure)}`); setBusy(false); }
   };
 
   // The way down to the folder on show, from the home folder, as steps to click.
   const crumbs = listing?.crumbs ?? [];
 
   return (
-    <Dialog title="Nuevo workspace" role="dialog" className="dialog--folders" onClose={() => { if (!busy) onClose(); }}>
-      <p className="dialog__text">Elige una carpeta del ordenador. Sus diagramas aparecerán en la barra lateral; Paso no mueve ni borra nada.</p>
+    <Dialog title="New workspace" role="dialog" className="dialog--folders" onClose={() => { if (!busy) onClose(); }}>
+      <p className="dialog__text">Choose a folder on this computer. Its projects appear in the sidebar; Paso doesn't move or delete anything.</p>
       <div className="folders">
         <div className="folders__bar">
-          <button type="button" className="icon-btn" aria-label="Carpeta de inicio" title="Carpeta de inicio" disabled={!listing} onClick={() => void go(listing?.home)}>
+          <button type="button" className="icon-btn" aria-label="Home folder" title="Home folder" disabled={!listing} onClick={() => void go(listing?.home)}>
             <House className="i" aria-hidden="true" />
           </button>
-          <button type="button" className="icon-btn" aria-label="Subir un nivel" title="Subir un nivel" disabled={!listing?.parent} onClick={() => void go(listing?.parent ?? undefined)}>
+          <button type="button" className="icon-btn" aria-label="Up one level" title="Up one level" disabled={!listing?.parent} onClick={() => void go(listing?.parent ?? undefined)}>
             <ArrowUp className="i" aria-hidden="true" />
           </button>
-          <nav className="folders__path" aria-label="Carpeta actual" title={listing?.path}>
+          <nav className="folders__path" aria-label="Current folder" title={listing?.path}>
             {crumbs.map((crumb, index) => (
               <span key={crumb.path} className="folders__crumb">
                 {index > 0 && <ChevronRight className="i" aria-hidden="true" />}
@@ -70,15 +70,15 @@ export function FolderPicker({ api, near, onChoose, onClose }: Props) {
             ))}
           </nav>
         </div>
-        <ul className="folders__list" aria-label="Carpetas" aria-busy={!listing}>
+        <ul className="folders__list" aria-label="Folders" aria-busy={!listing}>
           {creating && listing && (
             <li className="folders__draft">
               <Folder className="i" aria-hidden="true" />
               <NameField
-                initial="" label="Nombre de la carpeta nueva" placeholder="Nombre de la carpeta"
+                initial="" label="Name of the new folder" placeholder="Folder name"
                 onSave={async (name) => {
                   try { const { path } = await api.createFolder(listing.path, name); await go(path); }
-                  catch (failure) { throw new Error(`No se pudo crear la carpeta. ${workspaceErrorText(failure)}`); }
+                  catch (failure) { throw new Error(`Couldn't create the folder. ${workspaceErrorText(failure)}`); }
                 }}
                 onCancel={() => setCreating(false)}
                 onAbandon={(message) => { setCreating(false); setError(message); }}
@@ -92,19 +92,19 @@ export function FolderPicker({ api, near, onChoose, onClose }: Props) {
               </button>
             </li>
           ))}
-          {listing && listing.folders.length === 0 && !creating && <li className="folders__empty">No hay carpetas dentro.</li>}
+          {listing && listing.folders.length === 0 && !creating && <li className="folders__empty">No folders inside.</li>}
         </ul>
         <div className="folders__foot">
           <button type="button" className="btn" disabled={!listing || creating} onClick={() => setCreating(true)}>
-            <FolderPlus className="i" aria-hidden="true" />Nueva carpeta
+            <FolderPlus className="i" aria-hidden="true" />New folder
           </button>
-          {listing && <span className="folders__count" role="status">{listing.projects ? `Tiene ${plural(listing.projects)}` : 'Sin diagramas todavía'}</span>}
+          {listing && <span className="folders__count" role="status">{listing.projects ? `Has ${plural(listing.projects)}` : 'No projects yet'}</span>}
         </div>
       </div>
       {error && <p className="dialog__error" role="alert">{error}</p>}
       <div className="dialog__actions">
-        <button type="button" className="btn btn--soft" data-autofocus onClick={onClose} disabled={busy}>Cancelar</button>
-        <button type="button" className="btn btn--primary" disabled={!listing || busy} onClick={() => void choose()}>Usar esta carpeta</button>
+        <button type="button" className="btn btn--soft" data-autofocus onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="button" className="btn btn--primary" disabled={!listing || busy} onClick={() => void choose()}>Use this folder</button>
       </div>
     </Dialog>
   );

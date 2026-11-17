@@ -15,7 +15,7 @@ type Props = {
   api: ApiClient;
   projectId: string;
   projectName: string;
-  /** "4 escenas · 17 pasos", as the project list shows it, so the two never disagree. */
+  /** "4 scenes · 17 steps", as the project list shows it, so the two never disagree. */
   listedSize: string;
   /** A loose diagram: the reserved project is shown limited to this one scene. */
   onlySceneId?: string;
@@ -27,13 +27,13 @@ type Props = {
   stepAgentStates?: Record<string, 'working' | 'changed'>;
   /** The app's own failures that have no other place here, such as a step that could not be saved. */
   notices?: React.ReactNode;
-  /** Presentar, over the top right corner: the same corner as on the board. */
+  /** Present, over the top right corner: the same corner as on the board. */
   corner?: React.ReactNode;
-  /** Saves a step's title, through the steps the Lienzo may have open. */
+  /** Saves a step's title, through the steps the Canvas may have open. */
   renameStep?: (target: { projectId: string; sceneId: string; stepId: string }, title: string) => Promise<void>;
 };
 
-const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Inténtalo de nuevo.';
+const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Try again.';
 
 /** `order` with the item at `from` moved to sit before the item that was at `to` (0..length). */
 function insertAt(order: string[], from: number, to: number) {
@@ -43,8 +43,8 @@ function insertAt(order: string[], from: number, to: number) {
 }
 
 /**
- * The Estudio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
- * It opens from the Lienzo | Estudio switch in the corner; a step, the same switch or Escape goes back to the board.
+ * The Studio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
+ * It opens from the Canvas | Studio switch in the corner; a step, the same switch or Escape goes back to the board.
  */
 export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, corner, renameStep }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);
@@ -80,13 +80,13 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
 
   const run = async (action: () => Promise<unknown>, what: string) => {
     try { await action(); setNotice(null); return true; }
-    catch (error) { setNotice(`No se pudo ${what}. ${reasonText(error)}`); return false; }
+    catch (error) { setNotice(`Couldn't ${what}. ${reasonText(error)}`); return false; }
   };
 
   const createScene = async () => {
     if (creating) return;
     setCreating(true);
-    await run(async () => { const id = await store.createScene(); setRenamingId(id); }, 'crear la escena');
+    await run(async () => { const id = await store.createScene(); setRenamingId(id); }, 'create the scene');
     setCreating(false);
   };
   useEffect(() => {
@@ -100,12 +100,12 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
       await store.deleteScene(deleting.id);
       setDeleting(null); setNotice(null);
       title.current?.focus();
-    } catch (error) { setDeleteError(`No se pudo eliminar la escena. ${reasonText(error)}`); }
+    } catch (error) { setDeleteError(`Couldn't delete the scene. ${reasonText(error)}`); }
     finally { setDeleteBusy(false); }
   };
   const closeDelete = () => { if (!deleteBusy) { setDeleting(null); setDeleteError(null); } };
 
-  const save = (next: string[]) => run(() => store.reorderScenes(next), 'reordenar las escenas');
+  const save = (next: string[]) => run(() => store.reorderScenes(next), 'reorder the scenes');
   const moveScene = (id: string, delta: -1 | 1) => {
     const from = order.indexOf(id);
     const to = from + delta;
@@ -113,7 +113,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
     const next = [...order];
     [next[from], next[to]] = [next[to], next[from]];
     void save(next);
-    setAnnouncement(`Escena movida a la posición ${to + 1} de ${order.length}.`);
+    setAnnouncement(`Scene moved to position ${to + 1} of ${order.length}.`);
   };
 
   // ---- Keyboard: Enter or Space picks a scene up, arrows move it, Enter or Space drops it, Escape puts it back.
@@ -121,8 +121,8 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
     if (!grabbed) return;
     const next = draft;
     setGrabbed(null);
-    if (keep && next && next.join() !== state.scenes.map((scene) => scene.id).join()) { void save(next); setDraft(null); setAnnouncement(`Escena soltada en la posición ${next.indexOf(grabbed) + 1} de ${next.length}.`); }
-    else { setDraft(null); if (!keep) setAnnouncement('Reordenación cancelada.'); }
+    if (keep && next && next.join() !== state.scenes.map((scene) => scene.id).join()) { void save(next); setDraft(null); setAnnouncement(`Scene dropped at position ${next.indexOf(grabbed) + 1} of ${next.length}.`); }
+    else { setDraft(null); if (!keep) setAnnouncement('Reorder canceled.'); }
   };
   const gripKeyDown = (id: string) => (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -130,7 +130,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
       if (grabbed === id) dropGrabbed(true);
       else {
         setGrabbed(id); setDraft(order);
-        setAnnouncement(`Escena ${order.indexOf(id) + 1} de ${order.length} agarrada. Flechas arriba y abajo para moverla, Intro para soltarla, Escape para cancelar.`);
+        setAnnouncement(`Scene ${order.indexOf(id) + 1} of ${order.length} picked up. Up and down arrows to move it, Enter to drop it, Escape to cancel.`);
       }
       return;
     }
@@ -145,7 +145,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
     const next = [...order];
     [next[from], next[to]] = [next[to], next[from]];
     setDraft(next);
-    setAnnouncement(`Posición ${to + 1} de ${order.length}.`);
+    setAnnouncement(`Position ${to + 1} of ${order.length}.`);
   };
   // Moving a scene moves its DOM node, which can take focus with it: put focus back on its handle.
   useEffect(() => { if (grabbed) grips.current.get(grabbed)?.focus(); }, [grabbed, draft]);
@@ -188,7 +188,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
     const from = order.indexOf(id);
     if (to === from || to === from + 1) return;
     void save(insertAt(order, from, to));
-    setAnnouncement(`Escena movida a la posición ${(to > from ? to : to + 1)} de ${order.length}.`);
+    setAnnouncement(`Scene moved to position ${(to > from ? to : to + 1)} of ${order.length}.`);
   };
   // Near the top or bottom edge a drag scrolls the board, so a scene can travel further than the screen.
   useEffect(() => {
@@ -219,8 +219,8 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
     return undefined;
   };
 
-  const back = () => navigate({ ...route, view: 'lienzo' });
-  // The Estudio shows one scene: the one selected in the sidebar, which is also the one the chat works on. Without one
+  const back = () => navigate({ ...route, view: 'canvas' });
+  // The Studio shows one scene: the one selected in the sidebar, which is also the one the chat works on. Without one
   // in the address, the first scene is selected, so later reorders do not change what is on show.
   const selectedScene = scenes.find((entry) => entry.id === route.sceneId) ?? scenes[0];
   useEffect(() => {
@@ -231,7 +231,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
   useEffect(() => { if (document.activeElement === document.body) title.current?.focus({ preventScroll: true }); }, []);
   return (
     <main
-      className="board" aria-label="Estudio" aria-busy={state.phase === 'loading'} data-dragging={drag?.moved || undefined} ref={setBoard}
+      className="board" aria-label="Studio" aria-busy={state.phase === 'loading'} data-dragging={drag?.moved || undefined} ref={setBoard}
       onKeyDown={(event) => {
         // Escape closes the overview, unless it is ending something here first: a rename, a drag, a held scene.
         if (event.key !== 'Escape' || event.defaultPrevented || renamingId || grabbed || drag || deleting) return;
@@ -255,7 +255,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
         <div className="notice notice--error board__notice" role="alert">
           <TriangleAlert className="i" aria-hidden="true" />
           <span>{notice}</span>
-          <button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setNotice(null)}><X className="i" aria-hidden="true" /></button>
+          <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setNotice(null)}><X className="i" aria-hidden="true" /></button>
         </div>
       )}
 
@@ -269,18 +269,18 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
       {state.phase === 'error' && (
         <div className="board__empty" role="status">
           <div className="main-message__icon"><TriangleAlert className="i" aria-hidden="true" /></div>
-          <h2 className="board__empty-title">No se pudieron cargar las escenas</h2>
-          <p>Paso no pudo leer este diagrama. Comprueba que el servicio local sigue en marcha.</p>
-          <button type="button" className="btn btn--soft" onClick={() => store.retry()}>Reintentar</button>
+          <h2 className="board__empty-title">Couldn't load the scenes</h2>
+          <p>Paso couldn't read this project. Check that the local service is still running.</p>
+          <button type="button" className="btn btn--soft" onClick={() => store.retry()}>Retry</button>
         </div>
       )}
 
       {state.phase === 'ready' && scenes.length === 0 && (
         <div className="board__empty">
           <div className="main-message__icon"><Layers className="i" aria-hidden="true" /></div>
-          <h2 className="board__empty-title">Este diagrama aún no tiene escenas</h2>
-          <p>Una escena agrupa los pasos de una parte de la explicación. Crea la primera y empieza a añadir pasos.</p>
-          <button type="button" className="btn btn--soft btn--large" disabled={creating} onClick={() => void createScene()}><Plus className="i" aria-hidden="true" />Crear la primera escena</button>
+          <h2 className="board__empty-title">This project has no scenes yet</h2>
+          <p>A scene groups the steps of one part of the explanation. Create the first one and start adding steps.</p>
+          <button type="button" className="btn btn--soft btn--large" disabled={creating} onClick={() => void createScene()}><Plus className="i" aria-hidden="true" />Create the first scene</button>
         </div>
       )}
 
@@ -303,16 +303,16 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
           grabbed={grabbed === scene.id}
           dragging={drag?.id === scene.id && drag.moved}
           dropMarker={dropMarker(index)}
-          onOpenStep={(stepId) => navigate({ projectId, view: 'lienzo', sceneId: scene.id, stepId })}
+          onOpenStep={(stepId) => navigate({ projectId, view: 'canvas', sceneId: scene.id, stepId })}
           onRenameStep={renameStep ? async (stepId, title) => {
             await renameStep({ projectId, sceneId: scene.id, stepId }, title);
             store.showTitle(stepId, title);
             setNotice(null);
           } : undefined}
-          onAddStep={async () => { await run(() => store.createStep(scene.id), 'añadir el paso'); }}
+          onAddStep={async () => { await run(() => store.createStep(scene.id), 'add the step'); }}
           onRename={async (name) => {
             try { await store.renameScene(scene.id, name); setRenamingId(null); setNotice(null); }
-            catch (error) { throw new Error(`No se pudo renombrar la escena. ${reasonText(error)}`); }
+            catch (error) { throw new Error(`Couldn't rename the scene. ${reasonText(error)}`); }
           }}
           onRenameStart={() => { setNotice(null); setRenamingId(scene.id); }}
           onRenameEnd={() => setRenamingId(null)}
@@ -331,14 +331,14 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
 
       {deleting && (
-        <Dialog title={`¿Eliminar la escena «${deleting.name}»?`} onClose={closeDelete}>
+        <Dialog title={`Delete the scene “${deleting.name}”?`} onClose={closeDelete}>
           <p className="dialog__text">
-            {deleting.stepIds.length === 0 ? 'La escena no tiene pasos' : deleting.stepIds.length === 1 ? 'Se borrará 1 paso' : `Se borrarán ${deleting.stepIds.length} pasos`}. No se puede deshacer.
+            {deleting.stepIds.length === 0 ? 'The scene has no steps' : deleting.stepIds.length === 1 ? 'This deletes 1 step' : `This deletes ${deleting.stepIds.length} steps`}. This can't be undone.
           </p>
           {deleteError && <p className="dialog__error" role="alert">{deleteError}</p>}
           <div className="dialog__actions">
-            <button type="button" className="btn btn--soft" data-autofocus onClick={closeDelete}>Cancelar</button>
-            <button type="button" className="btn btn--danger" disabled={deleteBusy} onClick={() => void confirmDelete()}>Eliminar escena</button>
+            <button type="button" className="btn btn--soft" data-autofocus onClick={closeDelete}>Cancel</button>
+            <button type="button" className="btn btn--danger" disabled={deleteBusy} onClick={() => void confirmDelete()}>Delete scene</button>
           </div>
         </Dialog>
       )}

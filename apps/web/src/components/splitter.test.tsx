@@ -10,17 +10,17 @@ function Chat({ left = PROJECTS_WIDTH.initial }: { left?: number }) {
   const width = useAgentWidth(left, false);
   const [open, setOpen] = useState(true);
   return <div data-testid="app" data-open={open} style={{ '--panel-agent': `${width.width}px` } as React.CSSProperties}>
-    <Splitter side="right" open={open} onToggle={() => setOpen(!open)} hide="Ocultar el agente" show="Mostrar el agente" controls="agent-panel" label="Anchura del chat" resize={width} />
+    <Splitter side="right" open={open} onToggle={() => setOpen(!open)} hide="Hide agent" show="Show agent" controls="agent-panel" label="Chat width" resize={width} />
   </div>;
 }
 function Sidebar() {
   const width = useProjectsWidth();
   const [open, setOpen] = useState(true);
   return <div data-testid="app" data-open={open}>
-    <Splitter side="left" open={open} onToggle={() => setOpen(!open)} hide="Ocultar diagramas" show="Mostrar diagramas" controls="projects-panel" label="Anchura de los diagramas" resize={width} />
+    <Splitter side="left" open={open} onToggle={() => setOpen(!open)} hide="Hide sidebar" show="Show sidebar" controls="projects-panel" label="Sidebar width" resize={width} />
   </div>;
 }
-const handle = (name = 'Anchura del chat') => screen.getByRole('separator', { name });
+const handle = (name = 'Chat width') => screen.getByRole('separator', { name });
 const now = (name?: string) => Number(handle(name).getAttribute('aria-valuenow'));
 const open = () => screen.getByTestId('app').dataset.open;
 
@@ -92,16 +92,16 @@ describe('the tab on the edge', () => {
   it('folds and unfolds the panel, with a chevron that points the way it goes', async () => {
     const user = userEvent.setup();
     render(<Chat />);
-    const tab = screen.getByRole('button', { name: 'Ocultar el agente' });
+    const tab = screen.getByRole('button', { name: 'Hide agent' });
     expect(tab).toHaveAttribute('aria-expanded', 'true');
     expect(tab).toHaveAttribute('aria-controls', 'agent-panel');
     expect(tab.querySelector('svg')).toHaveClass('lucide-chevron-right');
     await user.click(tab);
     expect(open()).toBe('false');
-    expect(tab).toHaveAccessibleName('Mostrar el agente');
+    expect(tab).toHaveAccessibleName('Show agent');
     expect(tab).toHaveAttribute('aria-expanded', 'false');
     expect(tab.querySelector('svg')).toHaveClass('lucide-chevron-left');
-    expect(handle()).toHaveAttribute('aria-valuetext', 'Plegado');
+    expect(handle()).toHaveAttribute('aria-valuetext', 'Folded');
     await user.click(tab);
     expect(open()).toBe('true');
   });
@@ -121,7 +121,7 @@ describe('the tab on the edge', () => {
     expect(now()).toBe(410);
     fireEvent.pointerUp(handle(), { pointerId: 1 });
     // Folded, a drag out of the edge opens it.
-    fireEvent.click(screen.getByRole('button', { name: 'Ocultar el agente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide agent' }));
     expect(open()).toBe('false');
     fireEvent.pointerDown(handle(), { button: 0, clientX: 1300, pointerId: 2 });
     fireEvent.pointerMove(handle(), { clientX: 1295, pointerId: 2 });   // a nudge is not enough
@@ -148,9 +148,9 @@ describe('the sidebar width', () => {
   it('starts at 240px, widens to the right up to 420px, and folds when dragged to the left', async () => {
     const user = userEvent.setup();
     render(<Sidebar />);
-    const name = 'Anchura de los diagramas';
+    const name = 'Sidebar width';
     expect(now(name)).toBe(PROJECTS_WIDTH.initial);
-    expect(screen.getByRole('button', { name: 'Ocultar diagramas' }).querySelector('svg')).toHaveClass('lucide-chevron-left');
+    expect(screen.getByRole('button', { name: 'Hide sidebar' }).querySelector('svg')).toHaveClass('lucide-chevron-left');
     handle(name).focus();
     await user.keyboard('{ArrowRight}');
     expect(now(name)).toBe(256);
@@ -164,7 +164,7 @@ describe('the sidebar width', () => {
     fireEvent.pointerMove(handle(name), { clientX: 100, pointerId: 1 });
     expect(open()).toBe('false');
     fireEvent.pointerUp(handle(name), { pointerId: 1 });
-    expect(screen.getByRole('button', { name: 'Mostrar diagramas' }).querySelector('svg')).toHaveClass('lucide-chevron-right');
+    expect(screen.getByRole('button', { name: 'Show sidebar' }).querySelector('svg')).toHaveClass('lucide-chevron-right');
     cleanup();
     render(<Sidebar />);
     expect(now(name)).toBe(280);   // remembered

@@ -160,13 +160,13 @@ export class StoryboardStore {
   }
   /** Turns a failure into words for the person, and reads the project again when it was out of date. */
   private async fail(error: unknown): Promise<never> {
-    if (error instanceof UnavailableError) throw new ActionError('No hay conexión con el servicio local.');
+    if (error instanceof UnavailableError) throw new ActionError('No connection to the local service.');
     if (error instanceof ApiRequestError) {
-      if (error.status === 409 || error.status === 428 || error.status === 400) throw new ActionError('La escena cambió fuera de Paso. Ya está actualizada: inténtalo de nuevo.');
-      if (error.status === 404) throw new ActionError('La escena ya no existe.');
-      if (error.status === 422) throw new ActionError('Los archivos del diagrama no son válidos.');
+      if (error.status === 409 || error.status === 428 || error.status === 400) throw new ActionError("The scene changed outside Paso. It's up to date now: try again.");
+      if (error.status === 404) throw new ActionError('The scene no longer exists.');
+      if (error.status === 422) throw new ActionError("The project's files aren't valid.");
     }
-    throw new ActionError('Inténtalo de nuevo.');
+    throw new ActionError('Try again.');
   }
 
   /** A title saved from here shows at once; the service's event confirms it. */
@@ -181,7 +181,7 @@ export class StoryboardStore {
   /** Appends a scene and returns its ID. The caller can then offer its name for editing. */
   createScene() {
     return this.change(async () => {
-      const { document, revision } = await this.api.createScene(this.projectId, `Escena ${this.state.scenes.length + 1}`);
+      const { document, revision } = await this.api.createScene(this.projectId, `Scene ${this.state.scenes.length + 1}`);
       const entry: SceneEntry = { id: document.id, name: document.name, revision, stepIds: document.stepIds };
       if (!this.state.scenes.some((scene) => scene.id === entry.id)) this.set({ scenes: [...this.state.scenes, entry], stepsLoaded: { ...this.state.stepsLoaded, [entry.id]: true } });
       return entry.id;

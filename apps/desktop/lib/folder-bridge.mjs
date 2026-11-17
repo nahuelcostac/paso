@@ -1,5 +1,5 @@
 /**
- * The native folder picker behind «Nuevo workspace…». The renderer can only ask for the dialog; it learns a path only
+ * The native folder picker behind “New workspace…”. The renderer can only ask for the dialog; it learns a path only
  * when the person picks one, and the service still validates that path when the folder is added as a workspace.
  *
  * This module does not import Electron so it can be tested in Node: `registerFolderBridge` gets what it needs.
@@ -21,12 +21,12 @@ export function folderRequest(near) {
   return { near };
 }
 
-/** The options for `dialog.showOpenDialog`, in Spanish. */
+/** The options for `dialog.showOpenDialog`. */
 export function dialogOptions({ near } = {}) {
   return {
-    title: 'Nuevo workspace',
-    message: 'Elige una carpeta. Sus diagramas aparecerán en la barra lateral; Paso no mueve ni borra nada.',
-    buttonLabel: 'Usar esta carpeta',
+    title: 'New Workspace',
+    message: "Choose a folder. Its projects appear in the sidebar; Paso doesn't move or delete anything.",
+    buttonLabel: 'Use This Folder',
     properties: ['openDirectory', 'createDirectory'],
     ...(near ? { defaultPath: dirname(near) } : {}),
   };

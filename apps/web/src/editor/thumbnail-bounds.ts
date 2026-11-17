@@ -1,6 +1,6 @@
 export type Bounds = readonly [number, number, number, number];
 
-/** The box around every step's rotated Excalidraw bounds. Thumbnails and Presentar both start from it. */
+/** The box around every step's rotated Excalidraw bounds. Thumbnails and Present both start from it. */
 export function unionBounds(bounds: readonly Bounds[]): Bounds {
   return [
     Math.min(...bounds.map((box) => box[0])),

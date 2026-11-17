@@ -398,7 +398,7 @@ describe('security', () => {
   });
 });
 
-describe('«Abrir carpeta»', () => {
+describe('“Open folder”', () => {
   it('opens the project folder, by its ID under the data directory, and nothing else', async () => {
     await service.close();
     const opened: string[] = [];

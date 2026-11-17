@@ -17,7 +17,7 @@ Ask the human before reopening any of these.
 - Each project is a readable folder with one JSON file per step.
 - Agent changes appear live on the canvas, and each run can be undone in one action.
 - In-app agents run on the user's own harnesses (`claude`, `codex`, `agy`). The app never stores API keys. By default they get only the board tools, with no shell or file editing.
-- The app works offline: no assets from a CDN. The UI language is Spanish.
+- The app works offline: no assets from a CDN. The UI language is English, with no language selector. People's own names and text stay in whatever language they wrote them in.
 
 ## Commands
 

@@ -161,7 +161,7 @@ it('does not discard edits made while the person loads the server copy after dow
   await store.external(a, 'new');
   const get = deferred<Envelope>(); vi.mocked(api.getStep).mockImplementationOnce(() => get.promise);
   const replacing = store.useServer(session); draw(store, session, 'during-replace');
-  get.resolve({ document: createStep({ id: 'a' }), revision: 'new' }); await expect(replacing).rejects.toThrow(/cambió/);
+  get.resolve({ document: createStep({ id: 'a' }), revision: 'new' }); await expect(replacing).rejects.toThrow(/changed/);
   expect(store.current()!.document.elements.map((e) => e.id)).toContain('during-replace'); store.stopTimers();
 });
 
@@ -247,7 +247,7 @@ describe('removing a step', () => {
   });
 });
 
-describe('naming a step from the Estudio', () => {
+describe('naming a step from the Studio', () => {
   it('names an open step through its session, unsaved drawing and all, and any other step on the service alone', async () => {
     const { store, api, documents } = setup();
     await store.select(a); const sa = mount(store); draw(store, sa, 'unsaved');
@@ -263,7 +263,7 @@ describe('naming a step from the Estudio', () => {
     await store.retitleStep(b, ' ');
     expect(documents.get('b')!.document).not.toHaveProperty('title');
     vi.mocked(api.saveStep).mockRejectedValueOnce(new ApiRequestError(500, 'X', 'boom'));
-    await expect(store.retitleStep(b, 'Otra')).rejects.toThrow('No se pudo guardar el título.');
+    await expect(store.retitleStep(b, 'Otra')).rejects.toThrow("Couldn't save the title.");
     store.stopTimers();
   });
 });

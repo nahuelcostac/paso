@@ -52,12 +52,12 @@ export function ProjectRow({ row, current, expanded = false, renaming, onOpen, o
     // The whole item, its scene list included, takes a dragged loose diagram.
     <li data-drop-project={row.id} data-drop={dropTarget || undefined}>
       <div className="project" data-current={current}>
-        <button ref={tile} type="button" className="project__tile" aria-haspopup="dialog" aria-label={`Cambiar el icono de ${name}`} onClick={() => onIcon(tile.current!)}>
+        <button ref={tile} type="button" className="project__tile" aria-haspopup="dialog" aria-label={`Change the icon of ${name}`} onClick={() => onIcon(tile.current!)}>
           <ProjectIcon name={icon} />
         </button>
         {renaming ? (
           <div className="project__text">
-            <NameField initial={name} label={`Nombre de ${name}`} onSave={onRename} onCancel={onRenameCancel} onAbandon={onRenameAbandon} />
+            <NameField initial={name} label={`Name of ${name}`} onSave={onRename} onCancel={onRenameCancel} onAbandon={onRenameAbandon} />
           </div>
         ) : (
           <button type="button" className="project__open" aria-current={current ? 'true' : undefined} aria-expanded={expanded} onClick={onOpen} title={`${name} · ${size}`}>
@@ -66,7 +66,7 @@ export function ProjectRow({ row, current, expanded = false, renaming, onOpen, o
           </button>
         )}
         {!renaming && (
-          <button ref={more} type="button" className="project__more" aria-haspopup="menu" aria-label={`Más acciones de ${name}`} onClick={() => onMenu(more.current!)}>
+          <button ref={more} type="button" className="project__more" aria-haspopup="menu" aria-label={`More actions for ${name}`} onClick={() => onMenu(more.current!)}>
             <EllipsisVertical className="i" aria-hidden="true" />
           </button>
         )}

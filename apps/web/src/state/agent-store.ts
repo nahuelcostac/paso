@@ -26,13 +26,13 @@ export type ModelOption = { id: string; label: string };
  */
 export const HARNESS_MODELS: Record<HarnessId, ModelOption[]> = {
   claude: [
-    { id: '', label: 'Predeterminado' },
+    { id: '', label: 'Default' },
     { id: 'claude-opus-5-5', label: 'Opus 5.5' },
     { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
     { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
   ],
-  codex: [{ id: '', label: 'Predeterminado' }, { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol' }, { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra' }],
-  agy: [{ id: '', label: 'Predeterminado' }],
+  codex: [{ id: '', label: 'Default' }, { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol' }, { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra' }],
+  agy: [{ id: '', label: 'Default' }],
 };
 
 /**
@@ -41,12 +41,12 @@ export const HARNESS_MODELS: Record<HarnessId, ModelOption[]> = {
  */
 export const HARNESS_EFFORTS: Record<HarnessId, ModelOption[]> = {
   claude: [
-    { id: '', label: 'Automático' }, { id: 'low', label: 'Bajo' }, { id: 'medium', label: 'Medio' },
-    { id: 'high', label: 'Alto' }, { id: 'xhigh', label: 'Muy alto' }, { id: 'max', label: 'Máximo' },
+    { id: '', label: 'Automatic' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' },
+    { id: 'high', label: 'High' }, { id: 'xhigh', label: 'Very high' }, { id: 'max', label: 'Maximum' },
   ],
   codex: [
-    { id: '', label: 'Automático' }, { id: 'low', label: 'Bajo' }, { id: 'medium', label: 'Medio' },
-    { id: 'high', label: 'Alto' }, { id: 'xhigh', label: 'Muy alto' }, { id: 'max', label: 'Máximo' }, { id: 'ultra', label: 'Ultra' },
+    { id: '', label: 'Automatic' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' },
+    { id: 'high', label: 'High' }, { id: 'xhigh', label: 'Very high' }, { id: 'max', label: 'Maximum' }, { id: 'ultra', label: 'Ultra' },
   ],
   agy: [],
 };
@@ -54,7 +54,7 @@ export const HARNESS_EFFORTS: Record<HarnessId, ModelOption[]> = {
 export type HarnessInfo = DetectedHarness & { added: boolean; supported: boolean; models?: CodexModel[] };
 export function modelOptions(harness: HarnessId, info?: HarnessInfo): ModelOption[] {
   return harness === 'codex' && info?.models?.length
-    ? [HARNESS_MODELS.codex[0], ...info.models.map((model) => ({ id: model.id, label: model.label + (model.isDefault ? ' (predeterminado)' : '') }))]
+    ? [HARNESS_MODELS.codex[0], ...info.models.map((model) => ({ id: model.id, label: model.label + (model.isDefault ? ' (default)' : '') }))]
     : HARNESS_MODELS[harness];
 }
 export function effortOptions(harness: HarnessId, model: string, info?: HarnessInfo): ModelOption[] {
@@ -122,32 +122,32 @@ export function countRunChanges(run: RunSummary): number {
   return run.changes.createdScenes.length + steps.size + reorderedOnly + projectOrder;
 }
 
-/** The run that "Deshacer ejecución" acts on: the newest finished run with changes. Newer runs without changes are undone with it. */
+/** The run that "Undo run" acts on: the newest finished run with changes. Newer runs without changes are undone with it. */
 export function undoableRun(runs: RunSummary[] | undefined): RunSummary | undefined {
   if (!runs || runs.some((run) => run.status === 'running')) return undefined;
   const newestFirst = [...runs].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
   return newestFirst.find((run) => (run.status === 'finished' || run.status === 'interrupted') && countRunChanges(run) > 0);
 }
 
-/** Spanish for a failed undo. The service's own messages are in English and name internal IDs. */
+/** Plain words for a failed undo. The service's own messages are in English and name internal IDs. */
 export function undoErrorMessage(error: unknown): string {
-  if (error instanceof UnavailableError) return 'No hay conexión con el servicio local.';
+  if (error instanceof UnavailableError) return 'No connection to the local service.';
   if (error instanceof ApiRequestError) {
     switch (error.code) {
-      case 'NEWER_RUN_EXISTS': return 'Hay una ejecución más reciente con cambios. Deshazla primero.';
-      case 'RUN_IN_PROGRESS': return 'El agente está trabajando en este diagrama. Espera a que termine o detenlo.';
-      case 'RUN_ALREADY_UNDONE': return 'Esta ejecución ya se deshizo.';
-      case 'NOT_FOUND': return 'Ya no se guarda el punto de restauración de esta ejecución.';
+      case 'NEWER_RUN_EXISTS': return 'There is a newer run with changes. Undo it first.';
+      case 'RUN_IN_PROGRESS': return 'The agent is working on this project. Wait for it to finish, or stop it.';
+      case 'RUN_ALREADY_UNDONE': return 'This run was already undone.';
+      case 'NOT_FOUND': return "This run's restore point is no longer kept.";
     }
   }
-  return 'No se pudo deshacer la ejecución. Inténtalo de nuevo.';
+  return "Couldn't undo the run. Try again.";
 }
 
 const sendErrorMessage = (error: unknown) => {
-  if (error instanceof UnavailableError) return 'No hay conexión con el servicio local.';
-  // The agent routes answer in Spanish already.
+  if (error instanceof UnavailableError) return 'No connection to the local service.';
+  // The agent routes already answer in words a person can act on.
   if (error instanceof ApiRequestError) return error.message;
-  return 'No se pudo enviar el mensaje al agente.';
+  return "Couldn't send the message to the agent.";
 };
 
 export class AgentStore {
@@ -432,7 +432,7 @@ export class AgentStore {
     const running = this.state.turns.find((turn) => turn.projectId === projectId && turn.status === 'running');
     if (!running) return;
     try { await this.api.cancelAgentSession(running.sessionId); }
-    catch (error) { this.setNotice(projectId, error instanceof ApiRequestError ? error.message : 'No se pudo detener al agente.'); }
+    catch (error) { this.setNotice(projectId, error instanceof ApiRequestError ? error.message : "Couldn't stop the agent."); }
   }
 
   // Undo ---------------------------------------------------------------------------------------------------
@@ -671,7 +671,7 @@ export function stepMarks(turns: AgentTurn[], runs: RunSummary[] | undefined, pr
   return marks;
 }
 
-/** The running turn of a project, with the step it is changing now, for the Lienzo's top bar. */
+/** The running turn of a project, with the step it is changing now, for the Canvas's top bar. */
 export function activeTurn(turns: AgentTurn[], projectId: string | undefined) {
   if (!projectId) return undefined;
   const turn = turns.find((candidate) => candidate.projectId === projectId && candidate.status === 'running');

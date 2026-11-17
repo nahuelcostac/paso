@@ -15,7 +15,7 @@ export function ProjectIcon({ name }: { name?: string }) {
   return <Icon className="i" aria-hidden="true" />;
 }
 
-/** Matches the Spanish name, the keywords and the Lucide name, ignoring case and accents. */
+/** Matches the name, the keywords and the Lucide name, ignoring case and accents. */
 export function searchIcons(query: string): IconEntry[] {
   const terms = fold(query).split(/\s+/).filter(Boolean);
   if (!terms.length) return ICONS;

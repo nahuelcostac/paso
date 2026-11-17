@@ -36,16 +36,16 @@ export function WorkspaceMenu({ anchor, workspaces, activeId, onSwitch, onAdd, o
             >
               <span className="menu__check">{checked && <Check className="i" aria-hidden="true" />}</span>
               <span className="menu__label">{workspace.name}</span>
-              {!workspace.available && <span className="menu__meta">No disponible</span>}
+              {!workspace.available && <span className="menu__meta">Unavailable</span>}
             </button>
           );
         })}
         <hr />
-        <button type="button" role="menuitem" onClick={run(onAdd)}><FolderPlus className="i" aria-hidden="true" />Nuevo workspace…</button>
-        <button type="button" role="menuitem" onClick={run(onReveal)}><FolderOpen className="i" aria-hidden="true" />Abrir carpeta</button>
+        <button type="button" role="menuitem" onClick={run(onAdd)}><FolderPlus className="i" aria-hidden="true" />New workspace…</button>
+        <button type="button" role="menuitem" onClick={run(onReveal)}><FolderOpen className="i" aria-hidden="true" />Open folder</button>
         {active && !active.default && (
-          <button type="button" role="menuitem" onClick={run(onRemove)} title="La carpeta y sus diagramas se quedan donde están.">
-            <X className="i" aria-hidden="true" />Quitar de la lista
+          <button type="button" role="menuitem" onClick={run(onRemove)} title="The folder and its projects stay where they are.">
+            <X className="i" aria-hidden="true" />Remove from list
           </button>
         )}
       </div>

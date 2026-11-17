@@ -8,13 +8,13 @@ export type StepFrameProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 
   number: number;
   /** The step's optional title. */
   title?: string;
-  /** The step open in the Lienzo: an ink edge and an ink number. */
+  /** The step open on the Canvas: an ink edge and an ink number. */
   current?: boolean;
   /** Whether the agent is changing this step right now or changed it in an active run. */
   agentState?: 'working' | 'changed';
   /**
-   * Its presentation camera. `own`: Presentar zooms to part of it. `previous`: it keeps the previous step's camera, so
-   * Presentar does not move on reaching it. The thumbnail still shows the whole scene.
+   * Its presentation camera. `own`: Present zooms to part of it. `previous`: it keeps the previous step's camera, so
+   * Present does not move on reaching it. The thumbnail still shows the whole scene.
    */
   framed?: 'own' | 'previous';
   /** The step drawn by the thumbnail service, as an SVG document. Without it a quiet placeholder shows. */
@@ -54,20 +54,20 @@ export function StepFrame({ number, title, current = false, agentState, framed, 
       type="button"
       className={`frame frame--${size} ${workingClass} ${className}`.replace(/\s+/g, ' ').trim()}
       aria-current={current ? 'step' : undefined}
-      aria-label={`Paso ${number}${title ? `: ${title}` : ''}${framed === 'own' ? ', con encuadre' : framed === 'previous' ? ', mantiene el encuadre anterior' : ''}`}
+      aria-label={`Step ${number}${title ? `: ${title}` : ''}${framed === 'own' ? ', framed' : framed === 'previous' ? ", keeps the previous step's framing" : ''}`}
       title={title}
       {...button}
     >
       <span className="frame__paper" data-state={url ? 'ready' : 'loading'}>
         {url ? <img src={url} alt="" draggable={false} /> : <span className="frame__placeholder" aria-hidden="true" />}
-        {framed === 'own' && size === 'storyboard' && <span className="frame__framed" title="Con encuadre: Presentar se acerca a una parte del dibujo" aria-hidden="true"><Scan className="i" /></span>}
-        {framed === 'previous' && size === 'storyboard' && <span className="frame__framed frame__framed--kept" title="Mantiene el encuadre del paso anterior: Presentar no se mueve al llegar a este paso" aria-hidden="true"><KeepCameraIcon /></span>}
+        {framed === 'own' && size === 'storyboard' && <span className="frame__framed" title="Framed: Present zooms to part of the drawing" aria-hidden="true"><Scan className="i" /></span>}
+        {framed === 'previous' && size === 'storyboard' && <span className="frame__framed frame__framed--kept" title="Keeps the previous step's framing: Present doesn't move on reaching this step" aria-hidden="true"><KeepCameraIcon /></span>}
       </span>
       <span className="frame__label">
         <span className="frame__num">{pad(number)}</span>
         {agentState && (
           <span className="chip chip--agent">
-            {agentState === 'working' ? (size === 'carousel' ? 'agente\u2026' : 'cambiando\u2026') : 'agente'}
+            {agentState === 'working' ? (size === 'carousel' ? 'agent\u2026' : 'changing\u2026') : 'agent'}
           </span>
         )}
         {size === 'storyboard' && (title ? <span className="frame__title">{title}</span> : <span className="frame__title frame__title--empty" aria-hidden="true" />)}

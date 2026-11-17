@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { LaserPointer, type SizeMappingDetails } from '@excalidraw/laser-pointer';
 
 /*
- * The same laser as Excalidraw's laser tool in the Lienzo (0.18.1, `laser-trails.ts` and `animated-trail.ts`): the same
+ * The same laser as Excalidraw's laser tool on the Canvas (0.18.1, `laser-trails.ts` and `animated-trail.ts`): the same
  * trail from `@excalidraw/laser-pointer`, with the same options, decay, size and colour.
  */
 
@@ -45,7 +45,7 @@ function pathOf(points: number[][]) {
 
 /**
  * The laser of one press, from `start`: it draws while the pointer is held and, once released (`held` false), fades
- * away like the Lienzo's. Each press gets its own, so one still fading stays while a new one starts.
+ * away like the Canvas's. Each press gets its own, so one still fading stays while a new one starts.
  */
 export function Laser({ start, held = true }: { start?: { x: number; y: number }; held?: boolean }) {
   const path = useRef<SVGPathElement>(null);

@@ -11,7 +11,7 @@ import '../styles/present.css';
 const Presentation = lazy(() => import('./Presentation'));
 
 /**
- * Presentar: the top bar's one primary action. Everything in the scene is saved before it starts, because the
+ * Present: the top bar's one primary action. Everything in the scene is saved before it starts, because the
  * presentation reads from the service. Local work that cannot be saved stops it, and the person is told why.
  */
 export function PresentButton({ api, store, subscribeEvents, projectId, scene, stepId, onShowStep }: {
@@ -37,7 +37,7 @@ export function PresentButton({ api, store, subscribeEvents, projectId, scene, s
       const blocked = store.unresolved().find(({ target }) => target.projectId === projectId && target.sceneId === scene.id && scene.stepIds.includes(target.stepId));
       if (blocked) {
         const number = scene.stepIds.indexOf(blocked.target.stepId) + 1;
-        setNotice(blocked.status === 'conflict' ? `No se puede presentar: el paso ${number} tiene un conflicto.` : `No se puede presentar: el paso ${number} no se pudo guardar.`);
+        setNotice(blocked.status === 'conflict' ? `Can't present: step ${number} has a conflict.` : `Can't present: step ${number} couldn't be saved.`);
         return;
       }
       // Saving is quick, so the browser still counts this as the person's click. If it took too long, fullscreen is refused and the presentation fills the window.
@@ -61,9 +61,9 @@ export function PresentButton({ api, store, subscribeEvents, projectId, scene, s
   useEffect(() => () => fullscreen.exit(), [fullscreen]);
 
   return <>
-    {notice && <span className="present-error" role="alert"><span className="present-error__text" title={notice}>{notice}</span><button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setNotice(undefined)}>×</button></span>}
-    <button ref={button} type="button" className="btn btn--primary" disabled={empty} title={empty ? 'Esta escena no tiene pasos que presentar' : 'Presentar'} onClick={() => void start()}>
-      <Play className="i" aria-hidden="true" />Presentar
+    {notice && <span className="present-error" role="alert"><span className="present-error__text" title={notice}>{notice}</span><button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setNotice(undefined)}>×</button></span>}
+    <button ref={button} type="button" className="btn btn--primary" disabled={empty} title={empty ? 'This scene has no steps to present' : 'Present'} onClick={() => void start()}>
+      <Play className="i" aria-hidden="true" />Present
     </button>
     {presenting && createPortal(<Suspense fallback={<div className="present" />}>
       <Presentation api={api} projectId={projectId} sceneId={presenting.sceneId} startStepId={presenting.stepId} subscribeEvents={subscribeEvents} fullscreen={fullscreen} onLeave={leave} />

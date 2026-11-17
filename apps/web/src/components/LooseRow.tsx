@@ -11,7 +11,7 @@ export type DragHandlers = {
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
 };
 
-export const stepCount = (steps: number) => steps === 0 ? 'Sin pasos' : steps === 1 ? '1 paso' : `${steps} pasos`;
+export const stepCount = (steps: number) => steps === 0 ? 'No steps' : steps === 1 ? '1 step' : `${steps} steps`;
 
 type Props = {
   diagram: LooseDiagram;
@@ -42,19 +42,19 @@ export function LooseRow({ diagram, current, renaming, dragging, onOpen, onMenu,
         <span className="project__tile" aria-hidden="true"><Shapes className="i" /></span>
         {renaming ? (
           <div className="project__text">
-            <NameField initial={name} label={`Nombre de ${name}`} onSave={onRename} onCancel={onRenameCancel} onAbandon={onRenameAbandon} />
+            <NameField initial={name} label={`Name of ${name}`} onSave={onRename} onCancel={onRenameCancel} onAbandon={onRenameAbandon} />
           </div>
         ) : (
           <button
             type="button" className="project__open" aria-current={current ? 'true' : undefined} onClick={onOpen}
-            title={`${name} · ${size}. Arrástralo a un proyecto para moverlo.`} {...drag}
+            title={`${name} · ${size}. Drag it onto a project to move it.`} {...drag}
           >
             <span className="project__name">{name}</span>
-            <span className="visually-hidden">, diagrama suelto, {size}</span>
+            <span className="visually-hidden">, loose diagram, {size}</span>
           </button>
         )}
         {!renaming && (
-          <button ref={more} type="button" className="project__more" aria-haspopup="menu" aria-label={`Más acciones de ${name}`} onClick={() => onMenu(more.current!)}>
+          <button ref={more} type="button" className="project__more" aria-haspopup="menu" aria-label={`More actions for ${name}`} onClick={() => onMenu(more.current!)}>
             <EllipsisVertical className="i" aria-hidden="true" />
           </button>
         )}

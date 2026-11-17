@@ -89,7 +89,7 @@ describe('ProjectsStore', () => {
     await writeFile(file, JSON.stringify({ ...doc, name: 'Fuera' }, null, 2));
     const failure = await store.update(id, { name: 'Dentro' }).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(ActionError);
-    expect((failure as ActionError).message).toMatch(/cambió fuera de Paso/);
+    expect((failure as ActionError).message).toMatch(/changed outside Paso/);
     await until(() => {
       const row = store.getState().rows.find((candidate) => candidate.id === id);
       return row?.kind === 'ok' && row.project.name === 'Fuera';
@@ -106,7 +106,7 @@ describe('ProjectsStore', () => {
     await rm(join(dataDir, id), { recursive: true });
     const failure = await store.update(id, { name: 'Otro' }).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(ActionError);
-    expect((failure as ActionError).message).toMatch(/ya no existe/);
+    expect((failure as ActionError).message).toMatch(/no longer exists/);
     await until(() => store.getState().rows.length === 0);
   });
 
@@ -188,7 +188,7 @@ describe('ProjectsStore: loose diagrams', () => {
     // A step ID the project already uses stops the move.
     await post('/api/projects/_loose/scenes/d/steps', { id: 'clash' });
     await until(() => store.getState().loose?.diagrams[0].steps === 2);
-    await expect(store.moveScene('_loose', 'd', 'p')).rejects.toThrow('El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
+    await expect(store.moveScene('_loose', 'd', 'p')).rejects.toThrow('The project already has steps or images with the same IDs.');
     expect(store.getState().loose!.diagrams.map((diagram) => diagram.id)).toEqual(['d']);
   });
 

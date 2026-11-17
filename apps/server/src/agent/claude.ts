@@ -19,18 +19,18 @@ const deniedBuiltIns = [
 ];
 
 const messages: Record<FailureCode, string> = {
-  not_installed: 'No se ha encontrado Claude Code. Instálalo y vuelve a intentarlo.',
-  signed_out: 'Claude Code no tiene la sesión iniciada. Ejecuta «claude» en una terminal, inicia sesión y vuelve a intentarlo.',
-  quota: 'Has alcanzado el límite de uso de tu suscripción de Claude. Espera a que se restablezca e inténtalo de nuevo.',
-  model_unavailable: 'El modelo pedido no está disponible con tu cuenta de Claude.',
-  unsupported_version: 'Tu versión de Claude Code no admite esta función. Actualiza Claude Code e inténtalo de nuevo.',
-  unsafe_configuration: 'Claude Code ofreció herramientas que no son del tablero. Se ha detenido la ejecución por seguridad.',
-  board_unavailable: 'No se pudieron iniciar las herramientas del tablero. Comprueba que Paso está compilado.',
-  timeout: 'Claude Code dejó de responder y se ha detenido.',
-  crashed: 'Claude Code se cerró de forma inesperada.',
-  protocol: 'Claude Code devolvió una respuesta que Paso no entiende.',
-  blocked: 'No se pudo preparar la ejecución. Inténtalo de nuevo.',
-  harness_error: 'Claude Code terminó con un error.',
+  not_installed: "Claude Code wasn't found. Install it and try again.",
+  signed_out: "Claude Code isn't signed in. Run \"claude\" in a terminal, sign in and try again.",
+  quota: "You've reached the usage limit of your Claude subscription. Wait for it to reset and try again.",
+  model_unavailable: "The requested model isn't available with your Claude account.",
+  unsupported_version: "Your version of Claude Code doesn't support this. Update Claude Code and try again.",
+  unsafe_configuration: 'Claude Code offered tools that are not board tools. The run was stopped for safety.',
+  board_unavailable: "The board tools couldn't start. Check that Paso is built.",
+  timeout: 'Claude Code stopped responding and was stopped.',
+  crashed: 'Claude Code closed unexpectedly.',
+  protocol: "Claude Code sent a response Paso doesn't understand.",
+  blocked: "Couldn't prepare the run. Try again.",
+  harness_error: 'Claude Code ended with an error.',
 };
 export const failureMessage = (code: FailureCode) => messages[code];
 
@@ -73,9 +73,9 @@ export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | '
     '--setting-sources', '',
     '--disable-slash-commands',
     '--append-system-prompt',
-    `Eres el asistente de Paso, un editor de pizarras paso a paso. Trabajas en el ${where} (IDs de servicio). ` +
-    'Solo puedes usar las herramientas del tablero de Paso: no hay terminal, archivos ni web. ' +
-    'Lee el paso antes de editarlo y responde en español, de forma breve.',
+    `You are Paso's assistant, in a whiteboard editor for explaining things step by step. You are working in the ${where} (service IDs). ` +
+    "You can only use Paso's board tools: there is no terminal, no files and no web. " +
+    "Read a step before you edit it. Reply briefly, in the language of the user's message.",
     ...(request.model ? ['--model', request.model] : []),
     ...(request.effort ? ['--effort', request.effort] : []),
     ...(request.resumeToken ? ['--resume', request.resumeToken] : []),

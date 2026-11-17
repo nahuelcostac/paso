@@ -26,7 +26,7 @@ export type StoreState = {
   workspaces: WorkspaceListing | null;
 };
 
-/** A failed action. `message` is the reason, a sentence that follows "No se pudo …". */
+/** A failed action. `message` is the reason, a sentence that follows "Couldn't …". */
 export class ActionError extends Error {}
 
 // Most recently changed first, as the sidebar groups them by when they last changed.
@@ -236,23 +236,23 @@ export class ProjectsStore {
   private async fail(error: unknown, id?: string): Promise<never> {
     if (error instanceof UnavailableError) {
       this.release(); void this.lost();
-      throw new ActionError('No hay conexión con el servicio local.');
+      throw new ActionError('No connection to the local service.');
     }
     if (error instanceof ApiRequestError) {
       if (error.status === 409 || error.status === 428) {
         if (id) await this.refresh(id);
-        throw new ActionError('El diagrama cambió fuera de Paso. Ya está actualizado: inténtalo de nuevo.');
+        throw new ActionError("The project changed outside Paso. It's up to date now: try again.");
       }
       if (error.status === 404) {
         if (id) await this.refresh(id);
-        throw new ActionError('El diagrama ya no existe.');
+        throw new ActionError('The project no longer exists.');
       }
       if (error.status === 422) {
         if (id) await this.refresh(id);
-        throw new ActionError('Los archivos del diagrama no son válidos.');
+        throw new ActionError("The project's files aren't valid.");
       }
     }
-    throw new ActionError('Inténtalo de nuevo.');
+    throw new ActionError('Try again.');
   }
 
   /** A write's own answer is newer than any re-read already on its way, which must not overwrite it. */
@@ -260,7 +260,7 @@ export class ProjectsStore {
 
   private okRow(id: string) {
     const row = this.state.rows.find((candidate) => candidate.id === id);
-    if (row?.kind !== 'ok') throw new ActionError('Este diagrama no se puede editar.');
+    if (row?.kind !== 'ok') throw new ActionError("This project can't be edited.");
     return row;
   }
 
@@ -282,7 +282,7 @@ export class ProjectsStore {
   }
   private looseDiagram(id: string) {
     const diagram = this.state.loose?.diagrams.find((candidate) => candidate.id === id);
-    if (!diagram) throw new ActionError('El diagrama ya no existe.');
+    if (!diagram) throw new ActionError('The diagram no longer exists.');
     return diagram;
   }
   /** Shows a loose diagram just created elsewhere, such as by the step actions, without waiting for its event. */
@@ -322,11 +322,11 @@ export class ProjectsStore {
       await this.api.moveScene(sourceId, sceneId, fresh.revision, targetId, index);
     } catch (error) {
       await Promise.all([reread(sourceId), reread(targetId)]);
-      if (error instanceof ApiRequestError && error.code === 'AGENT_RUNNING') throw new ActionError('Espera a que el agente termine.');
+      if (error instanceof ApiRequestError && error.code === 'AGENT_RUNNING') throw new ActionError('Wait for the agent to finish.');
       if (error instanceof ApiRequestError && (error.code === 'ID_COLLISION' || error.code === 'ASSET_CONFLICT')) {
         throw new ActionError(isLooseProject(targetId)
-          ? 'Ya hay un diagrama suelto con pasos o imágenes con los mismos identificadores.'
-          : 'El proyecto ya tiene pasos o imágenes con los mismos identificadores.');
+          ? 'A loose diagram already has steps or images with the same IDs.'
+          : 'The project already has steps or images with the same IDs.');
       }
       return this.fail(error);
     }
@@ -362,11 +362,11 @@ export class ProjectsStore {
   }
 }
 
-/** Words for a failed workspace action, after "No se pudo …". */
+/** Words for a failed workspace action, after "Couldn't …". */
 export function workspaceErrorText(error: unknown) {
-  if (error instanceof UnavailableError) return 'No hay conexión con el servicio local.';
+  if (error instanceof UnavailableError) return 'No connection to the local service.';
   if (error instanceof ApiRequestError && error.status !== 500) return error.message;
-  return 'Inténtalo de nuevo.';
+  return 'Try again.';
 }
 
 export function useProjects(store: ProjectsStore) {

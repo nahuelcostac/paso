@@ -20,9 +20,9 @@
 .frame__framed--kept { box-shadow: none; outline: 1px dashed var(--line-strong); outline-offset: -1px; }
 /* An untitled step says so on the card, in CSS, so the button's text stays its number alone. */
 .frame__title--empty { color: var(--ink-3); font-weight: var(--weight-regular); }
-.frame__title--empty::before { content: 'Sin título'; }
+.frame__title--empty::before { content: 'Untitled'; }
 .frame:hover { box-shadow: 0 0 0 1px var(--line-strong), var(--shadow-md); }
-/* The step open in the Lienzo: an ink edge and an ink number. */
+/* The step open in the Canvas: an ink edge and an ink number. */
 .frame[aria-current='step'] { box-shadow: 0 0 0 2px var(--accent); }
 .frame[aria-current='step'] .frame__num { background: var(--accent); color: var(--on-accent); box-shadow: none; }
 /* The agent is changing it now: a pink edge, which wins over the ink one. */
@@ -46,8 +46,8 @@
 .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: var(--radius-pill); font-size: var(--text-12); font-weight: var(--weight-semibold); line-height: 1; white-space: nowrap; flex: none; }
 .chip--agent { background: var(--agent); color: var(--on-agent); }
 
-/* In the Estudio a card's title is its own target: a click there, or F2 on the card, names the step, while the rest
-   of the card opens it on the Lienzo. The target lies over the card's label, so the title stays where it is drawn. */
+/* In the Studio a card's title is its own target: a click there, or F2 on the card, names the step, while the rest
+   of the card opens it on the Canvas. The target lies over the card's label, so the title stays where it is drawn. */
 .step-card { position: relative; min-width: 0; }
 /* Room for the pencil, so a long title is cut before it. */
 .step-card .frame__title { margin-right: 20px; }

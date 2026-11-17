@@ -44,7 +44,7 @@ export type StartServerOptions = {
   runsDir?: string; runRetentionLimit?: number;
   /** Where the list of workspaces is kept. Default: `workspaces.json` next to the data directory. */
   workspacesPath?: string;
-  /** How «Abrir carpeta» shows a project's folder. Default: the system's file manager. A desktop host can pass its own,
+  /** How “Open folder” shows a project's folder. Default: the system's file manager. A desktop host can pass its own,
    * such as Electron's shell.openPath. */
   openFolder?: OpenFolder;
 };
@@ -100,7 +100,7 @@ export async function startServer(options: StartServerOptions) {
     // The default folder is created on first use. Another workspace must still exist: a folder the person moved or
     // deleted is reported, never quietly created again.
     if (workspace.path !== dataRoot && !(await workspaces.list()).workspaces.find((item) => item.id === workspace.id)?.available) {
-      throw new ApiError(422, 'WORKSPACE_UNAVAILABLE', 'La carpeta de este workspace no existe o no se puede leer.');
+      throw new ApiError(422, 'WORKSPACE_UNAVAILABLE', "This workspace's folder doesn't exist or can't be read.");
     }
     const runs = await RunStore.create(workspace.path, { runsDir: runsFor(workspace), retentionLimit: options.runRetentionLimit });
     const store = await Store.create(workspace.path, options.pollIntervalMs, runs);
@@ -116,8 +116,8 @@ export async function startServer(options: StartServerOptions) {
   let switching: Promise<void> | undefined;
   const switchTo = async (id: string) => {
     const workspace = workspaces.get(id);
-    if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'Ya se está cambiando de workspace.');
-    if (sessions.busy()) throw new ApiError(409, 'AGENT_RUNNING', 'Espera a que el agente termine antes de cambiar de workspace.');
+    if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'The workspace is already being switched.');
+    if (sessions.busy()) throw new ApiError(409, 'AGENT_RUNNING', 'Wait for the agent to finish before switching workspaces.');
     if (workspace.id === current.workspace.id) { await workspaces.activate(id); return; }
     let done!: () => void;
     switching = new Promise<void>((resolve) => { done = resolve; });
@@ -136,7 +136,7 @@ export async function startServer(options: StartServerOptions) {
     adapters: agent.adapters,
     detect: (id) => detectHarness(id, options.harnessDetection ?? {}),
     validateTarget: async (projectId, sceneId) => {
-      if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'Paso está cambiando de workspace.');
+      if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'Paso is switching workspaces.');
       // A loose diagram is one scene: the agent gets that scene, never every loose diagram at once.
       if (isLooseProject(projectId) && !sceneId) throw new ApiError(400, 'SCENE_REQUIRED', 'Name the loose diagram (its scene) the agent works on.');
       await current.store.read(projectId, sceneId);
@@ -248,7 +248,7 @@ export async function startServer(options: StartServerOptions) {
         else if (method === 'DELETE') { result = await store.mutate(projectId, 'delete', null, revision, undefined, undefined, actor); status = 204; }
         else throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
       } else if (parts.length === 4 && parts[3] === 'reveal') {
-        // «Abrir carpeta»: the project's own folder, named by its ID under the data directory.
+        // “Open folder”: the project's own folder, named by its ID under the data directory.
         if (method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
         // The loose diagrams' hidden folder is not a project the person opens.
         if (isLooseProject(projectId)) throw new ApiError(404, 'NOT_FOUND', 'Project not found.');

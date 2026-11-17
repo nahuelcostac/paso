@@ -43,8 +43,8 @@ const elementIds = (step: Step) => step.elements.map((e) => e.id);
 function open(session: Session) { session.baseline = undefined; store.change(session, session.document.elements, session.document.appState, {}); return session; }
 function drawing(session: Session, id: string) { store.change(session, [...session.document.elements, element(id)], session.document.appState, {}); }
 
-describe('Añadir paso and Duplicar paso', () => {
-  it('Añadir: a new step right after the current one, from its latest drawing, with no title or notes', async () => {
+describe('Add step and Duplicate step', () => {
+  it('Add: a new step right after the current one, from its latest drawing, with no title or notes', async () => {
     const s = await scene(); await store.select(s.target(0)); const session = open(store.current()!);
     drawing(session, 'late');                       // not saved yet: the debounce has not fired
     expect(session.status).toBe('dirty');
@@ -56,7 +56,7 @@ describe('Añadir paso and Duplicar paso', () => {
     expect(elementIds(await content(s, s.ids[0]))).toEqual(['r1', 'late']);   // and the step it came from was saved
     expect(session.status).toBe('saved');
   });
-  it('Añadir in an empty scene makes a blank step', async () => {
+  it('Add in an empty scene makes a blank step', async () => {
     const s = await scene(0);
     const id = await actions.add(s.projectId, s.sceneId, undefined);
     expect(await order(s)).toEqual([id]); expect((await content(s, id)).elements).toEqual([]);
@@ -68,7 +68,7 @@ describe('Añadir paso and Duplicar paso', () => {
     expect(await order(s)).toEqual([...s.ids, id]);
     expect(elementIds(await content(s, id))).toEqual(['e2']);
   });
-  it('Duplicar with a save pending: the copy has the latest content, title and notes, right after the original', async () => {
+  it('Duplicate with a save pending: the copy has the latest content, title and notes, right after the original', async () => {
     const s = await scene(); await store.select(s.target(0)); const session = open(store.current()!);
     drawing(session, 'late'); drawing(session, 'later');
     const id = await actions.duplicate(s.target(0));
@@ -78,12 +78,12 @@ describe('Añadir paso and Duplicar paso', () => {
     expect(copy.id).not.toBe(s.ids[0]);
     expect(elementIds(await content(s, s.ids[0]))).toEqual(['r1', 'late', 'later']);
   });
-  it('Duplicar a step the store never opened works from the service copy', async () => {
+  it('Duplicate a step the store never opened works from the service copy', async () => {
     const s = await scene();
     const id = await actions.duplicate(s.target(2));
     expect(await order(s)).toEqual([s.ids[0], s.ids[1], s.ids[2], id]);
   });
-  it('Duplicar retries when an autosave lands between the flush and the copy', async () => {
+  it('Duplicate retries when an autosave lands between the flush and the copy', async () => {
     const s = await scene(); await store.select(s.target(0)); const session = open(store.current()!);
     const real = api.duplicateStep.bind(api); let calls = 0;
     api.duplicateStep = async (target, revision) => {
@@ -102,7 +102,7 @@ describe('Añadir paso and Duplicar paso', () => {
     await expect(actions.duplicate(s.target(0))).rejects.toBeInstanceOf(StructureError);
     expect(session.status).toBe('conflict');
     expect(await order(s)).toEqual(s.ids);
-    await expect(actions.add(s.projectId, s.sceneId, s.ids[0])).rejects.toThrow('cambios sin guardar');
+    await expect(actions.add(s.projectId, s.sceneId, s.ids[0])).rejects.toThrow('unsaved changes');
     expect(await order(s)).toEqual(s.ids);
   });
 });
@@ -159,7 +159,7 @@ describe('deleting a step', () => {
     const s = await scene(2); await store.select(s.target(0)); open(store.current()!);
     const current = await api.getStep(s.target(0));
     await api.saveStep(s.target(0), current.revision, { ...current.document, title: 'externo' });
-    await expect(actions.remove(s.target(0))).rejects.toThrow('cambió fuera de Paso');
+    await expect(actions.remove(s.target(0))).rejects.toThrow('changed outside Paso');
     expect(await order(s)).toEqual(s.ids);
   });
 });

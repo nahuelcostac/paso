@@ -42,7 +42,7 @@ type Props = {
   /** The loose diagram on screen, if one is. */
   looseCurrentId: string | null;
   onOpenLoose: (id: string) => void;
-  /** «Nuevo diagrama»: the app creates it with one empty step and opens it. Rejects with the words to show. */
+  /** “New diagram”: the app creates it with one empty step and opens it. Rejects with the words to show. */
   onCreateLoose: (name: string) => Promise<void>;
   /**
    * Moves a scene into another project, last or at `index` in its scene list: a loose diagram into a project, a scene
@@ -70,10 +70,10 @@ type Moving = { source: string; id: string; name: string };
 /** Where a drop would put it: a project, or the loose diagrams, and in a project's open list, above or below a scene. */
 type Drop = { id: string; index?: number; sceneId?: string; place?: 'before' | 'after' };
 
-const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Inténtalo de nuevo.';
+const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Try again.';
 
 /**
- * The sidebar, laid out like tldraw's: the mark, the workspace switcher, search and «Nuevo proyecto», then the projects
+ * The sidebar, laid out like tldraw's: the mark, the workspace switcher, search and “New project”, then the projects
  * grouped by when they last changed. Each workspace is a folder on this computer.
  */
 export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, onHide, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
@@ -117,7 +117,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     const name = named(id);
     setPicker(null);
     try { await store.update(id, { icon }); setNotice(null); }
-    catch (error) { setNotice(`No se pudo cambiar el icono de «${name}». ${reasonText(error)}`); }
+    catch (error) { setNotice(`Couldn't change the icon of “${name}”. ${reasonText(error)}`); }
   };
   const confirmDelete = async () => {
     if (!deleting) return;
@@ -127,7 +127,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       const id = deleting.id;
       setDeleting(null); setNotice(null);
       onDeleted(id);
-    } catch (error) { setDeleteError(`No se pudo eliminar el diagrama. ${reasonText(error)}`); }
+    } catch (error) { setDeleteError(`Couldn't delete the project. ${reasonText(error)}`); }
     finally { setDeleteBusy(false); }
   };
   const closeDelete = () => { if (!deleteBusy) { setDeleting(null); setDeleteError(null); } };
@@ -138,14 +138,14 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     catch (error) { setNotice(`${failure} ${workspaceErrorText(error)}`); }
     finally { setSwitching(false); }
   };
-  /** «Nuevo workspace…»: the system's folder dialog in the desktop app, the in-app explorer in a browser. */
+  /** “New workspace…”: the system's folder dialog in the desktop app, the in-app explorer in a browser. */
   const addWorkspace = async () => {
     const choose = nativeFolderChooser();
     if (!choose) { setChoosingFolder(true); return; }
     setNotice(null);
     const path = await choose(activeWorkspace && !activeWorkspace.default ? activeWorkspace.path : undefined).catch(() => undefined);
-    if (path === undefined) { setNotice('No se pudo abrir el selector de carpetas.'); return; }
-    if (path) await workspaceAction(() => store.addWorkspace(path), 'No se pudo añadir la carpeta.');
+    if (path === undefined) { setNotice("Couldn't open the folder chooser."); return; }
+    if (path) await workspaceAction(() => store.addWorkspace(path), "Couldn't add the folder.");
   };
 
   const offline = !state.connected && state.phase === 'ready';
@@ -194,16 +194,16 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     }
     return { id, index, sceneId: scene.dataset.dropScene, place };
   };
-  const targetName = (id: string) => isLooseProject(id) ? 'Diagramas sueltos' : named(id);
+  const targetName = (id: string) => isLooseProject(id) ? 'Loose diagrams' : named(id);
   const transfer = async (item: Moving, target: Drop) => {
     setNotice(null);
     if (target.id === item.source && target.sceneId && target.place) {
       try { await onReorderScene(item.source, item.id, target.sceneId, target.place); }
-      catch (error) { setNotice(`No se pudo mover «${item.name}». ${error instanceof Error ? error.message : 'Inténtalo de nuevo.'}`); }
+      catch (error) { setNotice(`Couldn't move “${item.name}”. ${error instanceof Error ? error.message : 'Try again.'}`); }
       return;
     }
     try { await onMoveScene(item.source, item.id, target.id, target.index); }
-    catch (error) { setNotice(`No se pudo mover «${item.name}». ${reasonText(error)}`); }
+    catch (error) { setNotice(`Couldn't move “${item.name}”. ${reasonText(error)}`); }
   };
   const dragHandlers = (item: Moving) => ({
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
@@ -252,7 +252,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     if (!over) return null;
     const row = rowById(over.id);
     const beside = over.sceneId && row?.kind === 'ok' ? row.sceneList.find((scene) => scene.id === over.sceneId)?.name : undefined;
-    return beside ? `${targetName(over.id)}», ${over.place === 'after' ? 'debajo' : 'encima'} de «${beside}` : targetName(over.id);
+    return beside ? `${targetName(over.id)}”, ${over.place === 'after' ? 'below' : 'above'} “${beside}` : targetName(over.id);
   })();
   // In its own project, the scene only changes place.
   const reorderName = (() => {
@@ -260,7 +260,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     if (!drag || !over || over.id !== drag.source || !over.sceneId) return null;
     const row = rowById(over.id);
     const beside = row?.kind === 'ok' ? row.sceneList.find((scene) => scene.id === over.sceneId)?.name : undefined;
-    return beside ? `${over.place === 'after' ? 'debajo' : 'encima'} de «${beside}»` : null;
+    return beside ? `${over.place === 'after' ? 'below' : 'above'} “${beside}”` : null;
   })();
   // A scene dragged out of a project can land among the loose diagrams, even while there are none.
   const sceneOut = drag !== null && !isLooseProject(drag.source);
@@ -282,7 +282,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       onMenu={(anchor) => setMenu(menu?.id === row.id ? null : { id: row.id, anchor })}
       onRename={async (name) => {
         try { await store.update(row.id, { name }); setRenamingId(null); setNotice(null); }
-        catch (error) { throw new Error(`No se pudo renombrar «${row.kind === 'ok' ? row.project.name : row.id}». ${reasonText(error)}`); }
+        catch (error) { throw new Error(`Couldn't rename “${row.kind === 'ok' ? row.project.name : row.id}”. ${reasonText(error)}`); }
       }}
       onRenameCancel={() => setRenamingId(null)}
       onRenameAbandon={(message) => { setRenamingId(null); setNotice(message); }}
@@ -301,7 +301,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       onMenu={(anchor) => setLooseMenu(looseMenu?.id === diagram.id ? null : { id: diagram.id, anchor })}
       onRename={async (name) => {
         try { await store.renameLoose(diagram.id, name); setRenamingLooseId(null); setNotice(null); }
-        catch (error) { throw new Error(`No se pudo renombrar «${diagram.scene.name}». ${reasonText(error)}`); }
+        catch (error) { throw new Error(`Couldn't rename “${diagram.scene.name}”. ${reasonText(error)}`); }
       }}
       onRenameCancel={() => setRenamingLooseId(null)}
       onRenameAbandon={(message) => { setRenamingLooseId(null); setNotice(message); }}
@@ -310,10 +310,10 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   );
 
   return (
-    <aside id="projects-panel" className="projects" aria-label="Diagramas" aria-busy={switching || undefined} data-dragging={drag ? 'true' : undefined}>
+    <aside id="projects-panel" className="projects" aria-label="Projects and diagrams" aria-busy={switching || undefined} data-dragging={drag ? 'true' : undefined}>
       <div className="projects__head">
         <Brand />
-        {onHide && <button type="button" className="icon-btn" aria-label="Cerrar diagramas" title="Cerrar diagramas" onClick={onHide}>
+        {onHide && <button type="button" className="icon-btn" aria-label="Close sidebar" title="Close sidebar" onClick={onHide}>
           <X className="i" aria-hidden="true" />
         </button>}
       </div>
@@ -321,7 +321,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
       <div className="projects__nav">
         <button
           ref={workspaceButton} type="button" className="workspace-switch" aria-haspopup="menu" aria-expanded={workspaceMenu}
-          aria-label={`Workspace: ${activeWorkspace?.name ?? 'cargando'}`} title={activeWorkspace?.path}
+          aria-label={`Workspace: ${activeWorkspace?.name ?? 'loading'}`} title={activeWorkspace?.path}
           disabled={!listing || switching} onClick={() => setWorkspaceMenu(!workspaceMenu)}
         >
           <span className="workspace-switch__name">{activeWorkspace?.name ?? ' '}</span>
@@ -330,13 +330,13 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
         <hr />
         {query === null ? (
           <button ref={searchButton} type="button" className="nav-row" onClick={() => setQuery('')}>
-            <Search className="i" aria-hidden="true" />Buscar…
+            <Search className="i" aria-hidden="true" />Search…
           </button>
         ) : (
           <label className="nav-row nav-row--field">
             <Search className="i" aria-hidden="true" />
             <input
-              type="search" autoFocus value={query} placeholder="Buscar…" aria-label="Buscar diagramas" spellCheck={false}
+              type="search" autoFocus value={query} placeholder="Search…" aria-label="Search projects and diagrams" spellCheck={false}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setQuery(null); requestAnimationFrame(() => searchButton.current?.focus()); } }}
               onBlur={(event) => { if (!event.currentTarget.value.trim()) setQuery(null); }}
@@ -344,17 +344,17 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           </label>
         )}
         <button type="button" className="nav-row" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); onCreatingChange(false); setCreatingLoose(true); }}>
-          <SquarePlus className="i" aria-hidden="true" />Nuevo diagrama
+          <SquarePlus className="i" aria-hidden="true" />New diagram
         </button>
         <button type="button" className="nav-row" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); setCreatingLoose(false); onCreatingChange(true); }}>
-          <SquarePen className="i" aria-hidden="true" />Nuevo proyecto
+          <SquarePen className="i" aria-hidden="true" />New project
         </button>
         <hr />
       </div>
 
       <div className="projects__body">
         {state.phase === 'loading' && (
-          <ul className="project-list" aria-busy="true" aria-label="Cargando diagramas">
+          <ul className="project-list" aria-busy="true" aria-label="Loading projects">
             {[0, 1, 2].map((n) => (
               <li key={n}><div className="project project--skeleton"><span className="project__tile" /><span className="skeleton skeleton--name" /></div></li>
             ))}
@@ -364,17 +364,17 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
         {state.phase === 'unavailable' && (
           <div className="panel-message" role="status">
             <ServerOff className="i" aria-hidden="true" />
-            <p className="panel-message__title">{state.reason === 'session' ? 'Sesión no válida' : 'Sin conexión'}</p>
-            <p>{state.reason === 'session' ? 'El servicio local no reconoce esta ventana. Reinicia Paso.' : 'No se puede llegar al servicio local de Paso. Se reintenta solo.'}</p>
-            <button type="button" className="btn" onClick={() => store.retry()}>Reintentar</button>
+            <p className="panel-message__title">{state.reason === 'session' ? 'Invalid session' : 'Offline'}</p>
+            <p>{state.reason === 'session' ? "The local service doesn't recognize this window. Restart Paso." : "Can't reach Paso's local service. It retries on its own."}</p>
+            <button type="button" className="btn" onClick={() => store.retry()}>Retry</button>
           </div>
         )}
 
         {state.phase === 'ready' && state.rows.length === 0 && looseAll.length === 0 && !creating && !creatingLoose && (
           <div className="panel-message">
             <Folder className="i" aria-hidden="true" />
-            <p className="panel-message__title">Aún no hay diagramas</p>
-            <p>{activeWorkspace && !activeWorkspace.default ? `La carpeta «${activeWorkspace.name}» no tiene diagramas todavía.` : 'Un diagrama reúne las escenas y los pasos de una explicación.'}</p>
+            <p className="panel-message__title">Nothing here yet</p>
+            <p>{activeWorkspace && !activeWorkspace.default ? `The folder “${activeWorkspace.name}” has no projects yet.` : 'A project gathers the scenes and steps of an explanation. A diagram is a single drawing.'}</p>
           </div>
         )}
 
@@ -388,12 +388,12 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
                     <div className="project__text">
                       <NameField
                         initial=""
-                        label="Nombre del diagrama nuevo"
-                        placeholder="Nombre del diagrama"
+                        label="Name of the new project"
+                        placeholder="Project name"
                         onSave={async (name) => {
                           let id: string;
                           try { id = await store.create(name); } 
-                          catch (error) { throw new Error(`No se pudo crear el diagrama. ${reasonText(error)}`); }
+                          catch (error) { throw new Error(`Couldn't create the project. ${reasonText(error)}`); }
                           onCreatingChange(false);
                           await onCreated(id);
                         }}
@@ -412,15 +412,15 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
               </section>
             ))}
             {broken.length > 0 && (
-              <section className="project-group" aria-label="No se pueden abrir">
-                <h3 className="project-group__title">No se pueden abrir</h3>
+              <section className="project-group" aria-label="Can't be opened">
+                <h3 className="project-group__title">Can't be opened</h3>
                 <ul className="project-list">{broken.map(renderRow)}</ul>
               </section>
             )}
             {/* Loose diagrams: flat below the projects, with no heading of their own. */}
             {(looseVisible.length > 0 || creatingLoose || sceneOut) && (
               <ul
-                className="project-list project-list--loose" aria-label="Diagramas sueltos"
+                className="project-list project-list--loose" aria-label="Loose diagrams"
                 data-drop-project={LOOSE_PROJECT_ID} data-drop={(sceneOut && drag?.over?.id === LOOSE_PROJECT_ID) || undefined}
               >
                 {creatingLoose && (
@@ -430,11 +430,11 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
                       <div className="project__text">
                         <NameField
                           initial=""
-                          label="Nombre del diagrama suelto nuevo"
-                          placeholder="Nombre del diagrama"
+                          label="Name of the new diagram"
+                          placeholder="Diagram name"
                           onSave={async (name) => {
                             try { await onCreateLoose(name); }
-                            catch (error) { throw new Error(`No se pudo crear el diagrama. ${reasonText(error)}`); }
+                            catch (error) { throw new Error(`Couldn't create the diagram. ${reasonText(error)}`); }
                             setCreatingLoose(false);
                           }}
                           onCancel={() => setCreatingLoose(false)}
@@ -446,11 +446,11 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
                 )}
                 {looseVisible.map(renderLoose)}
                 {sceneOut && looseVisible.length === 0 && !creatingLoose && (
-                  <li className="loose-drop" aria-hidden="true"><Shapes className="i" />Suelta aquí</li>
+                  <li className="loose-drop" aria-hidden="true"><Shapes className="i" />Drop here</li>
                 )}
               </ul>
             )}
-            {query !== null && visible.length === 0 && looseVisible.length === 0 && <p className="projects__empty" role="status">Ningún diagrama coincide.</p>}
+            {query !== null && visible.length === 0 && looseVisible.length === 0 && <p className="projects__empty" role="status">No matches.</p>}
           </>
         )}
       </div>
@@ -462,8 +462,8 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
             <div className="notice" role="status">
               <CloudOff className="i" aria-hidden="true" />
               <div className="notice__body">
-                <span>{state.reason === 'session' ? 'El servicio rechazó esta sesión.' : 'Sin conexión con el servicio.'} La lista puede no estar al día.</span>
-                <button type="button" className="notice__action" onClick={() => store.retry()}>Reintentar</button>
+                <span>{state.reason === 'session' ? 'The service rejected this session.' : 'No connection to the service.'} The list may be out of date.</span>
+                <button type="button" className="notice__action" onClick={() => store.retry()}>Retry</button>
               </div>
             </div>
           )}
@@ -471,7 +471,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
             <div className="notice notice--error" role="alert">
               <TriangleAlert className="i" aria-hidden="true" />
               <span>{notice}</span>
-              <button type="button" className="icon-btn" aria-label="Cerrar aviso" onClick={() => setNotice(null)}><X className="i" aria-hidden="true" /></button>
+              <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setNotice(null)}><X className="i" aria-hidden="true" /></button>
             </div>
           )}
         </div>
@@ -483,10 +483,10 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           workspaces={listing.workspaces}
           activeId={listing.activeId}
           onClose={() => setWorkspaceMenu(false)}
-          onSwitch={(id) => void workspaceAction(() => store.switchWorkspace(id), 'No se pudo abrir el workspace.')}
+          onSwitch={(id) => void workspaceAction(() => store.switchWorkspace(id), "Couldn't open the workspace.")}
           onAdd={() => void addWorkspace()}
-          onReveal={() => { setNotice(null); void store.revealWorkspace(listing.activeId).catch(() => setNotice('No se pudo abrir la carpeta del workspace.')); }}
-          onRemove={() => void workspaceAction(() => store.removeWorkspace(listing.activeId), 'No se pudo quitar el workspace.')}
+          onReveal={() => { setNotice(null); void store.revealWorkspace(listing.activeId).catch(() => setNotice("Couldn't open the workspace's folder.")); }}
+          onRemove={() => void workspaceAction(() => store.removeWorkspace(listing.activeId), "Couldn't remove the workspace.")}
         />
       )}
       {choosingFolder && (
@@ -507,7 +507,7 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           name={named(menu.id)}
           onClose={() => setMenu(null)}
           onRename={() => { setNotice(null); setRenamingId(menu.id); }}
-          onReveal={() => { setNotice(null); void store.reveal(menu.id).catch(() => setNotice('No se pudo abrir la carpeta del diagrama.')); }}
+          onReveal={() => { setNotice(null); void store.reveal(menu.id).catch(() => setNotice("Couldn't open the project's folder.")); }}
           onDelete={() => { setDeleteError(null); setDeleting(rowById(menu.id) as Extract<Row, { kind: 'ok' }>); }}
         />
       )}
@@ -529,24 +529,24 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           onClose={() => setMoving(null)}
           onMove={async (projectId) => {
             try { await onMoveScene(moving.source, moving.id, projectId); setNotice(null); }
-            catch (error) { throw new Error(`No se pudo mover «${moving.name}». ${reasonText(error)}`); }
+            catch (error) { throw new Error(`Couldn't move “${moving.name}”. ${reasonText(error)}`); }
           }}
         />
       )}
       {deletingLoose && (
-        <Dialog title={`¿Eliminar «${deletingLoose.scene.name}»?`} onClose={() => { if (!deleteBusy) { setDeletingLoose(null); setDeleteError(null); } }}>
+        <Dialog title={`Delete “${deletingLoose.scene.name}”?`} onClose={() => { if (!deleteBusy) { setDeletingLoose(null); setDeleteError(null); } }}>
           <p className="dialog__text">
-            {deletingLoose.steps === 0 ? 'Se borrará el diagrama' : `Se borrará el diagrama con ${stepCount(deletingLoose.steps).toLowerCase()}`}. No se puede deshacer.
+            {deletingLoose.steps === 0 ? 'This deletes the diagram' : `This deletes the diagram and its ${stepCount(deletingLoose.steps).toLowerCase()}`}. This can't be undone.
           </p>
           {deleteError && <p className="dialog__error" role="alert">{deleteError}</p>}
           <div className="dialog__actions">
-            <button type="button" className="btn btn--soft" data-autofocus onClick={() => { setDeletingLoose(null); setDeleteError(null); }}>Cancelar</button>
+            <button type="button" className="btn btn--soft" data-autofocus onClick={() => { setDeletingLoose(null); setDeleteError(null); }}>Cancel</button>
             <button type="button" className="btn btn--danger" disabled={deleteBusy} onClick={() => void (async () => {
               setDeleteBusy(true); setDeleteError(null);
               try { await onDeleteLoose(deletingLoose.id); setDeletingLoose(null); setNotice(null); }
-              catch (error) { setDeleteError(`No se pudo eliminar el diagrama. ${reasonText(error)}`); }
+              catch (error) { setDeleteError(`Couldn't delete the diagram. ${reasonText(error)}`); }
               finally { setDeleteBusy(false); }
-            })()}>Eliminar diagrama</button>
+            })()}>Delete diagram</button>
           </div>
         </Dialog>
       )}
@@ -557,9 +557,9 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
         document.body,
       )}
       <p className="visually-hidden" role="status" aria-live="polite">
-        {drag ? (reorderName ? `Suelta para colocar «${drag.name}» ${reorderName}.` : dropName ? `Suelta para mover «${drag.name}» a «${dropName}».` : sceneOut
-          ? `Arrastra «${drag.name}» a otro sitio de su proyecto, sobre otro proyecto, o sobre los diagramas sueltos para sacarla.`
-          : `Arrastra «${drag.name}» sobre un proyecto para moverlo.`) : ''}
+        {drag ? (reorderName ? `Drop to place “${drag.name}” ${reorderName}.` : dropName ? `Drop to move “${drag.name}” to “${dropName}”.` : sceneOut
+          ? `Drag “${drag.name}” to another place in its project, onto another project, or onto the loose diagrams to take it out.`
+          : `Drag “${drag.name}” onto a project to move it.`) : ''}
       </p>
       {picker && rowById(picker.id)?.kind === 'ok' && (
         <IconPicker
@@ -570,14 +570,14 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
         />
       )}
       {deleting && (
-        <Dialog title={`¿Eliminar «${deleting.project.name}»?`} onClose={closeDelete}>
+        <Dialog title={`Delete “${deleting.project.name}”?`} onClose={closeDelete}>
           <p className="dialog__text">
-            Se borrará la carpeta del diagrama{deleting.scenes > 0 ? ` con ${describeContents(deleting.scenes, deleting.steps)}` : ''}. No se puede deshacer.
+            This deletes the project's folder{deleting.scenes > 0 ? `, with its ${describeContents(deleting.scenes, deleting.steps)}` : ''}. This can't be undone.
           </p>
           {deleteError && <p className="dialog__error" role="alert">{deleteError}</p>}
           <div className="dialog__actions">
-            <button type="button" className="btn btn--soft" data-autofocus onClick={closeDelete}>Cancelar</button>
-            <button type="button" className="btn btn--danger" disabled={deleteBusy} onClick={() => void confirmDelete()}>Eliminar diagrama</button>
+            <button type="button" className="btn btn--soft" data-autofocus onClick={closeDelete}>Cancel</button>
+            <button type="button" className="btn btn--danger" disabled={deleteBusy} onClick={() => void confirmDelete()}>Delete project</button>
           </div>
         </Dialog>
       )}

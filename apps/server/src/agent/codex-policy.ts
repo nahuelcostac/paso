@@ -27,7 +27,7 @@ export function codexCatalog(model: string) {
       { effort: 'max', description: 'Maximum reasoning' }, { effort: 'ultra', description: 'Extended reasoning' },
     ],
     shell_type: 'disabled', visibility: 'list', supported_in_api: true, priority: 0,
-    base_instructions: 'Eres el asistente de Paso. Solo puedes usar las herramientas del tablero. Responde en español.',
+    base_instructions: "You are Paso's assistant. You can only use the board tools. Reply in the language of the user's message.",
     include_skills_usage_instructions: false, include_plugin_usage_instructions: false, include_apps_usage_instructions: false,
     default_reasoning_summary: 'none', support_verbosity: false, default_verbosity: null,
     apply_patch_tool_type: null, truncation_policy: { mode: 'tokens', limit: 10_000 },
@@ -83,15 +83,15 @@ export async function prepareCodex(request: AgentRunRequest, source: NodeJS.Proc
 
 export function codexFailureMessage(code: FailureCode) {
   const detail: Partial<Record<FailureCode, string>> = {
-    not_installed: 'No se ha encontrado Codex.', signed_out: 'Inicia sesión con «codex login» en una terminal y vuelve a intentarlo.',
-    quota: 'Has alcanzado el límite de uso de tu cuenta de Codex.', model_unavailable: 'El modelo pedido no está disponible con tu cuenta de Codex.',
-    unsupported_version: `Esta integración necesita Codex CLI ${codexVersion}.`,
-    unsafe_configuration: 'Codex ofreció herramientas o permisos ajenos al tablero. Se ha detenido la ejecución.',
-    board_unavailable: 'No se pudieron iniciar las herramientas del tablero.',
-    protocol: 'Codex devolvió una respuesta que Paso no entiende.', crashed: 'Codex se cerró de forma inesperada.',
-    timeout: 'Codex dejó de responder y se ha detenido.',
+    not_installed: "Codex wasn't found.", signed_out: 'Sign in with "codex login" in a terminal and try again.',
+    quota: "You've reached the usage limit of your Codex account.", model_unavailable: "The requested model isn't available with your Codex account.",
+    unsupported_version: `This integration needs Codex CLI ${codexVersion}.`,
+    unsafe_configuration: 'Codex offered tools or permissions beyond the board. The run was stopped.',
+    board_unavailable: "The board tools couldn't start.",
+    protocol: "Codex sent a response Paso doesn't understand.", crashed: 'Codex closed unexpectedly.',
+    timeout: 'Codex stopped responding and was stopped.',
   };
-  return detail[code] ?? 'Codex terminó con un error.';
+  return detail[code] ?? 'Codex ended with an error.';
 }
 export function classifyCodexFailure(text: string): FailureCode {
   if (/unauthorized|not logged in|login required|authentication|token.*expired|401/i.test(text)) return 'signed_out';

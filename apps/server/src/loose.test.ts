@@ -76,7 +76,7 @@ describe('the reserved project of loose diagrams', () => {
     expect((await api('/api/projects')).data.projects).toEqual([]);
     const read = await api(loose);
     expect(read.status).toBe(200);
-    expect(read.data.document).toMatchObject({ id: '_loose', name: 'Diagramas sueltos', sceneIds: ['diagram'] });
+    expect(read.data.document).toMatchObject({ id: '_loose', name: 'Loose diagrams', sceneIds: ['diagram'] });
     expect((await api(`${loose}/scenes`)).data.scenes.map((scene: { document: { name: string } }) => scene.document.name)).toEqual(['Suelto']);
   });
   it('is not a project to rename, delete, reveal or create by hand', async () => {

@@ -1,6 +1,6 @@
 import type { StepCamera } from '@paso/shared';
 
-/** What the Lienzo's canvas shows: Excalidraw's scroll and zoom, and the canvas size in screen pixels. */
+/** What the Canvas's canvas shows: Excalidraw's scroll and zoom, and the canvas size in screen pixels. */
 export type CanvasView = { scrollX: number; scrollY: number; zoom: number; width: number; height: number };
 
 /** The canvas's view, outside React: the canvas writes it on every change, and only what draws from it re-renders. */

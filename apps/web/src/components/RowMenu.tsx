@@ -4,9 +4,9 @@ import { Popover } from './Popover';
 
 type Props = {
   anchor: HTMLElement; name: string; onRename: () => void; onDelete: () => void; onClose: () => void;
-  /** «Abrir carpeta», for a project. A loose diagram has no folder of its own. */
+  /** “Open folder”, for a project. A loose diagram has no folder of its own. */
   onReveal?: () => void;
-  /** «Mover a proyecto…», for a loose diagram. */
+  /** “Move to project…”, for a loose diagram. */
   onMove?: () => void;
 };
 
@@ -26,7 +26,7 @@ export function RowMenu({ anchor, name, onRename, onReveal, onMove, onDelete, on
       onClose={onClose}
       align="end"
       role="menu"
-      label={`Acciones de ${name}`}
+      label={`Actions for ${name}`}
       className="menu"
       onKeyDown={(event) => {
         const keys: Record<string, number | 'first' | 'last'> = { ArrowDown: 1, ArrowUp: -1, Home: 'first', End: 'last' };
@@ -34,10 +34,10 @@ export function RowMenu({ anchor, name, onRename, onReveal, onMove, onDelete, on
       }}
     >
       <div ref={ref}>
-        <button type="button" role="menuitem" onClick={() => { onClose(); onRename(); }}><Pencil className="i" aria-hidden="true" />Renombrar</button>
-        {onMove && <button type="button" role="menuitem" onClick={() => { onClose(); onMove(); }}><FolderInput className="i" aria-hidden="true" />Mover a proyecto…</button>}
-        {onReveal && <button type="button" role="menuitem" onClick={() => { onClose(); onReveal(); }}><FolderOpen className="i" aria-hidden="true" />Abrir carpeta</button>}
-        <button type="button" role="menuitem" className="menu__danger" onClick={() => { onClose(); onDelete(); }}><Trash2 className="i" aria-hidden="true" />Eliminar…</button>
+        <button type="button" role="menuitem" onClick={() => { onClose(); onRename(); }}><Pencil className="i" aria-hidden="true" />Rename</button>
+        {onMove && <button type="button" role="menuitem" onClick={() => { onClose(); onMove(); }}><FolderInput className="i" aria-hidden="true" />Move to project…</button>}
+        {onReveal && <button type="button" role="menuitem" onClick={() => { onClose(); onReveal(); }}><FolderOpen className="i" aria-hidden="true" />Open folder</button>}
+        <button type="button" role="menuitem" className="menu__danger" onClick={() => { onClose(); onDelete(); }}><Trash2 className="i" aria-hidden="true" />Delete…</button>
       </div>
     </Popover>
   );
