@@ -16,16 +16,7 @@ import { ApiClient, type ClientConfig } from './lib/api';
  * Excalidraw itself and the drawing of a page. Bounds and fidelity are measured in a real browser instead.
  */
 const mocks = vi.hoisted(() => ({ renders: [] as string[], failing: new Set<string>() }));
-vi.mock('./editor/StepCanvas', async () => {
-  const { useEffect } = await import('react');
-  const shape = (id: string) => ({ id, type: 'rectangle', version: 1, versionNonce: 1, isDeleted: false, x: 0, y: 0, width: 10, height: 10 });
-  return { default: ({ store, session }: { store: import('./editor/step-store').StepStore; session: import('./editor/step-store').Session }) => {
-    useEffect(() => { session.baseline = undefined; store.change(session, session.document.elements, session.document.appState, {}); }, [session, store]);
-    return <div data-testid="canvas" data-step-id={session.target.stepId}>
-      <button type="button" onClick={() => store.change(session, [...session.document.elements, shape(`drawn-${session.document.elements.length}`)], session.document.appState, {})}>Dibujar</button>
-    </div>;
-  } };
-});
+vi.mock('./editor/StepCanvas', () => import('./editor/canvas-stand-in'));
 vi.mock('./editor/use-thumbnails', () => ({ useThumbnails: () => ({ svgs: {}, titles: {} }) }));
 // jsdom has no PointerEvent: without it, a pointer event fired in a test carries no button or coordinates.
 if (typeof window.PointerEvent === 'undefined') {

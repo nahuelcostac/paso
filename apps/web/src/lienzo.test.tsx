@@ -15,21 +15,7 @@ import { ApiClient, type ClientConfig } from './lib/api';
  * The Lienzo with its real service, store and carousel. Two edges are stand-ins because jsdom has no canvas:
  * Excalidraw itself (a button that makes an edit the way its onChange would) and the thumbnail drawing.
  */
-vi.mock('./editor/StepCanvas', async () => {
-  const { useEffect } = await import('react');
-  const shape = (id: string) => ({ id, type: 'rectangle', version: 1, versionNonce: 1, isDeleted: false, x: 0, y: 0, width: 10, height: 10 });
-  // With nothing selected, as here, the canvas gives ← → to the Lienzo (canvasStepKey, tested on its own).
-  // It reports a fixed view: 1000×700 at 100%, scrolled to the origin.
-  return { default: ({ store, session, onStepKey, view }: { store: import('./editor/step-store').StepStore; session: import('./editor/step-store').Session; onStepKey?: (delta: -1 | 1) => void; view?: import('./editor/canvas-view').ViewStore }) => {
-    useEffect(() => { session.baseline = undefined; store.change(session, session.document.elements, session.document.appState, {}); }, [session, store]);
-    useEffect(() => { view?.set({ scrollX: 0, scrollY: 0, zoom: 1, width: 1000, height: 700 }); }, [view]);
-    return <div data-testid="canvas" data-step-id={session.target.stepId} tabIndex={0}
-      onKeyDown={(event) => { const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0; if (delta) onStepKey?.(delta); }}>
-      <span>{session.document.elements.map((e) => e.id).join(',')}</span>
-      <button type="button" onClick={() => store.change(session, [...session.document.elements, shape(`drawn-${session.document.elements.length}`)], session.document.appState, {})}>Dibujar</button>
-    </div>;
-  } };
-});
+vi.mock('./editor/StepCanvas', () => import('./editor/canvas-stand-in'));
 // jsdom has no PointerEvent: without it, a pointer event fired in a test carries no coordinates.
 if (typeof window.PointerEvent === 'undefined') {
   class TestPointerEvent extends MouseEvent { pointerId: number; constructor(type: string, init: PointerEventInit = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; } }
