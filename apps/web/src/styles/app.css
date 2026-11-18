@@ -17,6 +17,8 @@ h1, h2, p, ul { margin: 0; padding: 0; }
 ul { list-style: none; }
 svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 :focus-visible { outline: none; box-shadow: var(--focus-ring) !important; }
+/* Excalidraw's text editor (a double click on the board, or on a shape) is the drawing's own text, not a control. */
+.excalidraw .excalidraw-wysiwyg:focus-visible { box-shadow: none !important; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The small spaced uppercase label above a title: “SCENE 1 OF 3”, “STEP 01”. */
