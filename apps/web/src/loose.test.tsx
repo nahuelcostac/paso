@@ -537,6 +537,21 @@ describe('the step strip of a loose diagram', () => {
     expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();
   });
 
+  it('is a plain whiteboard with one step: no Present, no view switch, the agent beside the Canvas', async () => {
+    await seedLoose('d', 'Pizarra');
+    window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
+    const { unmount } = render(<App config={config} recovery={memory()} />);
+    await screen.findByTestId('canvas', {}, patience);
+    expect(document.querySelector('.canvas__corner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Present/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: /agent/i }, patience)).toBeInTheDocument();
+    unmount();
+    // The Studio has nothing to show for it: an old address lands on the Canvas.
+    window.history.replaceState(null, '', '#/_loose/storyboard/d/d-step-0');
+    render(<App config={config} recovery={memory()} />);
+    await waitFor(() => expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0'), patience);
+  });
+
   it('shows the strip from the start when the diagram has several steps', async () => {
     const user = userEvent.setup();
     await seedLoose('d', 'Varios', 3);
@@ -545,6 +560,7 @@ describe('the step strip of a loose diagram', () => {
     await screen.findByTestId('canvas', {}, patience);
     expect(strip()).toBeInTheDocument();
     expect(frames()).toHaveLength(3);
+    expect(document.querySelector('.canvas__corner')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show steps' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Hide steps' }));
     expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();

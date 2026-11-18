@@ -114,6 +114,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // A loose diagram opens like a project with one scene: the reserved project, limited to that scene, under its name.
   const looseOpen = isLooseProject(route.projectId);
   const looseDiagram = looseOpen ? state.loose?.diagrams.find((diagram) => diagram.id === route.sceneId) : undefined;
+  // A loose diagram with one step is a plain whiteboard: no Studio, no Present. Its agent sits beside the Canvas.
+  const plainLoose = Boolean(looseDiagram && looseDiagram.steps <= 1);
   const looseRow = useMemo((): ProjectRow | undefined => state.loose && looseDiagram ? {
     kind: 'ok', id: LOOSE_PROJECT_ID, project: { ...state.loose.project, name: looseDiagram.scene.name },
     revision: state.loose.revision, scenes: 1, steps: looseDiagram.steps, sceneList: [looseDiagram.scene],
@@ -292,13 +294,18 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     }
   };
 
+  // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram, which has no Studio.
+  const chatHere = overview || plainLoose;
+  useEffect(() => {
+    if (plainLoose && overview) navigate({ ...routeRef.current, view: 'canvas' }, { replace: true });
+  }, [plainLoose, overview, navigate]);
   // The agent's marks on steps and its notice in the top bar follow the open project in both views.
   useEffect(() => { if (openProject) void agentStore.openProject(openProject.id); }, [agentStore, openProject?.id]);
   const sceneDocuments = useMemo(() => scenes?.map((item) => item.document) ?? [], [scenes]);
   const marks = useMemo(() => stepMarks(agentState.turns, agentState.runs[openProject?.id ?? ''], openProject?.id), [agentState.turns, agentState.runs, openProject?.id]);
   const working = useMemo(() => activeTurn(agentState.turns, openProject?.id), [agentState.turns, openProject?.id]);
   // Without the panel in view, the top bar says who is changing which step.
-  const statusShown = Boolean(openProject && overview && working && !agentShown);
+  const statusShown = Boolean(openProject && chatHere && working && !agentShown);
   const workingAt = working?.step && sceneDocuments.length ? (() => {
     for (const [index, scene] of sceneDocuments.entries()) {
       const at = scene.stepIds.indexOf(working.step!.stepId);
@@ -319,7 +326,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     </div>}
   </> : undefined;
   // The agent folds away entirely, leaving only its toggle; on a narrow window it stays folded and opens as a drawer.
-  const agentFolded = Boolean(openProject && overview && (narrow || !agentDocked));
+  const agentFolded = Boolean(openProject && chatHere && (narrow || !agentDocked));
   const toggleAgent = () => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(!agentDocked);
   const hideAgent = () => {
     if (narrow) setAgentOpen(false); else setAgentDocked(false);
@@ -336,7 +343,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
 
   return (
     <div
-      className={`app${panelOpen ? '' : ' app--panel-closed'}${leftDocked ? '' : ' app--left-floating'}${openProject && overview && agentDocked && !narrow ? ' app--agent' : ''}${agentFolded ? ' app--agent-folded' : ''}${openProject && overview && narrow ? ' app--agent-drawer' : ''}`}
+      className={`app${panelOpen ? '' : ' app--panel-closed'}${leftDocked ? '' : ' app--left-floating'}${openProject && chatHere && agentDocked && !narrow ? ' app--agent' : ''}${agentFolded ? ' app--agent-folded' : ''}${openProject && chatHere && narrow ? ' app--agent-drawer' : ''}`}
       style={{ '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
       {/* A docked side's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
@@ -344,7 +351,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         side="left" open onToggle={() => setPanelOpen(false)} hide="Hide sidebar" show="Show sidebar"
         controls="projects-panel" label="Sidebar width" resize={projectsWidth} tab={false}
       />}
-      {openProject && overview && agentDocked && !narrow && <Splitter
+      {openProject && chatHere && agentDocked && !narrow && <Splitter
         side="right" open onToggle={() => setAgentDocked(false)} hide="Hide agent" show="Show agent" controls="agent-panel"
         label="Chat width" resize={agentWidth} tab={false}
       />}
@@ -421,7 +428,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           />
         </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={panelOpen ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}
         {/* The agent sits beside the overview, where its changes show across the scenes. */}
-        {overview && (narrow || agentDocked) && <AgentPanel
+        {chatHere && (narrow || agentDocked) && <AgentPanel
           store={agentStore} projectId={row.id} projectName={row.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
           input={agentDrafts[JSON.stringify([row.id, onlySceneId ?? null])] ?? ''}
           setInput={(value) => {
@@ -440,7 +447,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           are drag areas, so a toggle placed before them would lose its clicks to the window. */}
       <div className="window-grip" aria-hidden="true" />
       <PanelToggle side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Hide sidebar" show="Show sidebar" controls="projects-panel" />
-      {openProject && overview && <PanelToggle side="right" open={agentShown} onToggle={toggleAgent} hide="Hide agent" show="Show agent" controls="agent-panel" />}
+      {openProject && chatHere && <PanelToggle side="right" open={agentShown} onToggle={toggleAgent} hide="Hide agent" show="Show agent" controls="agent-panel" />}
     </div>
   );
 }

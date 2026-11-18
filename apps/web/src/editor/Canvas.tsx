@@ -153,7 +153,9 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
       }}>Download copy and load the service's version</button>}
     </div>}
     <div className="canvas canvas--editor">
-      <div className="canvas__corner">
+      {/* A loose diagram with one step is a plain whiteboard: nothing to present, frame or see in the Studio. A second
+          step brings the corner back. */}
+      {!(loose && stepIds.length <= 1) && <div className="canvas__corner">
         {corner}
         <ViewToggle route={route} navigate={navigate} />
         {session && <CameraControl
@@ -161,7 +163,7 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
           onClear={() => { setFraming(false); store.setCamera(session, undefined); }}
           onKeep={(keep) => { setFraming(false); store.setCamera(session, keep ? PREVIOUS_CAMERA : undefined); }}
         />}
-      </div>
+      </div>}
       {/* One canvas for the diagram: moving to another step swaps the drawing in it, with no loading in between. */}
       {canvasOpen ? <Suspense fallback={<Loading>Loading editor…</Loading>}>
         <StepCanvas key={projectId} api={api} store={store} session={wanted} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} onShow={setShown} />
