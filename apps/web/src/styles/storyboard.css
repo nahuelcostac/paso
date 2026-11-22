@@ -18,7 +18,7 @@
 .scene__tools { margin-left: auto; align-self: flex-end; display: flex; gap: 2px; opacity: 0; transition: opacity var(--motion-fast); }
 .scene:hover .scene__tools, .scene:focus-within .scene__tools, .scene[data-grabbed] .scene__tools { opacity: 1; }
 @media (hover: none) { .scene__tools { opacity: 1; } }
-.scene__tool { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-md); color: var(--ink-3); }
+.scene__tool { display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--radius-md); color: var(--ink-3); }
 .scene__tool:hover { background: var(--surface-sunken); color: var(--ink); }
 .scene__tool[aria-expanded='true'] { background: var(--surface-sunken); color: var(--ink); }
 .scene__grip { cursor: grab; touch-action: none; }
