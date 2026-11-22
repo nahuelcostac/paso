@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
 import { ArrowUp, Eye, FilePlus, History, LoaderCircle, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { Scene } from '@paso/shared';
 import { ApiRequestError, UnavailableError, type AgentSessionInfo, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
@@ -186,6 +186,16 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   useEffect(() => { void store.openProject(projectId); }, [store, projectId]);
   // Opening the drawer puts the person in the composer.
   useEffect(() => { if (narrow && open) textarea.current?.focus(); }, [narrow, open]);
+  // The composer grows with its text, as in T3 Code, up to the cap in agent.css; past it, it scrolls.
+  useLayoutEffect(() => {
+    const field = textarea.current;
+    if (!field) return;
+    const fit = () => { field.style.height = 'auto'; field.style.height = `${field.scrollHeight}px`; };
+    fit();
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(fit);
+    observer?.observe(field);
+    return () => observer?.disconnect();
+  }, [input]);
 
   // The scene the agent works on is the one selected in the sidebar: the scene in the address, or else the first one.
   // A diagram with no scenes yet is given to it whole.

@@ -180,6 +180,26 @@ describe('agent message drafts', () => {
   });
 });
 
+describe('agent composer', () => {
+  it('grows with its text and shrinks back when it is sent', async () => {
+    // jsdom lays nothing out: the text's height is taken from its line count.
+    const scrollHeight = vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLTextAreaElement) { return 22 * Math.max(2, this.value.split('\n').length); });
+    try {
+      const user = userEvent.setup();
+      const panel = await openPanel();
+      const input = within(panel).getByRole('textbox', { name: 'Message to the agent' });
+      await waitFor(() => expect(input.style.height).toBe('44px'), patience);
+      await user.type(input, 'one{Shift>}{Enter}{/Shift}two{Shift>}{Enter}{/Shift}three{Shift>}{Enter}{/Shift}four');
+      expect(input.style.height).toBe('88px');
+      await user.clear(input);
+      expect(input.style.height).toBe('44px');
+    } finally {
+      scrollHeight.mockRestore();
+    }
+  });
+});
+
 describe('agent and model picker', () => {
   it('asks once to add Claude Code, shows Codex as available, and passes the chosen model', async () => {
     await installHarness('codex', 'codex-cli 0.80.0');
