@@ -217,6 +217,11 @@ export async function startServer(options: StartServerOptions) {
           broadcast({ type: 'workspaces', activeId: current.workspace.id });
           send(response, 204); return;
         }
+        if (parts.length === 4 && parts[3] === 'filter' && method === 'PUT') {
+          await workspaces.setFilter(parts[2], await json());
+          broadcast({ type: 'workspaces', activeId: current.workspace.id });
+          send(response, 200, await workspaces.list()); return;
+        }
         if (parts.length === 4 && parts[3] === 'reveal' && method === 'POST') {
           const { path } = workspaces.get(parts[2]);
           try { await (options.openFolder ?? openInFileManager)(path); }

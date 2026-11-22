@@ -8,7 +8,11 @@ import { ApiError, isMissing } from './errors.js';
 
 /** A folder of projects. `default` is the service's own data directory, which is always listed. */
 export type Workspace = { id: string; name: string; path: string };
-export type WorkspaceInfo = Workspace & { default: boolean; available: boolean };
+/**
+ * `filter` is what the sidebar shows of the workspace: one project's ID, the loose diagrams' reserved ID, or null for
+ * all of it. It is a view of the folder, kept with the list, so it is remembered however the app is opened.
+ */
+export type WorkspaceInfo = Workspace & { default: boolean; available: boolean; filter: string | null };
 
 export const DEFAULT_WORKSPACE_ID = 'default';
 const DEFAULT_WORKSPACE_NAME = 'My projects';
@@ -20,7 +24,10 @@ const fileSchema = z.object({
   defaultPath: z.string(),
   activeId: z.string(),
   workspaces: z.array(workspaceSchema),
+  /** The sidebar's filter of each workspace that has one, by workspace ID. */
+  filters: z.record(z.string(), idSchema).optional(),
 }).strict();
+const filterInput = z.object({ filter: idSchema.nullable() }).strict();
 const addInput = z.object({ path: z.string().min(1).max(4096), name: z.string().trim().min(1).max(200).optional() }).strict();
 const folderNameInput = z.object({ parent: z.string().min(1).max(4096), name: z.string().trim().min(1).max(255) }).strict();
 
@@ -46,6 +53,7 @@ export function workspacesPath(dataDir: string, configured?: string) {
 export class WorkspaceRegistry {
   private extra: Workspace[] = [];
   private activeId = DEFAULT_WORKSPACE_ID;
+  private filters: Record<string, string> = {};
   private writes: Promise<unknown> = Promise.resolve();
 
   private constructor(
@@ -62,7 +70,11 @@ export class WorkspaceRegistry {
       registry.extra = saved.workspaces.filter((workspace) => workspace.id !== DEFAULT_WORKSPACE_ID && isAbsolute(workspace.path));
       // A list written with another data directory belongs to another setup, such as a test or PASO_DATA_DIR:
       // its workspaces stay listed, but the service starts in its own folder.
-      if (saved.defaultPath === registry.defaultPath && registry.find(saved.activeId)) registry.activeId = saved.activeId;
+      const sameSetup = saved.defaultPath === registry.defaultPath;
+      if (sameSetup && registry.find(saved.activeId)) registry.activeId = saved.activeId;
+      // The default workspace's filter was about that setup's own folder.
+      registry.filters = Object.fromEntries(Object.entries(saved.filters ?? {})
+        .filter(([id]) => registry.find(id) && (sameSetup || id !== DEFAULT_WORKSPACE_ID)));
     } catch (error) {
       if (!isMissing(error) && !(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
     }
@@ -85,12 +97,15 @@ export class WorkspaceRegistry {
     const all = [this.get(DEFAULT_WORKSPACE_ID), ...this.extra];
     const workspaces: WorkspaceInfo[] = await Promise.all(all.map(async (workspace) => ({
       ...workspace, default: this.isDefault(workspace.id), available: this.isDefault(workspace.id) || await isFolder(workspace.path),
+      filter: this.filters[workspace.id] ?? null,
     })));
     return { activeId: this.activeId, workspaces };
   }
 
   private save() {
-    const data = { schemaVersion: 1, defaultPath: this.defaultPath, activeId: this.activeId, workspaces: this.extra };
+    // Without filters the file stays as it was before they existed.
+    const filters = Object.keys(this.filters).length ? { filters: this.filters } : {};
+    const data = { schemaVersion: 1, defaultPath: this.defaultPath, activeId: this.activeId, workspaces: this.extra, ...filters };
     const next = this.writes.then(async () => {
       await mkdir(dirname(this.file), { recursive: true });
       const temporary = `${this.file}.${randomUUID()}.tmp`;
@@ -124,7 +139,7 @@ export class WorkspaceRegistry {
     const workspace: Workspace = { id: randomUUID(), name: name ?? basename(real), path: real };
     this.extra.push(workspace);
     await this.save();
-    return { ...workspace, default: false, available: true } satisfies WorkspaceInfo;
+    return { ...workspace, default: false, available: true, filter: null } satisfies WorkspaceInfo;
   }
 
   /** Removes a workspace from the list. Its folder and files stay where they are. */
@@ -132,7 +147,16 @@ export class WorkspaceRegistry {
     this.get(id);
     if (this.isDefault(id)) throw new ApiError(400, 'DEFAULT_WORKSPACE', 'The default workspace cannot be removed.');
     this.extra = this.extra.filter((workspace) => workspace.id !== id);
+    delete this.filters[id];
     if (this.activeId === id) this.activeId = DEFAULT_WORKSPACE_ID;
+    await this.save();
+  }
+
+  /** Sets what the sidebar shows of a workspace: a project, the loose diagrams, or everything (null). */
+  async setFilter(id: string, input: unknown) {
+    this.get(id);
+    const { filter } = filterInput.parse(input);
+    if (filter === null) delete this.filters[id]; else this.filters[id] = filter;
     await this.save();
   }
 

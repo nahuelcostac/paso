@@ -26,7 +26,7 @@ async function api<T = unknown>(path: string, method = 'GET', input?: unknown) {
   });
   return { status: response.status, data: (response.status === 204 ? null : await response.json()) as T };
 }
-type Listing = { activeId: string; workspaces: Array<{ id: string; name: string; path: string; default: boolean; available: boolean }> };
+type Listing = { activeId: string; workspaces: Array<{ id: string; name: string; path: string; default: boolean; available: boolean; filter: string | null }> };
 const projectNames = async () => (await api<{ projects: Array<{ document: { name: string } }> }>('/api/projects')).data.projects.map((p) => p.document.name).sort();
 
 beforeEach(async () => {
@@ -85,6 +85,29 @@ describe('workspaces', () => {
     expect(listing.data.activeId).toBe(added.data.id);
     expect(listing.data.workspaces.map((w) => w.name)).toEqual(['My projects', 'Mis clases']);
     expect(await projectNames()).toEqual(['Sigue aquí']);
+  });
+
+  it('remembers the sidebar filter of each workspace across restarts, and forgets it with the workspace', async () => {
+    const added = await api<{ id: string }>('/api/workspaces', 'POST', { path: join(root, 'Clases') });
+    const filters = (listing: Listing) => Object.fromEntries(listing.workspaces.map((w) => [w.id, w.filter]));
+    expect(filters((await api<Listing>('/api/workspaces')).data)).toEqual({ default: null, [added.data.id]: null });
+    // Before any filter, the file keeps the shape it had.
+    expect(JSON.parse(await readFile(join(root, 'app', 'workspaces.json'), 'utf8'))).not.toHaveProperty('filters');
+
+    expect((await api<Listing>('/api/workspaces/default/filter', 'PUT', { filter: 'tema-1' })).status).toBe(200);
+    const set = await api<Listing>(`/api/workspaces/${added.data.id}/filter`, 'PUT', { filter: '_loose' });
+    expect(filters(set.data)).toEqual({ default: 'tema-1', [added.data.id]: '_loose' });
+    expect((await api(`/api/workspaces/${added.data.id}/filter`, 'PUT', { filter: '../fuera' })).status).toBe(400);
+    expect((await api('/api/workspaces/missing/filter', 'PUT', { filter: null })).status).toBe(404);
+
+    await service.close();
+    await start();
+    expect(filters((await api<Listing>('/api/workspaces')).data)).toEqual({ default: 'tema-1', [added.data.id]: '_loose' });
+
+    await api('/api/workspaces/default/filter', 'PUT', { filter: null });
+    await api(`/api/workspaces/${added.data.id}`, 'DELETE');
+    expect(filters((await api<Listing>('/api/workspaces')).data)).toEqual({ default: null });
+    expect(JSON.parse(await readFile(join(root, 'app', 'workspaces.json'), 'utf8'))).not.toHaveProperty('filters');
   });
 
   it('starts in the default workspace when the open one was deleted, and lists it as unavailable', async () => {

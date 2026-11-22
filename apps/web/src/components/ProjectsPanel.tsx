@@ -5,6 +5,7 @@ import { ChevronsUpDown, CloudOff, Folder, FolderPlus, Layers, Search, ServerOff
 import type { ApiClient } from '../lib/api';
 import { nativeFolderChooser } from '../lib/desktop';
 import { describeContents, fold, groupByRecency } from '../lib/format';
+import { shownFilter, showsUnder } from '../lib/project-filter';
 import { ActionError, workspaceErrorText, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
 import { Brand } from './Brand';
 import { Dialog } from './Dialog';
@@ -13,6 +14,7 @@ import { IconPicker } from './IconPicker';
 import { LooseRow, stepCount } from './LooseRow';
 import { MoveDialog } from './MoveDialog';
 import { NameField } from './NameField';
+import { ProjectFilter } from './ProjectFilter';
 import { ProjectRow } from './ProjectRow';
 import { RowMenu } from './RowMenu';
 import type { SceneTransfer } from './SceneList';
@@ -71,8 +73,8 @@ type Drop = { id: string; index?: number; sceneId?: string; place?: 'before' | '
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Try again.';
 
 /**
- * The sidebar, laid out like tldraw's: the mark, the workspace switcher, search and “New project”, then the projects
- * grouped by when they last changed. Each workspace is a folder on this computer.
+ * The sidebar, laid out like tldraw's: the mark, the workspace switcher, the project filter, search and “New project”,
+ * then the projects grouped by when they last changed. Each workspace is a folder on this computer.
  */
 export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -148,13 +150,15 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
 
   const offline = !state.connected && state.phase === 'ready';
   const looseAll = state.loose?.diagrams ?? [];
+  // What the list shows: one project, the loose diagrams, or everything; then search narrows it.
+  const filter = shownFilter(activeWorkspace?.filter, state.rows, state.phase);
+  const filterProjects = useMemo(() => state.rows.flatMap((row) => row.kind === 'ok' ? [{ id: row.id, name: row.project.name, icon: row.project.icon }] : []), [state.rows]);
   const terms = useMemo(() => fold(query ?? '').split(/\s+/).filter(Boolean), [query]);
-  const visible = useMemo(() => {
-    if (!terms.length) return state.rows;
-    return state.rows.filter((row) => terms.every((term) => fold(row.kind === 'ok' ? row.project.name : row.id).includes(term)));
-  }, [state.rows, terms]);
+  const visible = useMemo(() => state.rows.filter((row) => showsUnder(filter, row.id)
+    && terms.every((term) => fold(row.kind === 'ok' ? row.project.name : row.id).includes(term))), [state.rows, terms, filter]);
   // Search finds loose diagrams by name too.
-  const looseVisible = useMemo(() => terms.length ? looseAll.filter((diagram) => terms.every((term) => fold(diagram.scene.name).includes(term))) : looseAll, [looseAll, terms]);
+  const looseVisible = useMemo(() => !showsUnder(filter, LOOSE_PROJECT_ID) ? []
+    : terms.length ? looseAll.filter((diagram) => terms.every((term) => fold(diagram.scene.name).includes(term))) : looseAll, [looseAll, terms, filter]);
   const looseById = (id: string) => looseAll.find((diagram) => diagram.id === id);
   const ok = visible.filter((row): row is Extract<Row, { kind: 'ok' }> => row.kind === 'ok');
   const broken = visible.filter((row) => row.kind === 'error');
@@ -323,6 +327,11 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
           <span className="workspace-switch__name">{activeWorkspace?.name ?? ' '}</span>
           <ChevronsUpDown className="i" aria-hidden="true" />
         </button>
+        {/* As in T3 Code: what the list shows, “All projects” or one of them, with the loose diagrams as one more choice. */}
+        <ProjectFilter
+          projects={filterProjects} value={filter} disabled={!listing || switching || state.phase !== 'ready'}
+          onChange={(next) => { if (listing) void store.setFilter(listing.activeId, next); }}
+        />
         <hr />
         {/* As in T3 Code: “Search” on the left of one row, and the two ways to make something new as icons on its right. */}
         <div className="nav-actions">
@@ -450,6 +459,9 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
               </ul>
             )}
             {query !== null && visible.length === 0 && looseVisible.length === 0 && <p className="projects__empty" role="status">No matches.</p>}
+            {query === null && filter === LOOSE_PROJECT_ID && looseVisible.length === 0 && !creating && !creatingLoose && (
+              <p className="projects__empty" role="status">No loose diagrams yet.</p>
+            )}
           </>
         )}
       </div>

@@ -4,6 +4,8 @@ import { legacyRouteHash, parseRoute, routeHash } from './route';
 import { ICONS } from './icon-catalog';
 import { iconFor, searchIcons } from './icons';
 import { Folder } from 'lucide-react';
+import { matchChoices, shownFilter, showsUnder } from './project-filter';
+import type { ProjectRow } from '../state/projects-store';
 
 describe('formatSize', () => {
   it('writes the size as the brief shows it, with English plurals', () => {
@@ -93,5 +95,31 @@ describe('groupByRecency', () => {
       ['Today', ['esta mañana', 'otro reloj']], ['This month', ['ayer', 'día 1']], ['Earlier', ['octubre']],
     ]);
     expect(groupByRecency([items[3]], (item) => item.at, now).map((group) => group.label)).toEqual(['Earlier']);
+  });
+});
+
+describe('the project filter', () => {
+  const rows = [{ kind: 'error', id: 'rota', message: 'Unreadable' }, { kind: 'ok', id: 'tema', project: { id: 'tema', name: 'Tema' } }] as unknown as ProjectRow[];
+  it('falls back to all projects once the list shows its project is gone', () => {
+    expect(shownFilter(undefined, rows, 'ready')).toBeNull();
+    expect(shownFilter('tema', rows, 'ready')).toBe('tema');
+    expect(shownFilter('rota', rows, 'ready')).toBe('rota');
+    expect(shownFilter('_loose', [], 'ready')).toBe('_loose');
+    expect(shownFilter('otro', rows, 'ready')).toBeNull();
+    // Still loading: the project may be on the way.
+    expect(shownFilter('otro', [], 'loading')).toBe('otro');
+  });
+  it('shows a project or the loose diagrams under their own filter, and everything under none', () => {
+    expect(showsUnder(null, 'tema')).toBe(true);
+    expect(showsUnder('tema', 'tema')).toBe(true);
+    expect(showsUnder('tema', '_loose')).toBe(false);
+    expect(showsUnder('_loose', '_loose')).toBe(true);
+  });
+  it('matches every word, ignoring case and accents, and leaves out “All projects” while searching', () => {
+    const choices = [{ value: null, label: 'All projects' }, { value: 'a', label: 'Álgebra lineal' }, { value: 'b', label: 'Biología' }, { value: '_loose', label: 'Loose diagrams' }];
+    expect(matchChoices(choices, '  ')).toBe(choices);
+    expect(matchChoices(choices, 'LINEAL alge').map((choice) => choice.value)).toEqual(['a']);
+    expect(matchChoices(choices, 'all').map((choice) => choice.value)).toEqual([]);
+    expect(matchChoices(choices, 'loose').map((choice) => choice.value)).toEqual(['_loose']);
   });
 });

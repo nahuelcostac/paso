@@ -350,6 +350,17 @@ export class ProjectsStore {
     await this.loadAll();
   }
   revealWorkspace(id: string) { return this.api.revealWorkspace(id); }
+  /**
+   * What the sidebar shows of a workspace: a project, the loose diagrams (`LOOSE_PROJECT_ID`) or everything (null).
+   * It shows at once; if the service can't keep it, the list is read again.
+   */
+  async setFilter(id: string, filter: string | null) {
+    const listing = this.state.workspaces;
+    if (!listing?.workspaces.some((workspace) => workspace.id === id && workspace.filter !== filter)) return;
+    this.set({ workspaces: { ...listing, workspaces: listing.workspaces.map((workspace) => workspace.id === id ? { ...workspace, filter } : workspace) } });
+    try { await this.api.setWorkspaceFilter(id, filter); }
+    catch { await this.loadWorkspaces(); }
+  }
   /** Opens the project's folder in the system's file manager. */
   reveal(id: string) { return this.api.revealProject(id); }
   async remove(id: string) {
