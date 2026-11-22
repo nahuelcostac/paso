@@ -45,11 +45,42 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 | Keyboard focus | `box-shadow: var(--focus-ring)` on `:focus-visible` |
 | Lift | `--shadow-sm` (cards), `--shadow-md` (hover, the floating panels), `--shadow-lg` (popovers, dialogs, the chat drawer) |
 
-**Radii:** `--radius-panel` 20px (the chat's drawer), `--radius-sm` 6px (badges, small controls, carousel thumbnails), `--radius-md` 8px (buttons, inputs, menu items, project tiles), `--radius-card` 10px (step cards, Excalidraw islands), `--radius-lg` 14px (dialogs, the chat's bubbles and composer). Pills (`--radius-pill`) are only for the agent chip, the view selector and the chat's send button.
+**Radii:** after T3 Code, whose `--radius` is 8px. `--radius-sm` 4px (menu items, badges, inline fields, carousel thumbnails; T3 Code's `rounded-sm`), `--radius-md` 8px (buttons, fields, sidebar rows, menus and popovers; its `--control-radius`), `--radius-card` 10px (step cards, Excalidraw islands), `--radius-lg` 16px (dialogs, the chat's bubbles and composer; its `rounded-2xl`), `--radius-panel` 20px (the chat's drawer). Pills (`--radius-pill`) are only for the agent chip, the view selector and the chat's send button.
 
-**Type scale:** 11px for the spaced uppercase eyebrow only, 12px meta, 13px default, 15px, 20px for scene and dialog titles, 28px for the project title. Weights 400, 500, 600 and 700. Titles use `--tracking-title` (-0.02em); eyebrows use `--tracking-eyebrow` (0.16em).
+**Type scale:** T3 Code's at its 16px root: 14px default (`--text-14`, its `text-sm`: buttons, fields, menu items, sidebar rows, the agent conversation), 12px meta (`text-xs`), 11px for the spaced uppercase eyebrow only, 15px for the mark's name, 20px for scene and dialog titles, 28px for the project title. Weights 400, 500, 600 and 700; controls are 500, as there. Titles use `--tracking-title` (-0.02em); eyebrows use `--tracking-eyebrow` (0.16em).
 
-**Focus:** a grey ring (`--focus`, `#71717a`), a 3px band 2px outside the element. It reaches 3:1 on every layer.
+**Icons:** Lucide at 16px (`--icon`, T3 Code's `size-4`), 14px in 24px controls, with T3 Code's lighter stroke of 1.75 (`--icon-stroke`).
+
+**Focus:** a grey ring (`--focus`, `#71717a`), a 3px band 2px outside the element. It reaches 3:1 on every layer. It stays Paso's own: T3 Code's 2px inset ring in its blue would be a second hue in the chrome.
+
+## Controls: measured from T3 Code
+
+Taken from T3 Code's source (`github.com/pingdotgg/t3code`, `apps/web/src/components/ui/` and `index.css`) and checked against the installed app's bundle (T3 Code (Beta), `app.asar`). T3 Code's sizes are its desktop ones (`sm:` and up).
+
+| Control | Paso | T3 Code source |
+| --- | --- | --- |
+| Button | 32px (`--control-h`), 12px in, 8px corners, 14px weight 500, 16px icon 8px from the text | `button.tsx` size `default`: `h-9 sm:h-8 px-[calc(--spacing(3)-1px)]` plus a 1px border, `gap-2 font-medium sm:text-sm`, `rounded-[var(--control-radius)]` |
+| Small button (“Detect again”) | 28px (`--control-h-sm`), 10px in | size `sm`: `h-8 sm:h-7 px-[calc(--spacing(2.5)-1px)] gap-1.5` |
+| Extra small button (a notice's action, “Undo run”) | 24px (`--control-h-xs`), 8px in, 12px | size `xs`: `h-7 sm:h-6 sm:text-xs` |
+| Large button (empty states) | 36px (`--control-h-lg`), 14px in | size `lg`: `h-10 sm:h-9 px-[calc(--spacing(3.5)-1px)]` |
+| Icon button | 32px square, 16px icon, `--ink-3` | size `icon`: `size-9 sm:size-8` |
+| Ghost (`.btn`, `.icon-btn`) | no fill, `--surface-sunken` on hover | variant `ghost`: `border-transparent [:hover]:bg-accent` |
+| Soft, the outlined secondary (`.btn--soft`) | `--surface-raised` fill, `--line-strong` edge, `--shadow-sm` | variant `outline`: `border-input bg-popover shadow-xs/5` |
+| Primary (`.btn--primary`) | ink fill, `--on-ink`, `--shadow-sm`; 36px beside Excalidraw's islands | variant `default`: `bg-primary shadow-xs`, hover `bg-primary/90` |
+| Pressed | scales to 0.97, except a button that opens a menu | `[&:active:not([aria-haspopup])]:scale-[0.97]` |
+| Disabled | opacity 0.64 (`--disabled-opacity`) | `disabled:opacity-64` |
+| Field (the icon picker's search) | 32px, 12px in, 8px corners, `--line-strong` edge on `--surface-raised` | `input.tsx`: `sm:h-7.5` plus a 1px border, `rounded-lg border-input` |
+| Sidebar row (Search, a project) | 32px, 10px in, the icon 10px from the name, 4px apart, 14px weight 500 | `SidebarProjectFolderHeader.tsx`: `h-8 gap-2.5 px-(--sidebar-row-content-inset)` (10px), `text-sm font-medium`; `SidebarMenu` `gap-1` |
+| Sidebar sub-row (a scene) | 28px (`--control-h-sm`), under a line 14px in, 10px past it, 4px apart | `SidebarMenuSub`: `mx-3.5 border-l px-2.5 gap-1`; `SidebarMenuSubButton`: `h-7 px-2 gap-2` |
+| Row action (⋮) | 24px, 8px corners, 14px icon | `SidebarProjectFolderHeader.tsx` `size="icon-xs"`: `sm:size-6`, `sm:size-3.5` icon |
+| Menu | 4px in, 8px corners, at least 160px | `menu.tsx` popup: `rounded-lg p-1 min-w-[min(10rem,…)]` |
+| Menu item | 28px, 8px in, icon 8px from the label, 4px corners, 14px | `MenuItem`: `sm:min-h-7 px-2 gap-2 rounded-sm sm:text-sm` |
+| Menu separator | a line 8px in, 4px above and below | `MenuSeparator`: `mx-2 my-1 h-px` |
+| Dialog | 448px, 16px corners, 24px in, a 20px semibold title; the actions on a `--surface-sunken` band under a line, 16px above and below its 32px buttons | `dialog-styles.ts`: `rounded-2xl`; `dialog.tsx`: header `p-6`, title `font-semibold text-xl`, footer `border-t bg-muted/72 py-4 px-6 gap-2` |
+| Composer | 16px corners; its controls 24px, 7px in, 12px text, 14px icons; send a 32px circle | `ChatComposer.tsx` `rounded-2xl`; `ComposerControl.tsx` `sm:h-6 px-1.75 sm:text-xs`; `ComposerPrimaryActions.tsx` `sm:size-8 rounded-full` |
+| The person's message | 16px corners | `TimelineUserMessageRow.tsx` `rounded-2xl` |
+
+Kept as Paso's own: the colours (neutral greys and ink, not T3 Code's blue primary or its translucent glass menus and dialogs: everything here is solid), Inter instead of the system font, the focus ring, the sidebar's 60px head and the fold toggles (aligned with T3 Code before), Excalidraw's controls and Paso's islands over the board, which keep Excalidraw's 36px.
 
 ## Component rules
 
@@ -65,12 +96,12 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 
 **Excalidraw's main menu** (export, preferences, the library) sits right before its toolbar, 8px apart and centred on its height, the two centred on the board as one group. The selected shape's properties stay on the left, under the toolbar's row. The board's top left corner is the sidebar's button.
 
-**Scenes in the sidebar.** The open project's scenes hang under its row, like tldraw's pages: a thin line on their left, a 30px row each with its number in `--ink-3` and its name, the open scene on `--accent-soft` with its name in semibold. A click opens the scene on the board; in the Studio it selects the scene in place, and the Studio and the chat follow it. A ⋮ on hover or focus has “Rename” (in place), “Move to…” and “Delete…”, which asks first. A scene changes place by dragging it: a 2px accent line above or below the scene it would land next to, by the half of the row the pointer is on. “Add scene” closes the list. Other projects stay folded. With the sidebar folded, scenes are reached from the overview.
+**Scenes in the sidebar.** The open project's scenes hang under its row, like tldraw's pages: a thin line on their left, a 28px row each with its number in `--ink-3` and its name, the open scene on `--accent-soft` with its name in semibold. A click opens the scene on the board; in the Studio it selects the scene in place, and the Studio and the chat follow it. A ⋮ on hover or focus has “Rename” (in place), “Move to…” and “Delete…”, which asks first. A scene changes place by dragging it: a 2px accent line above or below the scene it would land next to, by the half of the row the pointer is on. “Add scene” closes the list. Other projects stay folded. With the sidebar folded, scenes are reached from the overview.
 
 **Sidebar.** The projects and loose diagrams, laid out like tldraw's sidebar. A `--surface` column docked to the left, 240px wide, the full height of the window, with a thin line on its right. Its 60px head holds the button that folds it (see “No header”), then the “Paso” mark, small as T3 Code's name: its tile as large as the button's 18px icon, and the name at 15px. Then:
 - The workspace switcher: the workspace's name in bold with a chevron. Its menu lists the workspaces, the open one checked and a missing folder marked “Unavailable”, then “New workspace…”, “Open folder” and, for a folder the person added, “Remove from list”.
-- One 34px row between thin rules, as in T3 Code: “Search” with its icon on the left, then “New project” (Lucide `folder-plus`) and “New diagram” (`square-pen`) as 32px icon buttons in `--ink-3`, named by their tooltips. “New project” asks for a name and opens the new project on the board, with its first scene and one empty step. “Search” turns into a field that filters the list in place, beside the two icons; Escape gives the row back.
-- The projects grouped by when they last changed: “Today”, “This month”, “Earlier”, with the group's name in 12px `--ink-3`. One 34px line per project: its 16px icon (which opens the icon picker), then its name. The open project has a `--accent-soft` fill and its name in semibold ink. A ⋮ button appears on hover or focus. Projects that cannot be read go last, under “Can't be opened”. Loose diagrams follow, flat, with no heading.
+- One 32px row between thin rules, as in T3 Code: “Search” with its icon on the left, then “New project” (Lucide `folder-plus`) and “New diagram” (`square-pen`) as 32px icon buttons in `--ink-3`, named by their tooltips. “New project” asks for a name and opens the new project on the board, with its first scene and one empty step. “Search” turns into a field that filters the list in place, beside the two icons; Escape gives the row back.
+- The projects grouped by when they last changed: “Today”, “This month”, “Earlier”, with the group's name in 12px `--ink-3`. One 32px line per project: its 16px icon (which opens the icon picker), then its name. The open project has a `--accent-soft` fill and its name in semibold ink. A ⋮ button appears on hover or focus. Projects that cannot be read go last, under “Can't be opened”. Loose diagrams follow, flat, with no heading.
 - The sidebar has no save indicator: saving is silent, and only a failure speaks. The step on screen shows its own notice on the Canvas; failures with no place of their own (“Review unsaved step”, a scene action that failed) sit at the foot of the sidebar; with the sidebar folded, above the step strip.
 - Under 1064px the sidebar opens over the content, 280px wide with a large shadow, over a scrim that closes it; choosing a project or diagram closes it too.
 
@@ -121,7 +152,7 @@ Excalidraw's own controls are white cards with thin lines and ink, like the step
 
 **Agent chat.** A column on the right of the Studio, 360px to start, flush with the window's edges like the sidebar: the chrome's grey, square corners and a thin line on its left. As a drawer on a narrow window it floats instead, with 20px corners. Its head names the scene the agent works on, the one selected in the sidebar (or the whole project while it has no scenes); there is nothing to pick there. Then “Conversation history” and “New conversation”, and at the right end the button that folds it (see “No header”), as a drawer too. No rule under it: space separates.
 - Its left edge is the splitter described under “No header”: a drag changes the width between 320px and 720px; the board always keeps 440px, and a wider sidebar leaves the chat less. A double click goes back to 360px. The width is remembered in this browser, and the narrow drawer uses it too.
-- The person's message: right-aligned, 80% maximum width, on `--surface-sunken`, 14px corners. No name or avatar.
+- The person's message: right-aligned, 80% maximum width, on `--surface-sunken`, 16px corners. No name or avatar.
 - The agent's text: bare, on the panel. No bubble.
 - Tool activity: one 26px row per tool, a 16px Lucide icon, muted detail after the label. The step number is a pink chip that jumps to that step.
 - Before the first message the log is empty: the head already says what the agent receives, and the composer invites the request.
@@ -139,7 +170,7 @@ With the panel folded, a floating pill shows who is changing which step, with `S
 - Above 24 steps, or under 480px wide, the pager drops the ticks and keeps the numbers.
 - Manual navigation uses the board gestures. A trackpad pinch or Ctrl/Cmd + wheel zooms around the pointer with Excalidraw's response and 0.1–30× limits relative to the opening frame. Two-finger scrolling or the wheel pans, Shift + wheel pans horizontally, and Space + drag or the middle mouse button pans freely. Space no longer advances a step, and releasing a drag never changes the step. + and − change zoom by 0.1; 0 restores the step's saved camera, or the scene frame. Direct gestures have no transition delay. Manual navigation stays between steps without a saved camera. The laser is the Canvas's: Excalidraw's laser cursor over the drawing, and while the pointer is held its red trail (`@excalidraw/laser-pointer`, with the options of Excalidraw 0.18.1), which fades within a second of the release; a press or click never changes the step, which only the pager and the keys do. Ctrl/Cmd with + and − stays the browser's zoom.
 
-**Dialogs and menus.** Dialogs are paper, 14px radius, with a large shadow over a dim scrim. They have a 20px title and the actions on the right under a thin rule; the destructive action is red text on a pale red fill. Menus and popovers are paper cards with a thin line and a large shadow. Items have 6px radius and a grey hover, and a checked item has a grey fill.
+**Dialogs and menus.** Dialogs are the chrome's grey, 16px radius, with a large shadow over a dim scrim. They have a 20px semibold title and the actions on the right on a sunken band under a thin rule, as in T3 Code; the destructive action is red text on a pale red fill. Menus and popovers are cards on the chrome's grey with 8px corners, a thin line and a large shadow. Items are 28px with 4px radius and a grey hover, and a checked item has a grey fill. See “Controls”.
 
 ## Excalidraw: measured on 0.18.1, not assumed
 

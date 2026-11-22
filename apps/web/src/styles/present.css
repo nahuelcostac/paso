@@ -30,7 +30,7 @@
 .present[data-idle='true'] .present__bar > * { pointer-events: none; }
 .present__title { min-width: 0; max-width: calc(50% - 120px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: var(--weight-medium); }
 .present__hint { white-space: nowrap; }
-.present__exit { display: inline-flex; align-items: center; gap: var(--space-2); height: 38px; padding: 0 var(--space-2) 0 var(--space-3); border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent-line); color: var(--ink-2); font-weight: var(--weight-semibold); }
+.present__exit { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-h-lg); padding: 0 var(--space-2) 0 var(--space-3); border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent-line); color: var(--ink-2); font-weight: var(--weight-semibold); }
 .present__exit:hover { background: var(--accent-soft); color: var(--ink); }
 .present__exit kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink-3); font: var(--weight-medium) var(--text-11) / 1 var(--font-ui); }
 @media (prefers-reduced-motion: reduce) { .present__bar, .present__stage { transition: none; } }
