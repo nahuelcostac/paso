@@ -230,7 +230,8 @@ button.nav-row:hover:not(:disabled) { background: var(--surface-sunken); color: 
 .project-filter-menu svg.project-filter-menu__check { color: var(--ink); }
 .projects__body { flex: 1; min-height: 0; overflow: hidden auto; padding: 0 var(--space-2) var(--space-2); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .project-group { margin-top: var(--space-1); }
-.project-group + .project-group { margin-top: var(--space-4); }
+.project-group + .project-group, .project-list + .project-group { margin-top: var(--space-4); }
+.project-list + .project-list { margin-top: var(--space-1); }
 .project-group__title { padding: 6px 10px; color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); }
 .projects__empty { padding: var(--space-3) var(--space-2); color: var(--ink-3); font-size: var(--text-12); }
 .project-list { display: flex; flex-direction: column; gap: var(--space-1); }
@@ -257,9 +258,7 @@ button.project__tile:hover { background: var(--surface-hover); color: var(--ink)
 @media (hover: none) { .project__more { opacity: 1; } }
 .project--skeleton { gap: 10px; }
 
-/* Loose diagrams: flat below the projects, with no heading. Each can be dragged onto a project. */
-.project-list--loose { margin-top: var(--space-3); }
-.project-group + .project-list--loose, .project-list + .project-list--loose { margin-top: var(--space-4); }
+/* A loose diagram can be dragged onto a project. */
 .project--loose[data-dragging='true'] { opacity: 0.45; }
 .projects[data-dragging='true'], .projects[data-dragging='true'] * { cursor: grabbing !important; user-select: none; }
 /* The project a dragged loose diagram would land in. */

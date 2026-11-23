@@ -20,7 +20,7 @@ export type StoreState = {
   /** Why the service cannot be reached, when it cannot. */
   reason: 'network' | 'session' | 'server' | null;
   rows: ProjectRow[];
-  /** The loose diagrams, newest first. They are never project rows. */
+  /** The loose diagrams in alphabetical order. */
   loose: LooseState;
   /** The workspaces and the open one. Null until the first read. */
   workspaces: WorkspaceListing | null;
@@ -29,11 +29,13 @@ export type StoreState = {
 /** A failed action. `message` is the reason, a sentence that follows "Couldn't …". */
 export class ActionError extends Error {}
 
-// Most recently changed first, as the sidebar groups them by when they last changed.
+const byName = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
 const sortRows = (rows: ProjectRow[]) => [...rows].sort((a, b) => {
   if (a.kind !== b.kind) return a.kind === 'ok' ? -1 : 1;
-  if (a.kind === 'ok' && b.kind === 'ok' && a.project.updatedAt !== b.project.updatedAt) return a.project.updatedAt < b.project.updatedAt ? 1 : -1;
-  return a.id < b.id ? -1 : 1;
+  const aName = a.kind === 'ok' ? a.project.name : a.id;
+  const bName = b.kind === 'ok' ? b.project.name : b.id;
+  return byName.compare(aName, bName) || a.id.localeCompare(b.id);
 });
 
 export type ServiceEvent = {
@@ -164,8 +166,9 @@ export class ProjectsStore {
     try { envelope = await this.api.getProject(LOOSE_PROJECT_ID); }
     catch (error) { if (error instanceof ApiRequestError && error.status === 404) return null; throw error; }
     const scenes = await this.api.listScenes(LOOSE_PROJECT_ID);
-    // Newest first: a new diagram is appended to the reserved project's scene list.
-    const diagrams = scenes.map(({ document, revision }) => ({ id: document.id, scene: document, revision, steps: document.stepIds.length })).reverse();
+    const diagrams = scenes
+      .map(({ document, revision }) => ({ id: document.id, scene: document, revision, steps: document.stepIds.length }))
+      .sort((a, b) => byName.compare(a.scene.name, b.scene.name) || a.id.localeCompare(b.id));
     return { project: envelope.document, revision: envelope.revision, diagrams };
   }
   private looseVersion = 0;

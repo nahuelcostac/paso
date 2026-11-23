@@ -32,9 +32,9 @@ afterEach(async () => {
 });
 
 describe('ProjectsStore', () => {
-  it('loads after the stream is ready, newest first, with errors last', async () => {
+  it('loads after the stream is ready, sorts projects by name with errors last, and resorts after a rename', async () => {
     const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-    for (const [id, name] of [['old', 'Viejo'], ['new', 'Nuevo']]) {
+    for (const [id, name] of [['old', 'Álgebra'], ['new', 'biología']]) {
       await fetch(`${service.url}/api/projects`, { method: 'POST', headers: auth, body: JSON.stringify({ id, name }) });
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
@@ -45,8 +45,10 @@ describe('ProjectsStore', () => {
     await until(() => store.getState().phase === 'ready');
     const { rows, connected } = store.getState();
     expect(connected).toBe(true);
-    expect(rows.map((row) => row.id)).toEqual(['new', 'old', 'bad']);
+    expect(rows.map((row) => row.id)).toEqual(['old', 'new', 'bad']);
     expect(rows[2].kind).toBe('error');
+    await store.update('old', { name: 'Zoología' });
+    expect(store.getState().rows.map((row) => row.id)).toEqual(['new', 'old', 'bad']);
   });
 
   it('keeps a rename when a re-read that started before it answers after it', async () => {
@@ -123,7 +125,7 @@ describe('ProjectsStore: loose diagrams', () => {
   const auth = () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
   const post = (path: string, body: unknown) => fetch(`${service.url}${path}`, { method: 'POST', headers: auth(), body: JSON.stringify(body) });
 
-  it('keeps them apart from the projects, newest first, and follows changes made elsewhere', async () => {
+  it('lists them by name, follows changes made elsewhere, and resorts after a rename', async () => {
     await post('/api/projects', { id: 'p', name: 'Proyecto' });
     store.start();
     await until(() => store.getState().phase === 'ready');
@@ -134,7 +136,9 @@ describe('ProjectsStore: loose diagrams', () => {
     await until(() => store.getState().loose?.diagrams.length === 2);
     const { rows, loose } = store.getState();
     expect(rows.map((row) => row.id)).toEqual(['p']);
-    expect(loose!.diagrams.map((diagram) => [diagram.id, diagram.scene.name, diagram.steps])).toEqual([['second', 'Segundo', 0], ['first', 'Primero', 1]]);
+    expect(loose!.diagrams.map((diagram) => [diagram.id, diagram.scene.name, diagram.steps])).toEqual([['first', 'Primero', 1], ['second', 'Segundo', 0]]);
+    await store.renameLoose('second', 'Ábaco');
+    expect(store.getState().loose?.diagrams.map((diagram) => diagram.id)).toEqual(['second', 'first']);
   });
 
   it('renames, deletes and moves one into a project', async () => {

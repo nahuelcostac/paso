@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { createPortal } from 'react-dom';
 import { isLooseProject, LOOSE_PROJECT_ID, type Scene } from '@paso/shared';
 import { CloudOff, Folder, FolderPlus, Layers, Search, ServerOff, Shapes, SquarePen, TriangleAlert, X } from 'lucide-react';
-import { describeContents, fold, groupByRecency } from '../lib/format';
+import { describeContents, fold } from '../lib/format';
 import { shownFilter, showsUnder } from '../lib/project-filter';
 import { ActionError, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
 import { Brand } from './Brand';
@@ -66,8 +66,7 @@ type Drop = { id: string; index?: number; sceneId?: string; place?: 'before' | '
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Try again.';
 
 /**
- * The sidebar, laid out like tldraw's: the mark, the project filter, search and “New project”, then the projects grouped
- * by when they last changed, in the open workspace (chosen in the activity bar), a folder on this computer.
+ * The sidebar of the open workspace, with its projects and loose diagrams in alphabetical order.
  */
 export function ProjectsPanel({ store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -136,9 +135,8 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
   const looseVisible = useMemo(() => !showsUnder(filter, LOOSE_PROJECT_ID) ? []
     : terms.length ? looseAll.filter((diagram) => terms.every((term) => fold(diagram.scene.name).includes(term))) : looseAll, [looseAll, terms, filter]);
   const looseById = (id: string) => looseAll.find((diagram) => diagram.id === id);
-  const ok = visible.filter((row): row is Extract<Row, { kind: 'ok' }> => row.kind === 'ok');
+  const ok = visible.filter((row) => row.kind === 'ok');
   const broken = visible.filter((row) => row.kind === 'error');
-  const groups = groupByRecency(ok, (row) => row.project.updatedAt);
   const showList = state.phase === 'ready' && (state.rows.length > 0 || looseAll.length > 0 || creating || creatingLoose);
 
   // Dragging a loose diagram onto a project, a scene onto another project or out into the loose diagrams, or a scene to
@@ -378,50 +376,47 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
                 </li>
               </ul>
             )}
-            {groups.map((group) => (
-              <section key={group.label} className="project-group" aria-label={group.label}>
-                <h3 className="project-group__title">{group.label}</h3>
-                <ul className="project-list">{group.items.map(renderRow)}</ul>
-              </section>
-            ))}
+            {ok.length > 0 && <ul className="project-list" aria-label="Projects">{ok.map(renderRow)}</ul>}
             {broken.length > 0 && (
               <section className="project-group" aria-label="Can't be opened">
                 <h3 className="project-group__title">Can't be opened</h3>
                 <ul className="project-list">{broken.map(renderRow)}</ul>
               </section>
             )}
-            {/* Loose diagrams: flat below the projects, with no heading of their own. */}
             {(looseVisible.length > 0 || creatingLoose || sceneOut) && (
-              <ul
-                className="project-list project-list--loose" aria-label="Loose diagrams"
-                data-drop-project={LOOSE_PROJECT_ID} data-drop={(sceneOut && drag?.over?.id === LOOSE_PROJECT_ID) || undefined}
-              >
-                {creatingLoose && (
-                  <li>
-                    <div className="project project--loose" data-draft="true">
-                      <span className="project__tile"><Shapes className="i" aria-hidden="true" /></span>
-                      <div className="project__text">
-                        <NameField
-                          initial=""
-                          label="Name of the new diagram"
-                          placeholder="Diagram name"
-                          onSave={async (name) => {
-                            try { await onCreateLoose(name); }
-                            catch (error) { throw new Error(`Couldn't create the diagram. ${reasonText(error)}`); }
-                            setCreatingLoose(false);
-                          }}
-                          onCancel={() => setCreatingLoose(false)}
-                          onAbandon={(message) => { setCreatingLoose(false); setNotice(message); }}
-                        />
+              <section className="project-group" aria-labelledby="loose-diagrams-title">
+                <h3 id="loose-diagrams-title" className="project-group__title">Loose diagrams</h3>
+                <ul
+                  className="project-list project-list--loose" aria-labelledby="loose-diagrams-title"
+                  data-drop-project={LOOSE_PROJECT_ID} data-drop={(sceneOut && drag?.over?.id === LOOSE_PROJECT_ID) || undefined}
+                >
+                  {creatingLoose && (
+                    <li>
+                      <div className="project project--loose" data-draft="true">
+                        <span className="project__tile"><Shapes className="i" aria-hidden="true" /></span>
+                        <div className="project__text">
+                          <NameField
+                            initial=""
+                            label="Name of the new diagram"
+                            placeholder="Diagram name"
+                            onSave={async (name) => {
+                              try { await onCreateLoose(name); }
+                              catch (error) { throw new Error(`Couldn't create the diagram. ${reasonText(error)}`); }
+                              setCreatingLoose(false);
+                            }}
+                            onCancel={() => setCreatingLoose(false)}
+                            onAbandon={(message) => { setCreatingLoose(false); setNotice(message); }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                )}
-                {looseVisible.map(renderLoose)}
-                {sceneOut && looseVisible.length === 0 && !creatingLoose && (
-                  <li className="loose-drop" aria-hidden="true"><Shapes className="i" />Drop here</li>
-                )}
-              </ul>
+                    </li>
+                  )}
+                  {looseVisible.map(renderLoose)}
+                  {sceneOut && looseVisible.length === 0 && !creatingLoose && (
+                    <li className="loose-drop" aria-hidden="true"><Shapes className="i" />Drop here</li>
+                  )}
+                </ul>
+              </section>
             )}
             {query !== null && visible.length === 0 && looseVisible.length === 0 && <p className="projects__empty" role="status">No matches.</p>}
             {query === null && filter === LOOSE_PROJECT_ID && looseVisible.length === 0 && !creating && !creatingLoose && (

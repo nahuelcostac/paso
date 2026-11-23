@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeContents, explainProjectError, fold, formatSize, groupByRecency } from './format';
+import { describeContents, explainProjectError, fold, formatSize } from './format';
 import { legacyRouteHash, parseRoute, routeHash } from './route';
 import { ICONS } from './icon-catalog';
 import { iconFor, searchIcons } from './icons';
@@ -77,24 +77,6 @@ describe('explainProjectError', () => {
     expect(newer.short).toMatch(/newer version/);
     expect(newer.long).toMatch(/Update Paso/);
     expect(explainProjectError('[{"code":"invalid_type"}]').short).toMatch(/damaged/);
-  });
-});
-
-describe('groupByRecency', () => {
-  it('groups by today, earlier this month and before, on the local calendar, and leaves out empty groups', () => {
-    const now = new Date(2026, 10, 10, 9, 30);
-    const at = (...parts: [number, number, number, number?]) => new Date(...(parts as [number, number, number, number])).toISOString();
-    const items = [
-      { name: 'esta mañana', at: at(2026, 10, 10, 0) },
-      { name: 'ayer', at: at(2026, 10, 9, 23) },
-      { name: 'día 1', at: at(2026, 10, 1, 0) },
-      { name: 'octubre', at: at(2026, 9, 31, 23) },
-      { name: 'otro reloj', at: at(2026, 10, 12, 0) },
-    ];
-    expect(groupByRecency(items, (item) => item.at, now).map((group) => [group.label, group.items.map((item) => item.name)])).toEqual([
-      ['Today', ['esta mañana', 'otro reloj']], ['This month', ['ayer', 'día 1']], ['Earlier', ['octubre']],
-    ]);
-    expect(groupByRecency([items[3]], (item) => item.at, now).map((group) => group.label)).toEqual(['Earlier']);
   });
 });
 

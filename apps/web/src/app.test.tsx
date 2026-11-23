@@ -141,14 +141,14 @@ describe('projects panel against the real service', () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
     await seed('Segundo', 'second');
     render(<App config={config} />);
-    // The newest is listed first and opened by default.
-    await screen.findByRole('heading', { level: 1, name: 'Segundo' }, patience);
-    expect(window.location.hash).toBe('#/second/canvas');
-    await user.click(screen.getByRole('button', { name: 'More actions for Segundo' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Delete/ }));
-    await user.click(await screen.findByRole('button', { name: 'Delete project' }));
+    // The first project in alphabetical order opens by default.
     await screen.findByRole('heading', { level: 1, name: 'Primero' }, patience);
     expect(window.location.hash).toBe('#/first/canvas');
+    await user.click(screen.getByRole('button', { name: 'More actions for Primero' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Delete/ }));
+    await user.click(await screen.findByRole('button', { name: 'Delete project' }));
+    await screen.findByRole('heading', { level: 1, name: 'Segundo' }, patience);
+    expect(window.location.hash).toBe('#/second/canvas');
   });
 
   it('shows size, icon and current marker on every row', async () => {
@@ -210,7 +210,7 @@ describe('workspaces, from the activity bar', () => {
     render(<App config={config} />);
     const sidebar = await screen.findByRole('complementary', { name: 'Projects and diagrams' }, patience);
     await within(sidebar).findByRole('button', { name: /^En casa/ }, patience);
-    expect(within(sidebar).getByRole('region', { name: 'Today' })).toHaveTextContent('En casa');
+    expect(within(sidebar).getByRole('list', { name: 'Projects' })).toHaveTextContent('En casa');
 
     // Switch: the list, the address and the board follow the other folder.
     await user.click(within(bar()).getByRole('button', { name: 'Workspace: My projects' }));
@@ -220,7 +220,7 @@ describe('workspaces, from the activity bar', () => {
     await waitFor(() => expect(within(bar()).getByRole('button', { name: 'Workspace: Clases' })).toBeEnabled(), patience);
     expect(window.location.hash).toBe('#/tema/canvas');
     expect(within(sidebar).queryByRole('button', { name: /^En casa/ })).not.toBeInTheDocument();
-    expect(within(sidebar).getByRole('region', { name: 'Earlier' })).toHaveTextContent('Tema 1');
+    expect(within(sidebar).getByRole('list', { name: 'Projects' })).toHaveTextContent('Tema 1');
 
     // Search filters the list in place.
     await user.click(within(sidebar).getByRole('button', { name: 'Search' }));

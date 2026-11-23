@@ -79,7 +79,7 @@ describe('the project filter', () => {
     await within(sidebar()).findByRole('button', { name: /^Bosquejo/ }, patience);
     expect(trigger()).toHaveAccessibleName('Filter by project: All projects');
     expect(trigger()).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(listed()).toEqual(['Biología', 'Álgebra', 'Bosquejo']);
+    expect(listed()).toEqual(['Álgebra', 'Biología', 'Bosquejo']);
 
     // Open from the keyboard: the search field takes the focus, and the chosen choice is highlighted.
     trigger().focus();
@@ -89,7 +89,7 @@ describe('the project filter', () => {
     expect(field).toHaveFocus();
     expect(trigger()).toHaveAttribute('aria-expanded', 'true');
     const options = () => within(menu).getAllByRole('option').map((option) => option.textContent);
-    expect(options()).toEqual(['All projects', 'Biología', 'Álgebra', 'Loose diagrams']);
+    expect(options()).toEqual(['All projects', 'Álgebra', 'Biología', 'Loose diagrams']);
     expect(within(menu).getByRole('option', { name: 'All projects' })).toHaveAttribute('aria-selected', 'true');
     expect(field).toHaveAttribute('aria-activedescendant', within(menu).getByRole('option', { name: 'All projects' }).id);
 
@@ -97,7 +97,7 @@ describe('the project filter', () => {
     await user.keyboard('{ArrowUp}');
     expect(field).toHaveAttribute('aria-activedescendant', within(menu).getByRole('option', { name: 'Loose diagrams' }).id);
     await user.keyboard('{ArrowDown}{ArrowDown}');
-    expect(field).toHaveAttribute('aria-activedescendant', within(menu).getByRole('option', { name: 'Biología' }).id);
+    expect(field).toHaveAttribute('aria-activedescendant', within(menu).getByRole('option', { name: 'Álgebra' }).id);
     expect(field).toHaveFocus();
 
     // Searching ignores accents and leaves out “All projects”; Enter chooses the first match.
@@ -155,7 +155,7 @@ describe('the project filter', () => {
     render(<App config={config} recovery={memory()} />);
     await waitFor(() => expect(trigger()).toHaveAccessibleName('Filter by project: Biología'), patience);
     expect(listed()).toEqual(['Biología']);
-    // The app opens on the filter's project, not on the most recent one.
+    // The app opens on the filter's project.
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/biologia\/canvas/), patience);
 
     // A new project opens, so the list shows everything again.

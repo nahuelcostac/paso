@@ -72,8 +72,25 @@ describe('loose diagrams in the sidebar', () => {
     await seedProject('p', 'Proyecto');
     render(<App config={config} recovery={memory()} />);
     await screen.findByRole('button', { name: /^Proyecto/ }, patience);
-    expect(within(sidebar()).queryByRole('list', { name: 'Loose diagrams' })).not.toBeInTheDocument();
+    expect(within(sidebar()).queryByRole('heading', { name: 'Loose diagrams' })).not.toBeInTheDocument();
     expect(within(sidebar()).getByRole('button', { name: 'New diagram' })).toBeInTheDocument();
+  });
+
+  it('lists projects alphabetically, followed by a section of loose diagrams in alphabetical order', async () => {
+    await seedProject('b', 'Biología');
+    await seedProject('a', 'Álgebra');
+    await seedLoose('alpha', 'Ábaco');
+    await seedLoose('zeta', 'Zeta');
+    render(<App config={config} recovery={memory()} />);
+
+    const panel = within(sidebar());
+    const section = await panel.findByRole('region', { name: 'Loose diagrams' }, patience);
+    const heading = within(section).getByRole('heading', { name: 'Loose diagrams' });
+    expect(panel.getAllByRole('heading')).toEqual([heading]);
+    expect([...sidebar().querySelectorAll('.project__name')].map((name) => name.textContent)).toEqual([
+      'Álgebra', 'Biología', 'Ábaco', 'Zeta',
+    ]);
+    expect(within(section).getByRole('list', { name: 'Loose diagrams' })).toHaveTextContent('Ábaco');
   });
 
   it('creates one with “New diagram”, opens it, renames and deletes it', async () => {
@@ -90,10 +107,8 @@ describe('loose diagrams in the sidebar', () => {
     const row = await screen.findByRole('button', { name: /^Pizarra rápida ?, loose diagram/ }, patience);
     expect(row).toHaveAttribute('aria-current', 'true');
     await waitFor(() => expect(row).toHaveTextContent('Pizarra rápida'), patience);
-    // Below the projects, with no heading of its own, and never as a project.
     const list = within(sidebar()).getByRole('list', { name: 'Loose diagrams' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
-    expect(within(sidebar()).queryByRole('heading', { name: /suelto/i })).not.toBeInTheDocument();
     const [sceneId] = await looseScenes();
     await waitFor(() => expect(window.location.hash).toMatch(new RegExp(`^#/_loose/canvas/${sceneId}/[\\w-]+$`)), patience);
     expect(screen.getByRole('heading', { level: 1, name: 'Pizarra rápida' })).toBeInTheDocument();
