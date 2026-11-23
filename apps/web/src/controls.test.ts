@@ -43,7 +43,7 @@ describe('controls measured from T3 Code', () => {
   });
 });
 
-describe('fixed activity bar', () => {
+describe('sidebar layout', () => {
   it('fits the macOS window buttons and centres the sidebar toggle beside the bar', async () => {
     const app = await css('app.css');
     const tokens = await css('tokens.css');
@@ -73,6 +73,14 @@ describe('fixed activity bar', () => {
   it('uses theme colours and one outline around the activity buttons', async () => {
     const app = await css('app.css');
     expect(rule(app, '.projects, .agent')).not.toContain('color-scheme: dark');
+    expect(rule(app, '.activity-bar')).toContain('padding: var(--bar-top) 0 var(--space-1)');
     expect(rule(app, '.activity-bar__buttons')).toContain('border: 1px solid var(--bar-line)');
+    expect(rule(app, '.activity-bar__buttons')).toContain('padding: calc(var(--space-1) + var(--bar-top-gap)) 0 var(--space-3)');
+  });
+
+  it('uses larger text for the Loose diagrams heading than for its entries', async () => {
+    const app = await css('app.css');
+    expect(rule(app, '.project-group__title--loose')).toContain('font-size: var(--text-14)');
+    expect(rule(app, '.project--loose')).toContain('font-size: var(--text-12)');
   });
 });

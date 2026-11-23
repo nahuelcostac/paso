@@ -90,11 +90,11 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .activity-bar {
   --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--bar-focus);
   grid-column: 1; grid-row: 1; display: flex; flex-direction: column; align-items: center;
-  min-height: 0; padding: calc(var(--bar-top) + var(--bar-top-gap)) 0 var(--space-3); overflow: hidden auto; scrollbar-width: none;
+  min-height: 0; padding: var(--bar-top) 0 var(--space-1); overflow: hidden auto; scrollbar-width: none;
 }
 .activity-bar__buttons {
   display: flex; flex: 1; flex-direction: column; justify-content: space-between; gap: var(--space-3);
-  width: calc(var(--bar-button) + 2 * var(--space-1)); padding: var(--space-1) 0;
+  width: calc(var(--bar-button) + 2 * var(--space-1)); padding: calc(var(--space-1) + var(--bar-top-gap)) 0 var(--space-3);
   background: var(--panel-bg); border: 1px solid var(--bar-line); border-radius: var(--radius-card);
 }
 .activity-bar__group { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
@@ -248,6 +248,7 @@ button.nav-row:hover:not(:disabled) { background: var(--surface-sunken); color: 
 .project-group + .project-group, .project-list + .project-group { margin-top: var(--space-4); }
 .project-list + .project-list { margin-top: var(--space-1); }
 .project-group__title { padding: 6px 10px; color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); }
+.project-group__title--loose { font-size: var(--text-14); }
 .projects__empty { padding: var(--space-3) var(--space-2); color: var(--ink-3); font-size: var(--text-12); }
 .project-list { display: flex; flex-direction: column; gap: var(--space-1); }
 /* One line per project: its icon, its name, and the menu on hover. */
@@ -274,7 +275,7 @@ button.project__tile:hover { background: var(--surface-hover); color: var(--ink)
 .project--skeleton { gap: 10px; }
 
 /* Align loose diagram names with the section heading. */
-.project--loose { padding-left: 10px; }
+.project--loose { padding-left: 10px; font-size: var(--text-12); }
 .project--loose[data-dragging='true'] { opacity: 0.45; }
 .projects[data-dragging='true'], .projects[data-dragging='true'] * { cursor: grabbing !important; user-select: none; }
 /* The project a dragged loose diagram would land in. */

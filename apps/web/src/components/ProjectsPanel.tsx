@@ -384,7 +384,7 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
             )}
             {(looseVisible.length > 0 || creatingLoose || sceneOut) && (
               <section className="project-group" aria-labelledby="loose-diagrams-title">
-                <h3 id="loose-diagrams-title" className="project-group__title">Loose diagrams</h3>
+                <h3 id="loose-diagrams-title" className="project-group__title project-group__title--loose">Loose diagrams</h3>
                 <ul
                   className="project-list project-list--loose" aria-labelledby="loose-diagrams-title"
                   data-drop-project={LOOSE_PROJECT_ID} data-drop={(sceneOut && drag?.over?.id === LOOSE_PROJECT_ID) || undefined}
