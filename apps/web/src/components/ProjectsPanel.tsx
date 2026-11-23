@@ -320,7 +320,6 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
             <SquarePen className="i" aria-hidden="true" />
           </button>
         </div>
-        <hr />
       </div>
 
       <div className="projects__body">

@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Clapperboard, Ellipsis, Settings } from 'lucide-react';
+import { Clapperboard, Presentation, Settings } from 'lucide-react';
 import { SettingsMenu } from './SettingsMenu';
 import { useCanvasMenu, type CanvasMenu } from '../editor/canvas-menu';
 import type { View } from '../lib/route';
@@ -58,7 +58,7 @@ export function ActivityBar({ chatOpen, working = false, view, onDiagram, onStud
     <div ref={bar} className="activity-bar" role="toolbar" aria-orientation="vertical" aria-label="Activity bar" onKeyDown={onKeyDown}>
       <div className="activity-bar__buttons">
         <div className="activity-bar__group">
-          {view && button('diagram', 'Diagram', <Ellipsis className="i" aria-hidden="true" />,
+          {view && button('diagram', 'Diagram', <Presentation className="i" aria-hidden="true" />,
             { 'aria-pressed': view === 'canvas' }, onDiagram)}
           {view && button('studio', 'Studio', <Clapperboard className="i" aria-hidden="true" />,
             {

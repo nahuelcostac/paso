@@ -211,8 +211,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
    the mark at its head; the header runs beside it. On a narrow window it opens over the content instead. */
 .projects { grid-column: 1; grid-row: 1; position: relative; z-index: 6; display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
 .projects-scrim { display: none; }
-.projects__nav { flex: none; padding: 0 var(--space-2); }
-.projects__nav hr { margin: var(--space-2) var(--space-1); border: 0; border-top: var(--border); }
+.projects__nav { flex: none; padding: 0 var(--space-2) var(--space-2); }
 /* The workspace's name in bold with a chevron, like tldraw's. */
 /* A sidebar row, as T3 Code's: 32px, 10px in, the icon 10px from the text. */
 .nav-row { display: flex; align-items: center; gap: 10px; width: 100%; height: var(--control-h); padding: 0 10px; border-radius: var(--radius-md); color: var(--ink-2); font-weight: var(--weight-medium); text-align: left; }

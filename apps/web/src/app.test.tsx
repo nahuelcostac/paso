@@ -421,7 +421,7 @@ describe('the board and its overview', () => {
     const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
     const diagram = within(bar).getByRole('button', { name: 'Diagram' });
     const studio = within(bar).getByRole('button', { name: 'Studio' });
-    expect(diagram.querySelector('.lucide-ellipsis')).toBeInTheDocument();
+    expect(diagram.querySelector('.lucide-presentation')).toBeInTheDocument();
     expect(diagram).toHaveAttribute('aria-pressed', 'true');
     expect(studio).toHaveAttribute('aria-pressed', 'false');
     await user.click(studio);
@@ -535,6 +535,7 @@ describe('the board and its overview', () => {
     expect(screen.getByRole('separator', { name: 'Sidebar width' })).toHaveAttribute('aria-valuenow', '240');
     // As in T3 Code, one row: “Search”, then the project filter and the two ways to make something new, as icons.
     const row = sidebar.querySelector<HTMLElement>('.nav-actions')!;
+    expect(within(sidebar).queryByRole('separator')).not.toBeInTheDocument();
     expect([...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['Search', 'Filter by project: All projects', 'New project', 'New diagram']);
     for (const name of ['Filter by project: All projects', 'New project', 'New diagram']) expect(within(row).getByRole('button', { name })).toHaveTextContent(/^$/);
     // While searching, the field takes the place of “Search”; the icons stay.
