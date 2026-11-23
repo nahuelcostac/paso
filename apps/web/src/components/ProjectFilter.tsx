@@ -83,7 +83,7 @@ function FilterList({ anchor, choices, value, onClose, onPick }: { anchor: HTMLE
   const separatorAt = matches.findIndex((choice) => choice.value === LOOSE_PROJECT_ID);
   return (
     <Popover anchor={anchor} onClose={onClose} role="dialog" label="Filter by project" className="menu project-filter-menu" onKeyDown={keys}>
-      <label className="nav-row nav-row--field project-filter-menu__search">
+      <label className="picker__search">
         <Search className="i" aria-hidden="true" />
         <input
           type="text" role="combobox" autoFocus value={query} placeholder="Search projects…" aria-label="Search projects" spellCheck={false}

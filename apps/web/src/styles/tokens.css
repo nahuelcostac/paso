@@ -94,14 +94,15 @@
   --focus: light-dark(#71717a, #a1a1aa); /* a grey that reaches 3:1 on every layer */
 
   /* ---------------------------------------------------------------- typography
-     Inter everywhere, numbers in tabular figures. 12px is the minimum, except the spaced uppercase eyebrow (11px). */
+     Inter everywhere, numbers in tabular figures. Sizes follow T3 Code's scale (its root is 16px): text-sm (14px) for
+     the interface, text-xs (12px) for meta. 12px is the minimum, except the spaced uppercase eyebrow (11px). */
   --font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; /* code in agent messages only */
 
   --text-11: 11px; /* eyebrow, uppercase and spaced */
   --text-12: 12px; /* meta, step numbers */
-  --text-13: 13px; /* default UI, agent conversation */
-  --text-15: 15px; /* card titles, dialog titles */
+  --text-14: 14px; /* default UI: buttons, fields, menu items, sidebar rows, the agent conversation (T3 Code's text-sm) */
+  --text-15: 15px; /* the mark's name in the sidebar's head, Present's messages */
   --text-20: 20px; /* scene titles */
   --text-28: 28px; /* project title on the storyboard */
 
@@ -134,14 +135,22 @@
   --carousel-h: 108px;
   --carousel-over-bar-h: 100px; /* the strip above its bar */
   --step-bar-h: 36px; /* the bar under the strip, which stays when it is hidden */
-  --control-h: 32px;
+  /* Control heights, as T3 Code's buttons at desktop width: h-8, sm h-7, xs h-6, lg h-9. */
+  --control-h: 32px; /* buttons, fields, sidebar rows, icon buttons */
+  --control-h-sm: 28px; /* menu items, rows inside a popup, the sidebar's scenes, small buttons */
+  --control-h-xs: 24px; /* the composer's controls, row actions (⋮) */
+  --control-h-lg: 36px; /* the large button, and Present beside Excalidraw's 36px islands */
+  --icon: 16px; /* icons in controls (T3 Code's size-4); 14px in xs controls */
+  --icon-stroke: 1.75; /* Lucide at T3 Code's lighter stroke */
+  --disabled-opacity: 0.64;
   --canvas-min-w: 744px; /* Excalidraw turns mobile below 730px; Present, icon only, still clears the toolbar at 744px */
 
   /* --------------------------------------------------------------------- shape */
-  --radius-sm: 6px; /* small controls, badges, thumbnails in the carousel */
-  --radius-md: 8px; /* buttons, inputs, menu items, project tiles */
-  --radius-card: 10px; /* step cards, scene and composer cards, Excalidraw islands */
-  --radius-lg: 14px; /* dialogs, popovers, the chat's bubbles and composer */
+  /* After T3 Code, whose --radius is 8px: rounded-sm 4px, the control radius 8px, rounded-2xl 16px. */
+  --radius-sm: 4px; /* menu items, badges, inline fields, thumbnails in the carousel */
+  --radius-md: 8px; /* buttons, fields, sidebar rows, menus and popovers (T3 Code's --control-radius) */
+  --radius-card: 10px; /* step cards, Excalidraw islands */
+  --radius-lg: 16px; /* dialogs, the chat's bubbles and composer (T3 Code's rounded-2xl) */
   --radius-panel: 20px; /* the floating projects and chat panels */
   --radius-pill: 999px; /* chips, the view selector */
 

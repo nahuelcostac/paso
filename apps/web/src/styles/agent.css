@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  height: 38px;
+  height: var(--control-h-lg);
   padding: 0 var(--space-1) 0 var(--space-3);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -20,7 +20,7 @@
   }
 }
 .agent-status .btn {
-  height: 30px;
+  height: var(--control-h-sm);
   padding: 0 var(--space-2) 0 6px;
 }
 .agent-status svg.i {
@@ -63,7 +63,7 @@
   padding: 0 var(--space-2);
   border-radius: var(--radius-md);
   text-align: left;
-  font-size: var(--text-13);
+  font-size: var(--text-14);
   font-weight: var(--weight-semibold);
   color: var(--ink);
 }
@@ -175,7 +175,7 @@ button.chip:hover {
   font-size: var(--text-12);
 }
 .run-end .btn {
-  height: 24px;
+  height: var(--control-h-xs);
   padding: 0 var(--space-2) 0 6px;
   font-size: var(--text-12);
   margin-right: -8px;
@@ -191,7 +191,7 @@ button.chip:hover {
   margin-top: -6px;
 }
 
-/* Composer: a lighter card than the panel, with a thin line. It takes the focus ring while its text has focus. */
+/* Composer: a lighter card than the panel, with a thin line and T3 Code's 16px corners. It takes the focus ring while its text has focus. */
 .composer {
   flex: none;
   margin: 0 var(--space-2) var(--space-2);
@@ -231,14 +231,16 @@ button.chip:hover {
   gap: 2px;
   margin-top: var(--space-1);
 }
+/* The composer's controls, as T3 Code's: 24px ghost buttons, 7px in, 12px text, 14px icons. */
 .composer__control {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: 28px;
-  padding: 0 6px 0 var(--space-2);
+  height: var(--control-h-xs);
+  padding: 0 7px;
   border-radius: var(--radius-md);
   color: var(--ink-2);
+  font-size: var(--text-12);
   white-space: nowrap;
 }
 .composer__control:hover:not(:disabled) {
@@ -300,7 +302,7 @@ button.chip:hover {
 
 /* Under 1100px the Storyboard keeps no column for the panel: it opens over the board, from the top bar. */
 /* Shows or hides the agent. With the panel in view it is a selected option, a grey fill: ink stays for Present. */
-.agent-toggle { height: 38px; padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
+.agent-toggle { height: var(--control-h-lg); padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
 .agent-toggle[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--surface-hover); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .agent[data-narrow] {
@@ -344,7 +346,7 @@ button.chip:hover {
 .agent-picker__head > :first-child { color: var(--ink-2); }
 .agent-picker__note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-regular); }
 .agent-picker__list { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; overflow-y: auto; }
-.agent-picker .agent-picker__row { display: flex; align-items: center; gap: var(--space-2); width: 100%; height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: inherit; font-size: var(--text-13); text-align: left; cursor: pointer; }
+.agent-picker .agent-picker__row { display: flex; align-items: center; gap: var(--space-2); width: 100%; height: var(--control-h-sm); padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: inherit; font-size: var(--text-14); text-align: left; cursor: pointer; }
 .agent-picker .agent-picker__row:hover { background: var(--surface-hover); }
 .agent-picker .agent-picker__row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
 .agent-picker .agent-picker__row[aria-checked='true'] { font-weight: var(--weight-medium); }
@@ -353,6 +355,9 @@ button.chip:hover {
 .agent-picker__row .i { width: 14px; height: 14px; color: var(--ink); }
 .agent-picker__status { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: 12px 10px; color: var(--ink-3); font-size: var(--text-12); }
 .agent-picker__status p { margin: 0; }
+/* “Detect again”: a small outlined button (T3 Code's sm, 28px), at its natural width. */
+.agent-picker .btn { height: var(--control-h-sm); padding: 0 10px; gap: 6px; }
+.agent-picker__models > .btn { align-self: flex-start; margin: var(--space-1) 10px 0; }
 .agent-picker__hint, .agent-picker__empty { margin: auto 10px 10px; color: var(--ink-3); font-size: var(--text-12); }
 .agent-picker__empty { margin: 10px; }
 @media (max-width: 479px) {
@@ -369,9 +374,9 @@ button.chip:hover {
 .history__item[data-current] { background: var(--accent-soft); }
 .menu.history .history__open { display: flex; flex: 1; flex-direction: column; align-items: stretch; gap: 2px; width: auto; height: auto; min-width: 0; padding: 7px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
 .history__open:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.history__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-13); font-weight: var(--weight-medium); }
+.history__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-14); font-weight: var(--weight-medium); }
 .history__meta { display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-3); font-size: var(--text-12); }
-.menu.history .history__delete { flex: none; justify-content: center; width: 30px; height: 30px; padding: 0; margin-right: 2px; opacity: 0; }
+.menu.history .history__delete { flex: none; justify-content: center; width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; margin-right: 2px; opacity: 0; }
 .menu.history .history__item:hover .history__open, .menu.history .history__open:focus-visible { background: transparent; }
 .menu.history .history__item:hover .history__delete, .menu.history .history__item:focus-within .history__delete { opacity: 1; }
 @media (hover: none) { .menu.history .history__delete { opacity: 1; } }
