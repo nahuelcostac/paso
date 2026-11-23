@@ -95,7 +95,6 @@ Kept as Paso's own: the colours (neutral greys and ink, not T3 Code's blue prima
 **Window layout.** The main view reaches the top, right and bottom edges.
 
 **Activity bar.** A 44px column at the left edge. One thin, rounded outline groups the 32px buttons. Their 20px Lucide icons use near-black ink in the light theme and light ink in the dark theme. A neutral fill marks hover (`--bar-hover`). The active button has a dark fill (`--bar-active`) with a light icon. Each button has a name and a tooltip. The top group contains these buttons.
-- **Projects** (Lucide `folders`) opens the projects panel in the left spot.
 - **Diagram** (Lucide `ellipsis`) opens the Canvas.
 - **Studio** (Lucide `clapperboard`) opens the overview and the chat. If the overview is already open with the chat hidden, Studio opens the chat in the left spot. A running agent adds a pink dot to the button when the chat is hidden. Both view buttons appear when a diagram is open.
 
@@ -105,7 +104,7 @@ At the foot, two buttons:
 
 Opening a panel takes the left spot from the other panel. The buttons report whether their panel is open (`aria-expanded`, with `aria-controls` while open). The Diagram and Studio buttons report which view is open (`aria-pressed`). The gear opens a menu (`aria-haspopup`). The bar is one toolbar for the keyboard: Tab reaches it once, at the button used last; ↑ ↓ move, stopping at the ends, Home and End go to the ends. Its focus ring uses the theme grey (`--bar-focus`). Which panel was left open (or none) is remembered in this browser (`paso.side-panel` in `localStorage`), and in the desktop app, whose page keeps its origin, across relaunches. On a project's Canvas a remembered chat is not shown; the Studio brings it back.
 
-The sidebar toggle sits at the top, just to the right of the activity bar, with room for the native window buttons on macOS. It hides the current panel or opens the last used panel available in the current view. If chat is unavailable, it opens Projects. The toggle leaves the current view in place. The app also remembers the last panel after it is folded (`paso.last-side-panel` in `localStorage`).
+The sidebar toggle sits at the top, just to the right of the activity bar, with room for the native window buttons on macOS. “Hide sidebar” closes the visible panel and “Show sidebar” opens Projects. The toggle leaves the current view in place.
 
 The docked panel's right edge is a separator the person drags to change its width, remembered in this browser, each panel its own: the projects from 200px to 420px (240px at first), the chat as below; both always leave the main view 440px. Dragging it more than 80px past the narrowest width folds the panel. A thin grey line (`--bar-focus`) marks the edge inside the panel, on hover, while dragging and with keyboard focus (where the arrow keys move it, Home and End go to the ends, Enter folds); a double click goes back to the starting width.
 

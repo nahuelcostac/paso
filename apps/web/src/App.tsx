@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { PanelLeft } from 'lucide-react';
 import { LOOSE_PROJECT_ID, isLooseProject } from '@paso/shared';
 import { ApiRequestError, UnavailableError } from './lib/api';
@@ -16,7 +16,7 @@ import { ProjectsPanel } from './components/ProjectsPanel';
 import { SceneList } from './components/SceneList';
 import { AgentWorking } from './components/AgentWorking';
 import { BOARD_MIN, Splitter, useAgentWidth, useProjectsWidth } from './components/Splitter';
-import { ActivityBar, type SidePanel } from './components/ActivityBar';
+import { ActivityBar } from './components/ActivityBar';
 import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
 import { createCanvasMenu } from './editor/canvas-menu';
 import { PresentButton } from './present/PresentButton';
@@ -45,11 +45,11 @@ function useMediaQuery(query: string) {
 }
 
 const SIDE_KEY = 'paso.side-panel';
-const LAST_SIDE_KEY = 'paso.last-side-panel';
+type SidePanel = 'projects' | 'agent';
 /** The panel left open in the left spot, remembered in this browser (and in the desktop app, whose origin stays). */
-function storedSide(key = SIDE_KEY): SidePanel | null {
+function storedSide(): SidePanel | null {
   try {
-    const value = window.localStorage.getItem(key);
+    const value = window.localStorage.getItem(SIDE_KEY);
     return value === 'agent' ? 'agent' : value === 'none' ? null : 'projects';
   } catch { return 'projects'; }
 }
@@ -61,25 +61,18 @@ function storedSide(key = SIDE_KEY): SidePanel | null {
  */
 function useSidePanel(narrow: boolean) {
   const [side, setSide] = useState<SidePanel | null>(() => narrow ? null : storedSide());
-  const [lastSide, setLastSide] = useState<SidePanel>(() => side ?? storedSide() ?? storedSide(LAST_SIDE_KEY) ?? 'projects');
   const crossed = useRef(narrow);
   useEffect(() => {
     if (crossed.current === narrow) return;
     crossed.current = narrow;
-    const restored = narrow ? null : storedSide();
-    setSide(restored);
-    if (!narrow) setLastSide(restored ?? storedSide(LAST_SIDE_KEY) ?? 'projects');
+    setSide(narrow ? null : storedSide());
   }, [narrow]);
   const choose = useCallback((next: SidePanel | null) => {
     setSide(next);
-    if (next) setLastSide(next);
     if (window.matchMedia(NARROW).matches) return;
-    try {
-      window.localStorage.setItem(SIDE_KEY, next ?? 'none');
-      if (next) window.localStorage.setItem(LAST_SIDE_KEY, next);
-    } catch { /* a convenience: it just won't be remembered */ }
+    try { window.localStorage.setItem(SIDE_KEY, next ?? 'none'); } catch { /* a convenience: it just won't be remembered */ }
   }, []);
-  return { side, lastSide, chooseSide: choose };
+  return { side, chooseSide: choose };
 }
 
 /** `recovery` is where unsaved drafts are kept. It is the browser's IndexedDB unless a host or a test supplies another. */
@@ -108,10 +101,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   useSyncExternalStore(steps.subscribe, steps.getSnapshot);
   const [route, navigate] = useRoute();
   const [creating, setCreating] = useState(false);
-  const agentOpener = useRef<HTMLButtonElement>(null);
   // Under this the panel in the left spot opens over the content, as a drawer.
   const narrow = useMediaQuery(NARROW);
-  const { side, lastSide, chooseSide } = useSidePanel(narrow);
+  const { side, chooseSide } = useSidePanel(narrow);
   const boardMin = BOARD_MIN.storyboard;
   const overview = route.view === 'storyboard';
   // Each panel's width, which the person drags, remembered apart.
@@ -334,13 +326,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const canShowAgent = Boolean(openProject && chatHere);
   const shown = side === 'agent' && !canShowAgent ? null : side;
   const sidebarLabel = shown ? 'Hide sidebar' : 'Show sidebar';
-  const toggleSidebar = (event: MouseEvent<HTMLButtonElement>) => {
-    if (shown) chooseSide(null);
-    else if (lastSide === 'agent' && canShowAgent) {
-      agentOpener.current = event.currentTarget;
-      chooseSide('agent');
-    } else chooseSide('projects');
-  };
   const docked = narrow ? null : shown;
   const left = docked === 'projects' ? projectsWidth.width : docked === 'agent' ? agentWidth.width : 0;
   /** A drawer steps aside once something is chosen in it. Docked, the panel stays. */
@@ -378,10 +363,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const hideAgent = () => {
     chooseSide(null);
     // Focus goes back to the button that opened it.
-    (agentOpener.current ?? document.querySelector<HTMLButtonElement>('.activity-bar__button[data-id="studio"]'))?.focus();
+    document.querySelector<HTMLButtonElement>('.activity-bar__button[data-id="studio"]')?.focus();
   };
   const openStudio = () => {
-    agentOpener.current = null;
     chooseSide('agent');
     if (!overview) navigate({ ...routeRef.current, view: 'storyboard' });
   };
@@ -400,7 +384,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       style={{ '--left': `${left}px`, '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
       <ActivityBar
-        panel={shown} onProjects={() => chooseSide(shown === 'projects' ? null : 'projects')}
+        chatOpen={shown === 'agent'}
         working={Boolean(openProject && working && shown !== 'agent')}
         view={openProject ? route.view : undefined}
         onDiagram={() => navigate({ ...routeRef.current, view: 'canvas' })}
@@ -412,7 +396,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         <button
           type="button" className="icon-btn sidebar-toggle" aria-label={sidebarLabel} title={sidebarLabel}
           aria-expanded={shown !== null} aria-controls={shown ? `${shown}-panel` : undefined}
-          onClick={toggleSidebar}
+          onClick={() => chooseSide(shown ? null : 'projects')}
         >
           <PanelLeft className="i" aria-hidden="true" />
         </button>

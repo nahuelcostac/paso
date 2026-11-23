@@ -118,7 +118,8 @@ async function openPanel() {
  * a time. Returns the chat's panel.
  */
 async function pickScene(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await user.click(within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Projects' }));
+  await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
+  await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
   expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
   await user.click(within(await screen.findByRole('list', { name: 'Scenes of Búsqueda binaria' }, patience)).getByRole('button', { name }));
   await user.click(studioButton());
@@ -145,7 +146,6 @@ beforeEach(async () => {
 
   window.history.replaceState(null, '', '#/p/storyboard');
   window.localStorage.removeItem('paso.side-panel');
-  window.localStorage.removeItem('paso.last-side-panel');
   window.matchMedia = ((query: string) => ({
     matches: false, media: query, addEventListener() {}, removeEventListener() {},
   })) as unknown as typeof window.matchMedia;
@@ -430,7 +430,8 @@ describe('a turn as it happens', () => {
     expect(document.querySelector('.app')).not.toHaveClass('app--agent');
     expect(toggle.querySelector('.activity-bar__badge')).not.toBeNull();
     await user.click(toggle);
-    await user.click(within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Projects' }));
+    await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
+    await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
     const status = await screen.findByRole('status', { name: 'Agent working' }, patience);
     expect(status).toHaveTextContent('Claude Code is changing a step');
     expect(within(status).getByRole('button', { name: 'Go to step 1 of scene 1' })).toHaveTextContent('1');
@@ -730,11 +731,11 @@ describe('narrow windows', () => {
 
     const sidebarToggle = screen.getByRole('button', { name: 'Show sidebar' });
     await user.click(sidebarToggle);
-    expect(panel).toHaveAttribute('data-open', 'true');
-    expect(within(panel).getByRole('textbox', { name: 'Message to the agent' })).toHaveFocus();
-    await user.keyboard('{Escape}');
+    const projects = screen.getByRole('complementary', { name: 'Projects and diagrams' });
     expect(panel).not.toHaveAttribute('data-open');
+    await user.click(sidebarToggle);
+    expect(projects).not.toBeInTheDocument();
     expect(sidebarToggle).toHaveFocus();
-    expect(window.localStorage.getItem('paso.last-side-panel')).toBeNull();
+    expect(window.localStorage.getItem('paso.side-panel')).toBeNull();
   });
 });

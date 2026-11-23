@@ -1,15 +1,11 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Clapperboard, Ellipsis, Folders, Settings } from 'lucide-react';
+import { Clapperboard, Ellipsis, Settings } from 'lucide-react';
 import { SettingsMenu } from './SettingsMenu';
 import { useCanvasMenu, type CanvasMenu } from '../editor/canvas-menu';
 import type { View } from '../lib/route';
 
-export type SidePanel = 'projects' | 'agent';
-
 type Props = {
-  /** The panel in view in the left spot, if any. */
-  panel: SidePanel | null;
-  onProjects: () => void;
+  chatOpen: boolean;
   /** The agent works while its panel is out of view: a pink dot on Studio. */
   working?: boolean;
   /** The current view, or undefined when no diagram is open. */
@@ -22,19 +18,18 @@ type Props = {
 };
 
 /**
- * Projects, Diagram and Studio sit above the workspace switcher and settings. Tab reaches the toolbar once.
+ * Diagram and Studio sit above the workspace switcher and settings. Tab reaches the toolbar once.
  * The arrow keys, Home and End move between its buttons.
  */
-export function ActivityBar({ panel, onProjects, working = false, view, onDiagram, onStudio, canvasMenu, workspace }: Props) {
+export function ActivityBar({ chatOpen, working = false, view, onDiagram, onStudio, canvasMenu, workspace }: Props) {
   const bar = useRef<HTMLDivElement>(null);
   const gear = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const canvas = useCanvasMenu(canvasMenu);
   // The button that keeps the toolbar's one tab stop: the last one used.
-  const [current, setCurrent] = useState('projects');
-  const shown = ['projects', ...(view ? ['diagram', 'studio'] : []), 'workspace', 'settings'];
-  const stop = shown.includes(current) ? current : 'projects';
-  const chatOpen = panel === 'agent';
+  const [current, setCurrent] = useState<string>();
+  const shown = [...(view ? ['diagram', 'studio'] : []), 'workspace', 'settings'];
+  const stop = current && shown.includes(current) ? current : shown[0];
   const studioTitle = view === 'canvas' ? 'Open Studio with agent chat' : chatOpen ? 'Studio' : 'Open agent chat';
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -63,9 +58,6 @@ export function ActivityBar({ panel, onProjects, working = false, view, onDiagra
     <div ref={bar} className="activity-bar" role="toolbar" aria-orientation="vertical" aria-label="Activity bar" onKeyDown={onKeyDown}>
       <div className="activity-bar__buttons">
         <div className="activity-bar__group">
-          {button('projects', 'Projects', <Folders className="i" aria-hidden="true" />,
-            { 'aria-expanded': panel === 'projects', 'aria-controls': panel === 'projects' ? 'projects-panel' : undefined },
-            onProjects)}
           {view && button('diagram', 'Diagram', <Ellipsis className="i" aria-hidden="true" />,
             { 'aria-pressed': view === 'canvas' }, onDiagram)}
           {view && button('studio', 'Studio', <Clapperboard className="i" aria-hidden="true" />,
