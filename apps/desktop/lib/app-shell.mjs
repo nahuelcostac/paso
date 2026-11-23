@@ -37,9 +37,7 @@ export function allowsPermission(permission, requestingUrl) {
 export const TRAFFIC_LIGHTS = { x: 10, y: 14 };
 
 /**
- * The window's frame. On macOS it has no title bar: the window's buttons sit at the top of the page's activity bar, which
- * is wider for them (see “Desktop window” in
- * docs/design/direction.md). Elsewhere the system's frame stays.
+ * On macOS the native buttons sit over Paso's own layout. Elsewhere the system's frame stays.
  * @param {NodeJS.Platform} platform
  * @returns {Partial<import('electron').BrowserWindowConstructorOptions>}
  */

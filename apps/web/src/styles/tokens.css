@@ -148,7 +148,7 @@
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
   --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
   --window-controls-w: 0px; /* the window's own buttons, at the top of the activity bar: none in a browser */
-  --bar-w: 52px; /* the activity bar; barWidth() in Splitter.tsx reads it */
+  --bar-w: 52px; /* the activity bar beside an open panel; Splitter reads this width */
   --bar-top: 40px; /* the row for the app mark and, on macOS, the window controls */
   --bar-top-gap: 0px;
   --panel-mark-size: 18px;

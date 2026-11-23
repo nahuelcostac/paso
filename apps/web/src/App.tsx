@@ -386,7 +386,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
 
   return (
     <div
-      className={`app${shown ? ` app--${shown}` : ''}${narrow ? ' app--narrow' : ''}`}
+      className={`app app--${shown ?? 'folded'}${narrow ? ' app--narrow' : ''}`}
       style={{ '--left': `${left}px`, '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
       <ActivityBar

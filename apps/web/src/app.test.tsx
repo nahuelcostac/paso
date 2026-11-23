@@ -495,7 +495,7 @@ describe('the board and its overview', () => {
     expect((await readProject('one')).sceneIds).toEqual(['s1']);
   });
 
-  it('has no header: a black activity bar on the left opens one panel at a time, and remembers which', async () => {
+  it('compacts the activity bar with no panel open and remembers the panel selection', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera']);
@@ -514,6 +514,8 @@ describe('the board and its overview', () => {
     // The main view sits apart from the panel, in its own box with rounded left corners; the panel is not in it.
     // The panel starts with the app's icon and name, after the window's buttons in the desktop app.
     expect(sidebar.querySelector('.panel-brand')).toHaveTextContent('Paso');
+    const app = bar.closest('.app');
+    expect(app).toHaveClass('app--projects');
     const main = document.querySelector('.main')!;
     expect(main).toContainElement(screen.getByRole('main', { name: 'Canvas' }));
     expect(main).not.toContainElement(sidebar);
@@ -542,7 +544,9 @@ describe('the board and its overview', () => {
     expect(projects).toHaveFocus();
     expect(screen.queryByRole('separator', { name: 'Sidebar width' })).not.toBeInTheDocument();
     expect(window.localStorage.getItem('paso.side-panel')).toBe('none');
+    expect(app).toHaveClass('app--folded');
     await user.click(projects);
+    expect(app).not.toHaveClass('app--folded');
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
 
     const studio = within(bar).getByRole('button', { name: 'Studio' });
@@ -574,6 +578,7 @@ describe('the board and its overview', () => {
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     expect(studio).toHaveAttribute('aria-expanded', 'false');
+    expect(app).toHaveClass('app--folded');
 
     // Remembered across a relaunch.
     unmount();

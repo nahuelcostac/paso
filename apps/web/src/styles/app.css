@@ -25,15 +25,18 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
 /* The window: the activity bar down its left edge and the panel in the left spot (the projects or the agent's chat),
-   black, then the main view, flush with the window's other edges and meeting the black in a straight edge. No
-   header: nothing runs across the top. App sets --left to the docked panel's width. */
+   black, then the main view. App sets --left to the docked panel's width. */
 .app {
   display: grid; height: 100%;
   grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr);
   background: var(--bar);
 }
+.app--folded {
+  --bar-w: 44px;
+  --bar-button: var(--control-h-lg);
+}
 .shell {
-  position: relative; display: grid; min-width: 0; min-height: 0;
+  grid-column: 2; grid-row: 1; position: relative; display: grid; min-width: 0; min-height: 0;
   grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr);
 }
 .main {
@@ -90,7 +93,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .main > * { grid-column: 1; grid-row: 1; }
 
 /* The activity bar, as in VS Code: black in both themes, the panels and the Studio at the top, the gear at the foot.
-   Round 40px buttons with 20px icons in light grey; the open panel and the view on screen are white on a soft round
+   Round buttons with 20px icons in light grey. The open panel and the view on screen are white on a soft round
    highlight. The focus ring is light, so it shows on the black. */
 .activity-bar {
   --focus-ring: 0 0 0 2px var(--bar), 0 0 0 4px var(--bar-focus);
@@ -130,9 +133,15 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .settings-menu__swatch[aria-disabled='true'] > span { opacity: var(--disabled-opacity); }
 /* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
 .canvas--editor .excalidraw .main-menu-trigger { display: none; }
-/* Without a title bar (the desktop app on macOS), the window moves by the black around the window's buttons and the
-   app's icon: the bar and the panel's top row, never their buttons. Never by the main view either, where the drawing
-   needs the pointer. */
+/* On macOS, reserve a top row for the native buttons when the rail is too narrow to hold them. */
+:root[data-window-controls='mac'] .app--folded { grid-template-rows: var(--bar-top) minmax(0, 1fr); }
+:root[data-window-controls='mac'] .app--folded::before {
+  content: ''; grid-area: 1 / 1 / 2 / -1; background: var(--page); border-bottom: var(--border);
+  -webkit-app-region: drag;
+}
+:root[data-window-controls='mac'] .app--folded .activity-bar { grid-row: 2; padding-top: var(--bar-top-gap); }
+:root[data-window-controls='mac'] .app--folded .shell { grid-row: 2; }
+/* The black around the open panel's mark and the native buttons also moves the window. */
 :root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand { -webkit-app-region: drag; }
 :root[data-window-controls='mac'] .activity-bar__button { -webkit-app-region: no-drag; }
 
