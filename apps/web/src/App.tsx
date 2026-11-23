@@ -21,6 +21,7 @@ import { useScenes } from './state/scenes';
 import { ActionError, ProjectsStore, useProjects, type ProjectRow } from './state/projects-store';
 import { AgentStore, HARNESS_NAMES, activeTurn, stepMarks, useAgent } from './state/agent-store';
 import { formatSize } from './lib/format';
+import { shownFilter, showsUnder } from './lib/project-filter';
 import { stepCount } from './components/LooseRow';
 
 const Canvas = lazy(() => import('./editor/Canvas'));
@@ -259,13 +260,32 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const showing = onCanvas && route.sceneId && route.stepId ? targetKey({ projectId: route.projectId!, sceneId: route.sceneId, stepId: route.stepId }) : undefined;
   const failedStep = steps.unresolved().find((session) => targetKey(session.target) !== showing);
 
-  // No project in the address: open the first one that can be opened.
+  // The sidebar's project filter of the open workspace, kept by the service.
+  const workspace = state.workspaces?.workspaces.find((candidate) => candidate.id === state.workspaces?.activeId);
+  const filter = shownFilter(workspace?.filter, state.rows, state.phase);
+
+  // No project in the address: open the first one that can be opened, among what the sidebar's filter shows.
   useEffect(() => {
     if (state.phase !== 'ready' || route.projectId) return;
-    const first = state.rows.find((candidate) => candidate.kind === 'ok');
+    const loose = state.loose?.diagrams[0];
+    if (isLooseProject(filter) && loose) { openLoose(loose.id, true); return; }
+    const opens = state.rows.filter((candidate) => candidate.kind === 'ok');
+    const first = opens.find((candidate) => candidate.id === filter) ?? opens[0];
     if (first) navigate({ projectId: first.id, view: 'canvas', ...lastPlace.current[first.id] }, { replace: true });
-    else if (state.loose?.diagrams[0]) openLoose(state.loose.diagrams[0].id, true);
-  }, [state.phase, state.rows, state.loose, route, navigate]);
+    else if (loose) openLoose(loose.id, true);
+  }, [state.phase, state.rows, state.loose, route, navigate, filter]);
+
+  // As in T3 Code, opening something the filter hides (a new project, a scene followed into another project) shows
+  // “All projects” again, so the open item is always in the list. A filter whose project is gone is forgotten.
+  const filterState = useRef({ stored: workspace?.filter, activeId: state.workspaces?.activeId });
+  filterState.current = { stored: workspace?.filter, activeId: state.workspaces?.activeId };
+  useEffect(() => {
+    const { stored, activeId } = filterState.current;
+    if (route.projectId && stored && activeId && !showsUnder(stored, route.projectId)) void store.setFilter(activeId, null);
+  }, [route.projectId, store]);
+  useEffect(() => {
+    if (workspace?.filter && filter === null && state.connected && state.workspaces) void store.setFilter(state.workspaces.activeId, null);
+  }, [workspace?.filter, filter, state.connected, state.workspaces, store]);
 
   useEffect(() => {
     document.title = row?.kind === 'ok' ? `${row.project.name} · Paso` : 'Paso';

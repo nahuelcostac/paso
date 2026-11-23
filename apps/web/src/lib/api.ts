@@ -2,7 +2,8 @@ import type { Project, Scene, Step } from '@paso/shared';
 import type { Target, Binaries } from '../editor/step-store';
 import type { DesktopBridge } from './desktop';
 
-export type ClientConfig = { baseUrl: string; token: string };
+/** `eventsUrl` is the event stream's address when it is not at `baseUrl`, as in the desktop app. */
+export type ClientConfig = { baseUrl: string; token: string; eventsUrl?: string };
 
 /** The service cannot be reached, or rejected this session. The UI offers a retry. */
 export class UnavailableError extends Error {
@@ -21,7 +22,8 @@ export type ProjectEnvelope = { document: Project; revision: string };
 export type ProjectListItem = ({ id: string } & ProjectEnvelope) | { id: string; error: { code: string; message: string } };
 
 /** A folder of projects. `default` is the service's own folder, always listed. */
-export type WorkspaceInfo = { id: string; name: string; path: string; default: boolean; available: boolean };
+/** `filter` is what the sidebar shows of the workspace: a project's ID, `LOOSE_PROJECT_ID`, or null for everything. */
+export type WorkspaceInfo = { id: string; name: string; path: string; default: boolean; available: boolean; filter: string | null };
 export type WorkspaceListing = { activeId: string; workspaces: WorkspaceInfo[] };
 export type FolderListing = { path: string; parent: string | null; home: string; folders: Array<{ name: string; path: string }>; projects: number; crumbs: Array<{ name: string; path: string }> };
 
@@ -120,8 +122,9 @@ export type RunSummary = {
 };
 
 export function configFromPage(): ClientConfig {
-  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? (window as Window & { pasoDesktop?: DesktopBridge }).pasoDesktop?.token ?? '';
-  return { baseUrl: window.location.origin, token };
+  const desktop = (window as Window & { pasoDesktop?: DesktopBridge }).pasoDesktop;
+  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? desktop?.token ?? '';
+  return { baseUrl: window.location.origin, token, ...(desktop?.events ? { eventsUrl: desktop.events } : {}) };
 }
 
 export class ApiClient {
@@ -179,6 +182,8 @@ export class ApiClient {
   activateWorkspace(id: string) { return this.request<WorkspaceListing>('/workspaces/active', { method: 'PUT', body: { id } }); }
   /** Takes a workspace off the list. Its folder and files stay. */
   removeWorkspace(id: string) { return this.request<void>(`/workspaces/${encodeURIComponent(id)}`, { method: 'DELETE' }); }
+  /** Remembers what the sidebar shows of a workspace. */
+  setWorkspaceFilter(id: string, filter: string | null) { return this.request<WorkspaceListing>(`/workspaces/${encodeURIComponent(id)}/filter`, { method: 'PUT', body: { filter } }); }
   revealWorkspace(id: string) { return this.request<void>(`/workspaces/${encodeURIComponent(id)}/reveal`, { method: 'POST' }); }
   /** The folder explorer: folder names only. With no path it starts in the person's home folder. */
   listFolders(path?: string) { return this.request<FolderListing>(`/folders${path ? `?path=${encodeURIComponent(path)}` : ''}`); }
@@ -309,6 +314,6 @@ export class ApiClient {
 
   /** WebSocket URL and subprotocols. The token never goes in the URL. */
   eventsTarget() {
-    return { url: `${this.config.baseUrl.replace(/^http/, 'ws')}/api/events`, protocols: ['paso', `paso-token.${this.config.token}`] };
+    return { url: this.config.eventsUrl ?? `${this.config.baseUrl.replace(/^http/, 'ws')}/api/events`, protocols: ['paso', `paso-token.${this.config.token}`] };
   }
 }

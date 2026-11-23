@@ -8,6 +8,7 @@ import { brandFaviconHref } from '@paso/shared';
 const require = createRequire(import.meta.url);
 const webPort = Number(process.env.PASO_WEB_PORT ?? 5173);
 const servicePort = Number(process.env.PASO_PORT ?? 3001);
+const desktopDev = process.env.PASO_DESKTOP_DEV === '1';
 const fonts = join(dirname(require.resolve('@excalidraw/excalidraw')), 'fonts');
 
 export default defineConfig(({ command }) => ({
@@ -73,13 +74,15 @@ export default defineConfig(({ command }) => ({
     },
     transformIndexHtml() {
       const token = process.env.PASO_SESSION_TOKEN;
-      if (command !== 'serve' || process.env.PASO_DESKTOP_DEV === '1') return [];
+      if (command !== 'serve' || desktopDev) return [];
       if (!token || !/^[A-Za-z0-9_-]{32,256}$/.test(token)) throw new Error('Start Paso with pnpm dev.');
       return [{ tag: 'meta', attrs: { name: 'paso-session-token', content: token }, injectTo: 'head' }];
     },
   }],
   server: {
     host: '127.0.0.1', port: webPort, strictPort: true, cors: false,
+    // In the desktop app the page is not on Vite's origin, so its HMR client is told where the socket is.
+    ...(desktopDev ? { hmr: { protocol: 'ws', host: '127.0.0.1', port: webPort, clientPort: webPort } } : {}),
     proxy: { '/api': { target: `http://127.0.0.1:${servicePort}`, changeOrigin: true, ws: true } },
   },
 }));
