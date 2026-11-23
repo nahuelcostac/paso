@@ -376,8 +376,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       className={`app${shown ? ` app--${shown}` : ''}${narrow ? ' app--narrow' : ''}`}
       style={{ '--left': `${left}px`, '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
-      {/* The black frame. In the desktop app on macOS its top holds the window's buttons and moves the window. */}
-      <div className="window-grip" aria-hidden="true" />
       <ActivityBar
         panel={shown} onPanel={togglePanel} chat={openProject ? (chatHere ? 'here' : 'studio') : 'none'}
         working={Boolean(openProject && working && shown !== 'agent')}
@@ -458,7 +456,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           />
         )}
         {row?.kind === 'ok' ? <>
-          {/* The main view: the content inside the black frame, with its rounded corners. */}
+          {/* The main view, flush with the window's edges, its left corners rounded against the black. */}
           <div className="main">{route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
             <Canvas
               key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}

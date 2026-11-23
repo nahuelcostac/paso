@@ -7,7 +7,7 @@ type WithBridge = Window & { pasoDesktop?: { windowControls?: 'mac' } };
 describe('the window buttons over the page', () => {
   afterEach(() => { delete (window as WithBridge).pasoDesktop; delete document.documentElement.dataset.windowControls; });
 
-  it("marks the page in the desktop app on macOS, so the frame's top leaves them room", () => {
+  it("marks the page in the desktop app on macOS, so the activity bar leaves them room", () => {
     (window as WithBridge).pasoDesktop = { windowControls: 'mac' };
     markWindowControls();
     expect(document.documentElement.dataset.windowControls).toBe('mac');

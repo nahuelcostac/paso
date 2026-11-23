@@ -334,6 +334,8 @@ describe('a turn as it happens', () => {
     const user = userEvent.setup();
     let panel = await openPanel();
 
+    // The panel starts with the app's icon and name, as the projects do.
+    expect(panel.querySelector('.panel-brand')).toHaveTextContent('Paso');
     // The target is the scene selected in the sidebar; the panel's head names it, and there is nothing to pick there.
     // The log starts empty.
     expect(within(panel).getByRole('log', { name: 'Conversation with the agent' })).toBeEmptyDOMElement();

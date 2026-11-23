@@ -11,6 +11,7 @@ import { AgentPicker } from './AgentPicker';
 import { ProviderIcon } from './ProviderIcon';
 import { Dialog } from './Dialog';
 import { Popover } from './Popover';
+import { Brand } from './Brand';
 import { pad } from './StepFrame';
 import '../styles/agent.css';
 
@@ -308,6 +309,8 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
       id="agent-panel" className="agent" aria-label="Agent" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
     >
+      {/* The app's icon and name, as at the top of the projects: the panel in the left spot always starts with them. */}
+      <div className="panel-brand"><Brand /></div>
       <div className="agent__head">
         {/* What the agent works on: the scene selected in the sidebar. There is nothing to pick here. */}
         <h2 className="agent__target" title={`${projectName} · ${targetScene ? targetScene.name : 'The whole project'}`}>

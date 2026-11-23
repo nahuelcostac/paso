@@ -55,12 +55,12 @@ describe('the chat width', () => {
     await user.keyboard('{Home}');
     expect(now()).toBe(320);
     await user.keyboard('{End}');
-    expect(now()).toBe(720);   // 1440 - 60 frame - 440 board leaves 940: the cap wins
+    expect(now()).toBe(720);   // 1440 - 52 bar - 440 board leaves 948: the cap wins
     cleanup();
     window.innerWidth = 1000;
     render(<Chat />);
-    expect(handle()).toHaveAttribute('aria-valuemax', '500');   // 1000 - 52 bar - 8 frame - 440 board
-    expect(now()).toBe(500);   // the remembered 720 shows narrower, and is not forgotten
+    expect(handle()).toHaveAttribute('aria-valuemax', '508');   // 1000 - 52 bar - 440 board
+    expect(now()).toBe(508);   // the remembered 720 shows narrower, and is not forgotten
     cleanup();
     window.innerWidth = 1440;
     render(<Chat />);

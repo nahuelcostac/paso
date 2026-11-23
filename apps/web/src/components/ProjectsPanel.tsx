@@ -313,10 +313,8 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
 
   return (
     <aside id="projects-panel" className="projects" aria-label="Projects and diagrams" aria-busy={switching || undefined} data-dragging={drag ? 'true' : undefined}>
-      <div className="projects__head">
-        {/* The window's buttons (in the desktop app) and the sidebar's toggle sit before the mark, over the head. */}
-        <Brand />
-      </div>
+      {/* The app's icon and name, right after the window's buttons in the desktop app, which sit on the bar beside it. */}
+      <div className="panel-brand"><Brand /></div>
 
       <div className="projects__nav">
         <button
