@@ -9,7 +9,7 @@ export const AGENT_WIDTH = { initial: 360, min: 320, max: 720 } as const;
 export const FOLDED = 16;
 /** What the overview keeps beside the chat: the room for its cards. The chat is only in the overview. */
 export const BOARD_MIN = { storyboard: 440 } as const;
-/** The activity bar width with a panel open, as set on the root in tokens.css. */
+/** The fixed activity bar width, as set on the root in tokens.css. */
 export function barWidth() {
   const value = typeof document === 'undefined' ? NaN : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-w'));
   return Number.isFinite(value) && value > 0 ? value : 52;

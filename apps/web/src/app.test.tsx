@@ -495,7 +495,7 @@ describe('the board and its overview', () => {
     expect((await readProject('one')).sceneIds).toEqual(['s1']);
   });
 
-  it('compacts the activity bar with no panel open and remembers the panel selection', async () => {
+  it('switches panels from the activity bar and remembers the panel selection', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera']);
@@ -586,6 +586,40 @@ describe('the board and its overview', () => {
     render(<App config={config} />);
     expect(await screen.findByRole('complementary', { name: 'Agent' }, patience)).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+  });
+
+  it('toggles the sidebar independently of the view and reopens the last available panel', async () => {
+    const user = userEvent.setup();
+    await seed('Uno', 'one');
+    await scenes('one', ['Primera']);
+    window.location.hash = '#/one/canvas/s1/s1t1';
+    const { unmount } = render(<App config={config} />);
+    await screen.findByRole('main', { name: 'Canvas' }, patience);
+    const toggle = screen.getByRole('button', { name: 'Hide sidebar' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls', 'projects-panel');
+    await user.click(toggle);
+    expect(toggle).toHaveAccessibleName('Show sidebar');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).not.toHaveAttribute('aria-controls');
+    expect(toggle).toHaveFocus();
+    expect(screen.getByRole('main', { name: 'Canvas' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
+
+    await user.click(within(bar()).getByRole('button', { name: 'Studio' }));
+    await screen.findByRole('complementary', { name: 'Agent' }, patience);
+    expect(toggle).toHaveAttribute('aria-controls', 'agent-panel');
+    await user.click(toggle);
+    expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+
+    unmount();
+    render(<App config={config} />);
+    await screen.findByRole('main', { name: 'Studio' }, patience);
+    await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
+    expect(await screen.findByRole('complementary', { name: 'Agent' }, patience)).toBeInTheDocument();
   });
 
   it('moves through the activity bar with the keyboard and keeps one tab stop', async () => {

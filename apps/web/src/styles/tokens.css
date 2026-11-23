@@ -27,7 +27,8 @@
 }
 
 :root {
-  color-scheme: light dark;
+  --theme-scheme: light dark;
+  color-scheme: var(--theme-scheme);
 
   /* ------------------------------------------------------------------ colour
      Each pair is light-dark(light, dark). Use the names, never raw values. */
@@ -148,9 +149,10 @@
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
   --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
   --window-controls-w: 0px; /* the window's own buttons, at the top of the activity bar: none in a browser */
-  --bar-w: 52px; /* the activity bar beside an open panel; Splitter reads this width */
-  --bar-top: 40px; /* the row for the app mark and, on macOS, the window controls */
+  --bar-w: 52px; /* the fixed activity bar; Splitter reads this width */
+  --bar-top: 40px; /* the row for the sidebar toggle, app mark and macOS window controls */
   --bar-top-gap: 0px;
+  --sidebar-toggle-inset: calc(var(--control-h-sm) + 2 * var(--space-2));
   --panel-mark-size: 18px;
   --bar-button: 40px; /* its round buttons, 20px icons */
   --carousel-h: 108px;
@@ -192,7 +194,7 @@
 /* The native buttons are 14px high and start 14px from the top. Keep the app mark at their size and centre. */
 :root[data-window-controls='mac'] {
   --window-controls-w: 80px;
-  --bar-w: 80px;
+  --bar-w: var(--window-controls-w);
   --bar-top: 42px;
   --bar-top-gap: var(--space-2);
   --panel-mark-size: 14px;
@@ -201,10 +203,10 @@
 /* Non-colour theme values cannot use light-dark(). This filter is Excalidraw's own
    dark-mode filter, so a thumbnail always matches the canvas it came from. */
 :root[data-theme='light'] {
-  color-scheme: light;
+  --theme-scheme: light;
 }
 :root[data-theme='dark'] {
-  color-scheme: dark;
+  --theme-scheme: dark;
   --thumb-filter: invert(93%) hue-rotate(180deg);
 }
 @media (prefers-color-scheme: dark) {

@@ -27,14 +27,12 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 /* The window: the activity bar down its left edge and the panel in the left spot (the projects or the agent's chat),
    black, then the main view. App sets --left to the docked panel's width. */
 .app {
+  --window-header-bg: var(--page);
   display: grid; height: 100%;
   grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr);
   background: var(--bar);
 }
-.app--folded {
-  --bar-w: 44px;
-  --bar-button: var(--control-h-lg);
-}
+.app[data-view='canvas'] { --window-header-bg: var(--paper); }
 .shell {
   grid-column: 2; grid-row: 1; position: relative; display: grid; min-width: 0; min-height: 0;
   grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr);
@@ -133,20 +131,16 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .settings-menu__swatch[aria-disabled='true'] > span { opacity: var(--disabled-opacity); }
 /* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
 .canvas--editor .excalidraw .main-menu-trigger { display: none; }
-/* Extend the black rail just far enough to cover the native buttons. */
-:root[data-window-controls='mac'] .app--folded {
-  --window-controls-overhang: calc(var(--window-controls-w) - var(--bar-w));
+/* The native buttons and the panel header share the workspace colour. The first row also moves the window. */
+:root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand {
+  background: linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top));
+  -webkit-app-region: drag;
 }
-:root[data-window-controls='mac'] .app--folded::before {
-  content: ''; position: fixed; z-index: 8; top: 0; left: 0;
-  width: var(--window-controls-w); height: var(--bar-top); background: var(--bar); -webkit-app-region: drag;
-  border-bottom-right-radius: var(--radius-md);
+:root[data-window-controls='mac'] .panel-brand { color-scheme: var(--theme-scheme); color: var(--ink); }
+:root[data-window-controls='mac'] .main {
+  border-image: linear-gradient(var(--window-header-bg) var(--bar-top), var(--bar-line) var(--bar-top)) 1;
 }
-/* The shape properties sit just below the native controls. */
-:root[data-window-controls='mac'] .app--folded .canvas--editor .excalidraw .selected-shape-actions { margin-top: var(--space-2); }
-/* The black around the open panel's mark and the native buttons also moves the window. */
-:root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand { -webkit-app-region: drag; }
-:root[data-window-controls='mac'] .activity-bar__button { -webkit-app-region: no-drag; }
+:root[data-window-controls='mac'] .activity-bar__button, :root[data-window-controls='mac'] .sidebar-toggle { -webkit-app-region: no-drag; }
 
 /* The agent at work with its panel folded: a floating pill at the foot of the Studio, by the chat's tab, with a pink
    pulse, the step it is changing as a pink chip, and Stop. */
@@ -167,11 +161,11 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .brand__tile { fill: var(--ink); }
 .brand__step { fill: none; stroke: var(--on-ink); }
 .brand__name { font-size: 21px; font-weight: var(--weight-bold); letter-spacing: -0.04em; line-height: 1; }
-/* Centre the mark above the Search icon. On macOS the mark shares its row with the window controls. */
+/* The mark starts after the sidebar toggle. On macOS it shares the native buttons' centre line. */
 .panel-brand {
   flex: none; display: flex; align-items: center; cursor: default;
   height: calc(var(--bar-top) + var(--bar-top-gap));
-  padding: 0 var(--space-3) var(--bar-top-gap) calc(var(--space-2) + 10px + (var(--icon) - var(--panel-mark-size)) / 2);
+  padding: 0 var(--space-3) var(--bar-top-gap) var(--sidebar-toggle-inset);
 }
 .panel-brand .brand { gap: var(--space-2); }
 .panel-brand .brand__mark { width: var(--panel-mark-size); height: var(--panel-mark-size); }
@@ -203,6 +197,16 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger-ink) 14%, var(--surface)); }
 .icon-btn { display: inline-grid; place-items: center; width: var(--control-h); height: var(--control-h); border-radius: var(--radius-md); color: var(--ink-3); flex: none; }
 .icon-btn:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
+.sidebar-toggle {
+  position: absolute; z-index: 16; left: var(--space-2); top: calc((var(--bar-top) - var(--control-h-sm)) / 2);
+  width: var(--control-h-sm); height: var(--control-h-sm); background: var(--surface); color: var(--ink-2);
+}
+:root[data-window-controls='mac'] .sidebar-toggle { --surface: var(--window-header-bg); }
+:root:not([data-window-controls='mac']) .sidebar-toggle[aria-expanded='true'] {
+  --focus-ring: 0 0 0 2px var(--bar), 0 0 0 4px var(--bar-focus);
+  background: transparent; color: var(--bar-ink);
+}
+:root:not([data-window-controls='mac']) .sidebar-toggle[aria-expanded='true']:hover { background: var(--bar-hover); color: var(--bar-ink-active); }
 
 /* Sidebar: the projects, laid out like tldraw's. A paper column docked to the left, the full height of the window, with
    the mark at its head; the header runs beside it. On a narrow window it opens over the content instead. */
@@ -458,7 +462,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* The Canvas fills everything right of the sidebar, edge to edge: the canvas, then its step strip. No card, no gutter. */
 .canvas-page { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
 .editor-notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--danger-soft); color: var(--ink); border-bottom: var(--border); }
-:root[data-window-controls='mac'] .app--folded .editor-notice { padding-left: calc(var(--window-controls-overhang) + var(--space-4)); }
+.app--folded .editor-notice { padding-left: var(--sidebar-toggle-inset); }
 .editor-notice .btn { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-sm); }
 .canvas--editor > .canvas__placeholder { height: 100%; justify-content: center; padding: var(--space-5); }
 .canvas--editor { display: block; padding: 0; flex: 1; min-height: 320px; overflow: auto; }
@@ -477,7 +481,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* A narrower window: the board's padding shrinks before anything else does. */
 @media (max-width: 1099px) {
   .board { padding: var(--space-6) var(--space-5) var(--space-7); }
-  :root[data-window-controls='mac'] .app--folded .board { padding-left: calc(var(--window-controls-overhang) + var(--space-2)); }
+  .app--folded .board { padding-left: var(--sidebar-toggle-inset); }
 }
 
 

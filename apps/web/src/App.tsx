@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { PanelLeft } from 'lucide-react';
 import { LOOSE_PROJECT_ID, isLooseProject } from '@paso/shared';
 import { ApiRequestError, UnavailableError } from './lib/api';
 import { ApiClient, type ClientConfig } from './lib/api';
@@ -44,10 +45,11 @@ function useMediaQuery(query: string) {
 }
 
 const SIDE_KEY = 'paso.side-panel';
+const LAST_SIDE_KEY = 'paso.last-side-panel';
 /** The panel left open in the left spot, remembered in this browser (and in the desktop app, whose origin stays). */
-function storedSide(): SidePanel | null {
+function storedSide(key = SIDE_KEY): SidePanel | null {
   try {
-    const value = window.localStorage.getItem(SIDE_KEY);
+    const value = window.localStorage.getItem(key);
     return value === 'agent' ? 'agent' : value === 'none' ? null : 'projects';
   } catch { return 'projects'; }
 }
@@ -59,18 +61,25 @@ function storedSide(): SidePanel | null {
  */
 function useSidePanel(narrow: boolean) {
   const [side, setSide] = useState<SidePanel | null>(() => narrow ? null : storedSide());
+  const [lastSide, setLastSide] = useState<SidePanel>(() => side ?? storedSide() ?? storedSide(LAST_SIDE_KEY) ?? 'projects');
   const crossed = useRef(narrow);
   useEffect(() => {
     if (crossed.current === narrow) return;
     crossed.current = narrow;
-    setSide(narrow ? null : storedSide());
+    const restored = narrow ? null : storedSide();
+    setSide(restored);
+    if (!narrow) setLastSide(restored ?? storedSide(LAST_SIDE_KEY) ?? 'projects');
   }, [narrow]);
   const choose = useCallback((next: SidePanel | null) => {
     setSide(next);
+    if (next) setLastSide(next);
     if (window.matchMedia(NARROW).matches) return;
-    try { window.localStorage.setItem(SIDE_KEY, next ?? 'none'); } catch { /* a convenience: it just won't be remembered */ }
+    try {
+      window.localStorage.setItem(SIDE_KEY, next ?? 'none');
+      if (next) window.localStorage.setItem(LAST_SIDE_KEY, next);
+    } catch { /* a convenience: it just won't be remembered */ }
   }, []);
-  return [side, choose] as const;
+  return { side, lastSide, chooseSide: choose };
 }
 
 /** `recovery` is where unsaved drafts are kept. It is the browser's IndexedDB unless a host or a test supplies another. */
@@ -99,9 +108,10 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   useSyncExternalStore(steps.subscribe, steps.getSnapshot);
   const [route, navigate] = useRoute();
   const [creating, setCreating] = useState(false);
+  const agentOpener = useRef<HTMLButtonElement>(null);
   // Under this the panel in the left spot opens over the content, as a drawer.
   const narrow = useMediaQuery(NARROW);
-  const [side, chooseSide] = useSidePanel(narrow);
+  const { side, lastSide, chooseSide } = useSidePanel(narrow);
   const boardMin = BOARD_MIN.storyboard;
   const overview = route.view === 'storyboard';
   // Each panel's width, which the person drags, remembered apart.
@@ -321,7 +331,16 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram, which has no Studio. Both
   // take the left spot, one at a time; on a project's Canvas the chat is not there, and the spot shows nothing for it.
   const chatHere = overview || plainLoose;
-  const shown = side === 'agent' && !(openProject && chatHere) ? null : side;
+  const canShowAgent = Boolean(openProject && chatHere);
+  const shown = side === 'agent' && !canShowAgent ? null : side;
+  const sidebarLabel = shown ? 'Hide sidebar' : 'Show sidebar';
+  const toggleSidebar = (event: MouseEvent<HTMLButtonElement>) => {
+    if (shown) chooseSide(null);
+    else if (lastSide === 'agent' && canShowAgent) {
+      agentOpener.current = event.currentTarget;
+      chooseSide('agent');
+    } else chooseSide('projects');
+  };
   const docked = narrow ? null : shown;
   const left = docked === 'projects' ? projectsWidth.width : docked === 'agent' ? agentWidth.width : 0;
   /** A drawer steps aside once something is chosen in it. Docked, the panel stays. */
@@ -362,9 +381,10 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const hideAgent = () => {
     chooseSide(null);
     // Focus goes back to the button that opened it.
-    document.querySelector<HTMLElement>('.activity-bar__button[data-id="studio"]')?.focus();
+    (agentOpener.current ?? document.querySelector<HTMLButtonElement>('.activity-bar__button[data-id="studio"]'))?.focus();
   };
   const toggleStudio = () => {
+    agentOpener.current = null;
     if (plainLoose) {
       chooseSide(shown === 'agent' ? null : 'agent');
       return;
@@ -387,6 +407,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   return (
     <div
       className={`app app--${shown ?? 'folded'}${narrow ? ' app--narrow' : ''}`}
+      data-view={openProject ? route.view : undefined}
       style={{ '--left': `${left}px`, '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
       <ActivityBar
@@ -398,6 +419,13 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         workspace={(stop) => <WorkspaceSwitcher api={api} store={store} state={state} onSwitchWorkspace={switchWorkspace} onNotice={setWorkspaceNotice} {...stop} />}
       />
       <div className="shell">
+        <button
+          type="button" className="icon-btn sidebar-toggle" aria-label={sidebarLabel} title={sidebarLabel}
+          aria-expanded={shown !== null} aria-controls={shown ? `${shown}-panel` : undefined}
+          onClick={toggleSidebar}
+        >
+          <PanelLeft className="i" aria-hidden="true" />
+        </button>
         {/* The docked panel's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
         {docked && <Splitter
           key={docked} side="left" open onToggle={() => chooseSide(null)}

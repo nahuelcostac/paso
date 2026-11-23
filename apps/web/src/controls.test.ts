@@ -43,20 +43,19 @@ describe('controls measured from T3 Code', () => {
   });
 });
 
-describe('folded activity bar', () => {
-  it('keeps the black space behind the macOS window buttons within the top-left corner', async () => {
+describe('fixed activity bar', () => {
+  it('fits the macOS window buttons and centres the sidebar toggle beside the bar', async () => {
     const app = await css('app.css');
     const tokens = await css('tokens.css');
     const mac = ":root[data-window-controls='mac']";
-    const macFolded = `${mac} .app--folded`;
     expect(rule(tokens, mac)).toContain('--bar-top: 42px');
     expect(rule(tokens, mac)).toContain('--window-controls-w: 80px');
+    expect(rule(tokens, mac)).toContain('--bar-w: var(--window-controls-w)');
     expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr)');
-    expect(rule(app, '.app--folded')).toContain('--bar-w: 44px');
-    expect(rule(app, macFolded)).not.toContain('grid-template');
-    const corner = rule(app, `${macFolded}::before`);
-    expect(corner).toContain('position: fixed; z-index: 8; top: 0; left: 0');
-    expect(corner).toContain('width: var(--window-controls-w); height: var(--bar-top); background: var(--bar); -webkit-app-region: drag');
-    expect(corner).toContain('border-bottom-right-radius: var(--radius-md)');
+    expect(app).not.toContain('--bar-w:');
+    expect(rule(app, '.sidebar-toggle')).toContain('top: calc((var(--bar-top) - var(--control-h-sm)) / 2)');
+    expect(rule(app, '.app')).toContain('--window-header-bg: var(--page)');
+    expect(rule(app, ".app[data-view='canvas']")).toContain('--window-header-bg: var(--paper)');
+    expect(rule(app, `${mac} .activity-bar, ${mac} .panel-brand`)).toContain('linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top))');
   });
 });

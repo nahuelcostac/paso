@@ -145,6 +145,7 @@ beforeEach(async () => {
 
   window.history.replaceState(null, '', '#/p/storyboard');
   window.localStorage.removeItem('paso.side-panel');
+  window.localStorage.removeItem('paso.last-side-panel');
   window.matchMedia = ((query: string) => ({
     matches: false, media: query, addEventListener() {}, removeEventListener() {},
   })) as unknown as typeof window.matchMedia;
@@ -707,7 +708,7 @@ describe('narrow windows', () => {
     const panel = await screen.findByRole('complementary', { name: 'Agent', hidden: true }, patience);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(panel).not.toHaveAttribute('data-open');
-    // A drawer does not dock: there is no edge to drag, only the bar's button.
+    // A drawer does not dock and has no edge to drag.
     expect(screen.queryByRole('separator', { name: 'Chat width' })).not.toBeInTheDocument();
 
     await user.click(toggle);
@@ -726,5 +727,14 @@ describe('narrow windows', () => {
     const status = await screen.findByRole('status', { name: 'Agent working' }, patience);
     await user.click(within(status).getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument(), patience);
+
+    const sidebarToggle = screen.getByRole('button', { name: 'Show sidebar' });
+    await user.click(sidebarToggle);
+    expect(panel).toHaveAttribute('data-open', 'true');
+    expect(within(panel).getByRole('textbox', { name: 'Message to the agent' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(panel).not.toHaveAttribute('data-open');
+    expect(sidebarToggle).toHaveFocus();
+    expect(window.localStorage.getItem('paso.last-side-panel')).toBeNull();
   });
 });
