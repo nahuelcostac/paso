@@ -180,8 +180,8 @@ describe('agent message drafts', () => {
     await user.type(input(), 'Borrador uno');
     panel = await pickScene(user, 'Scene 2: Partir en dos');
     expect(input()).toHaveValue('Borrador uno');
-    // The Studio's button again goes back to the Canvas, where the chat is not; once more, and the chat is back.
-    await user.click(screen.getByRole('button', { name: 'Studio' }));
+    // Diagram opens the Canvas. Studio opens the chat again with its draft.
+    await user.click(screen.getByRole('button', { name: 'Diagram' }));
     expect(await screen.findByRole('main', { name: 'Canvas' }, patience)).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Studio' }, patience));
@@ -423,7 +423,7 @@ describe('a turn as it happens', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveAttribute('aria-controls', 'agent-panel');
     expect(toggle.querySelector('.activity-bar__badge')).toBeNull();
-    await user.click(toggle);
+    await user.click(screen.getByRole('button', { name: 'Diagram' }));
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');

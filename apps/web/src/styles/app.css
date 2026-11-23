@@ -86,7 +86,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
 .main > * { grid-column: 1; grid-row: 1; }
 
-/* A single outline groups the activity buttons, with Projects and Studio at the top. */
+/* A single outline groups the activity buttons, with Projects, Diagram and Studio at the top. */
 .activity-bar {
   --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--bar-focus);
   grid-column: 1; grid-row: 1; display: flex; flex-direction: column; align-items: center;
@@ -107,7 +107,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .activity-bar__button[aria-expanded='true'], .activity-bar__button[aria-pressed='true'] { background: var(--bar-active); color: var(--bar-ink-active); }
 .activity-bar__button:active:not([aria-haspopup]) { scale: 0.95; }
 /* The agent works while its chat is out of view: a pink dot, the agent's mark, on its button. */
-.activity-bar__badge { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--panel-bg); }
+.activity-bar__badge { position: absolute; top: var(--space-1); right: var(--space-1); width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--panel-bg); }
 /* The gear's menu: what Excalidraw's main menu held, beside the gear. */
 .popover.settings-menu { width: 264px; max-width: calc(100vw - 16px); }
 .settings-menu hr { margin: var(--space-1) var(--space-2); border: 0; border-top: var(--border); }
@@ -201,7 +201,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .icon-btn { display: inline-grid; place-items: center; width: var(--control-h); height: var(--control-h); border-radius: var(--radius-md); color: var(--ink-3); flex: none; }
 .icon-btn:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
 .sidebar-toggle {
-  position: absolute; z-index: 16; left: var(--space-2); top: calc((var(--bar-top) - var(--control-h-sm)) / 2);
+  position: absolute; z-index: 16; left: var(--sidebar-toggle-start); top: calc((var(--bar-top) - var(--control-h-sm)) / 2);
   width: var(--control-h-sm); height: var(--control-h-sm); background: var(--surface); color: var(--ink-2);
 }
 :root[data-window-controls='mac'] .sidebar-toggle { --surface: var(--window-header-bg); }
@@ -429,14 +429,17 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* The Studio is the white workspace: its cards and lines take the --work-* layer, while the panels around it keep the
    chrome's grey. Tokens that are built from others are rebuilt here, or they would keep the chrome's values. */
 .board {
+  --board-inline-padding: 56px;
   --surface: var(--work-surface); --surface-sunken: var(--work-sunken); --surface-hover: var(--work-hover);
   --line: var(--work-line); --line-strong: var(--work-line-strong);
   --border: 1px solid var(--line); --focus-ring: 0 0 0 2px var(--surface), 0 0 0 5px var(--focus);
-  position: relative; overflow: hidden auto; min-width: 0; padding: 44px 56px var(--space-7);
+  position: relative; overflow: hidden auto; min-width: 0; padding: 44px var(--board-inline-padding) var(--space-7);
   /* A thin thumb with no track: a grey track would sit as a stripe against the chat's card. */
   scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
 }
 .board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: 180px; }
+/* Keep notices and the title clear of the toggle when it sits over the board. */
+.app--folded .board { padding-left: max(var(--board-inline-padding), var(--sidebar-toggle-inset)); }
 /* In the Studio the corner scrolls with the page, and the title keeps clear of it. */
 .board__corner { z-index: 2; }
 .board__head { display: flex; padding-right: 180px; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
@@ -479,8 +482,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .app--narrow .projects-scrim { display: block; position: fixed; z-index: 14; inset: 0 0 0 var(--bar-w); background: var(--scrim); }
 /* A narrower window: the board's padding shrinks before anything else does. */
 @media (max-width: 1099px) {
-  .board { padding: var(--space-6) var(--space-5) var(--space-7); }
-  .app--folded .board { padding-left: var(--sidebar-toggle-inset); }
+  .board { --board-inline-padding: var(--space-5); padding-top: var(--space-6); }
 }
 
 

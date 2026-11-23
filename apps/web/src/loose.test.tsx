@@ -556,7 +556,7 @@ describe('the step strip of a loose diagram', () => {
     expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();
   });
 
-  it('uses Studio to open and close chat beside the Canvas of a one-step diagram', async () => {
+  it('opens Studio and the Canvas separately for a one-step diagram', async () => {
     await seedLoose('d', 'Pizarra');
     window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     const { unmount } = render(<App config={config} recovery={memory()} />);
@@ -566,21 +566,24 @@ describe('the step strip of a loose diagram', () => {
     const user = userEvent.setup();
     const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
     const studio = within(bar).getByRole('button', { name: 'Studio' });
+    const diagram = within(bar).getByRole('button', { name: 'Diagram' });
     expect(studio).toHaveAttribute('aria-expanded', 'false');
-    expect(studio).not.toHaveAttribute('aria-pressed');
+    expect(studio).toHaveAttribute('aria-pressed', 'false');
     await user.click(studio);
+    const overview = await screen.findByRole('main', { name: 'Studio' }, patience);
     expect(await screen.findByRole('textbox', { name: /agent/i }, patience)).toBeInTheDocument();
     expect(studio).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('canvas')).toBeInTheDocument();
-    await user.click(studio);
-    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
-    expect(studio).toHaveAttribute('aria-expanded', 'false');
+    expect(studio).toHaveAttribute('aria-pressed', 'true');
+    expect(await within(overview).findByRole('button', { name: /^Step 1/ }, patience)).toBeInTheDocument();
+    await user.click(diagram);
+    expect(await screen.findByTestId('canvas', {}, patience)).toBeInTheDocument();
+    expect(diagram).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('complementary', { name: 'Agent' })).toBeInTheDocument();
     expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0');
     unmount();
-    // The Studio has nothing to show for it: an old address lands on the Canvas.
     window.history.replaceState(null, '', '#/_loose/storyboard/d/d-step-0');
     render(<App config={config} recovery={memory()} />);
-    await waitFor(() => expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0'), patience);
+    expect(await screen.findByRole('main', { name: 'Studio' }, patience)).toBeInTheDocument();
   });
 
   it('shows the strip from the start when the diagram has several steps', async () => {

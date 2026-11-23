@@ -127,7 +127,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // A loose diagram opens like a project with one scene: the reserved project, limited to that scene, under its name.
   const looseOpen = isLooseProject(route.projectId);
   const looseDiagram = looseOpen ? state.loose?.diagrams.find((diagram) => diagram.id === route.sceneId) : undefined;
-  // A loose diagram with one step is a plain whiteboard: no step overview, no Present. Its agent sits beside the Canvas.
+  // A loose diagram with at most one step can also show its agent beside the Canvas.
   const plainLoose = Boolean(looseDiagram && looseDiagram.steps <= 1);
   const looseRow = useMemo((): ProjectRow | undefined => state.loose && looseDiagram ? {
     kind: 'ok', id: LOOSE_PROJECT_ID, project: { ...state.loose.project, name: looseDiagram.scene.name },
@@ -328,7 +328,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     }
   };
 
-  // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram, which has no Studio. Both
+  // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram. Both
   // take the left spot, one at a time; on a project's Canvas the chat is not there, and the spot shows nothing for it.
   const chatHere = overview || plainLoose;
   const canShowAgent = Boolean(openProject && chatHere);
@@ -345,9 +345,6 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const left = docked === 'projects' ? projectsWidth.width : docked === 'agent' ? agentWidth.width : 0;
   /** A drawer steps aside once something is chosen in it. Docked, the panel stays. */
   const closeDrawer = () => { if (window.matchMedia(NARROW).matches) chooseSide(null); };
-  useEffect(() => {
-    if (plainLoose && overview) navigate({ ...routeRef.current, view: 'canvas' }, { replace: true });
-  }, [plainLoose, overview, navigate]);
   // The agent's marks on steps and its notice in the top bar follow the open project in both views.
   useEffect(() => { if (openProject) void agentStore.openProject(openProject.id); }, [agentStore, openProject?.id]);
   const sceneDocuments = useMemo(() => scenes?.map((item) => item.document) ?? [], [scenes]);
@@ -383,16 +380,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     // Focus goes back to the button that opened it.
     (agentOpener.current ?? document.querySelector<HTMLButtonElement>('.activity-bar__button[data-id="studio"]'))?.focus();
   };
-  const toggleStudio = () => {
+  const openStudio = () => {
     agentOpener.current = null;
-    if (plainLoose) {
-      chooseSide(shown === 'agent' ? null : 'agent');
-      return;
-    }
-    if (overview && shown === 'agent') {
-      navigate({ ...routeRef.current, view: 'canvas' });
-      return;
-    }
     chooseSide('agent');
     if (!overview) navigate({ ...routeRef.current, view: 'storyboard' });
   };
@@ -413,8 +402,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       <ActivityBar
         panel={shown} onProjects={() => chooseSide(shown === 'projects' ? null : 'projects')}
         working={Boolean(openProject && working && shown !== 'agent')}
-        studio={openProject ? (plainLoose ? 'whiteboard' : overview ? 'overview' : 'canvas') : undefined}
-        onStudio={toggleStudio}
+        view={openProject ? route.view : undefined}
+        onDiagram={() => navigate({ ...routeRef.current, view: 'canvas' })}
+        onStudio={openStudio}
         canvasMenu={canvasMenu}
         workspace={(stop) => <WorkspaceSwitcher api={api} store={store} state={state} onSwitchWorkspace={switchWorkspace} onNotice={setWorkspaceNotice} {...stop} />}
       />

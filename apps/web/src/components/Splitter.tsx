@@ -12,7 +12,7 @@ export const BOARD_MIN = { storyboard: 440 } as const;
 /** The fixed activity bar width, as set on the root in tokens.css. */
 export function barWidth() {
   const value = typeof document === 'undefined' ? NaN : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-w'));
-  return Number.isFinite(value) && value > 0 ? value : 52;
+  return Number.isFinite(value) && value > 0 ? value : 44;
 }
 const STEP = 16;
 /** A drag this far past the narrowest width folds the side; dragging a folded side out by `OPEN_AT` unfolds it. */

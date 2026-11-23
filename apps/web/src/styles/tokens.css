@@ -94,7 +94,7 @@
   --focus: light-dark(#71717a, #a1a1aa); /* a grey that reaches 3:1 on every layer */
 
   /* The sidebar follows the theme. Its activity buttons share an outline and use solid ink when selected. */
-  --bar: var(--surface);
+  --bar: var(--panel-bg);
   --bar-ink: var(--ink);
   --bar-ink-active: light-dark(#ffffff, #f4f4f5);
   --bar-hover: var(--surface-hover);
@@ -142,12 +142,13 @@
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
   --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
   --window-controls-w: 0px; /* the window's own buttons, at the top of the activity bar: none in a browser */
-  --bar-w: 52px; /* the fixed activity bar; Splitter reads this width */
+  --bar-w: 44px; /* the fixed activity bar; Splitter reads this width */
   --bar-top: 40px; /* the row for the sidebar toggle, app mark and macOS window controls */
   --bar-top-gap: 0px;
-  --sidebar-toggle-inset: calc(var(--control-h-sm) + 2 * var(--space-2));
+  --sidebar-toggle-start: calc(max(0px, var(--window-controls-w) - var(--bar-w)) + var(--space-2));
+  --sidebar-toggle-inset: calc(var(--sidebar-toggle-start) + var(--control-h-sm) + var(--space-2));
   --panel-mark-size: 18px;
-  --bar-button: 40px; /* its round buttons, 20px icons */
+  --bar-button: var(--control-h); /* 32px buttons with 20px icons */
   --carousel-h: 108px;
   --carousel-over-bar-h: 100px; /* the strip above its bar */
   --step-bar-h: 36px; /* the bar under the strip, which stays when it is hidden */
@@ -187,7 +188,6 @@
 /* The native buttons are 14px high and start 14px from the top. Keep the app mark at their size and centre. */
 :root[data-window-controls='mac'] {
   --window-controls-w: 80px;
-  --bar-w: var(--window-controls-w);
   --bar-top: 42px;
   --bar-top-gap: var(--space-2);
   --panel-mark-size: 14px;

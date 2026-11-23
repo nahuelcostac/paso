@@ -43,7 +43,7 @@ function insertAt(order: string[], from: number, to: number) {
 
 /**
  * The Studio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
- * It opens from “Studio” in the activity bar; a step, the same button or Escape goes back to the board.
+ * Studio opens it from the activity bar. Diagram, a step or Escape goes back to the board.
  */
 export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, corner, renameStep }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);

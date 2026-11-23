@@ -50,10 +50,13 @@ describe('fixed activity bar', () => {
     const mac = ":root[data-window-controls='mac']";
     expect(rule(tokens, mac)).toContain('--bar-top: 42px');
     expect(rule(tokens, mac)).toContain('--window-controls-w: 80px');
-    expect(rule(tokens, mac)).toContain('--bar-w: var(--window-controls-w)');
+    expect(rule(tokens, ':root')).toContain('--bar-w: 44px');
+    expect(rule(tokens, ':root')).toContain('--bar: var(--panel-bg)');
+    expect(rule(tokens, mac)).not.toContain('--bar-w:');
     expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr)');
     expect(app).not.toContain('--bar-w:');
     expect(rule(app, '.sidebar-toggle')).toContain('top: calc((var(--bar-top) - var(--control-h-sm)) / 2)');
+    expect(rule(app, '.sidebar-toggle')).toContain('left: var(--sidebar-toggle-start)');
     expect(rule(app, '.app')).toContain('--window-header-bg: var(--page)');
     expect(rule(app, ".app[data-view='canvas']")).toContain('--window-header-bg: var(--paper)');
     expect(rule(app, `${mac} .activity-bar, ${mac} .panel-brand`)).toContain('linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top))');
