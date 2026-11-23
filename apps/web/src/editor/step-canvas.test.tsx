@@ -9,6 +9,7 @@ import type { ApiClient } from '../lib/api';
 import type { CanvasCamera } from './canvas-camera';
 import { LOADING_DELAY_MS } from './Loading';
 import { nextStepState } from './step-swap';
+import { createCanvasMenu } from './canvas-menu';
 import type { AppState } from '@excalidraw/excalidraw/types';
 
 /**
@@ -16,7 +17,7 @@ import type { AppState } from '@excalidraw/excalidraw/types';
  * history the way Excalidraw does: an edit can be undone, a scene set with CaptureUpdateAction.NEVER cannot, and its
  * onChange fires after every render, as Excalidraw's does after every update.
  */
-const fake = vi.hoisted(() => ({ mounts: 0, fonts: undefined as Promise<void> | undefined }));
+const fake = vi.hoisted(() => ({ mounts: 0, fonts: undefined as Promise<void> | undefined, sidebars: [] as unknown[], dialogs: [] as unknown[] }));
 vi.mock('@excalidraw/excalidraw', async () => {
   const { useEffect, useReducer, useRef } = await import('react');
   type Scene = { elements: Array<{ id: string; isDeleted?: boolean }>; appState: Record<string, unknown>; files: Record<string, unknown>; undo: Array<Array<{ id: string }>> };
@@ -37,6 +38,7 @@ vi.mock('@excalidraw/excalidraw', async () => {
         updateScene: ({ elements, appState, captureUpdate }: { elements?: Scene['elements']; appState?: Record<string, unknown>; captureUpdate?: string }) => {
           if (elements) { if (captureUpdate !== 'NEVER') live.undo.push(live.elements); live.elements = [...elements]; }
           if (appState) live.appState = { ...live.appState, ...appState };
+          if (appState?.openDialog) fake.dialogs.push(appState.openDialog);
           update();
         },
         addFiles: (files: Array<{ id: string }>) => { for (const file of files) live.files[file.id] = file; },
@@ -46,7 +48,7 @@ vi.mock('@excalidraw/excalidraw', async () => {
         getSceneElementsIncludingDeleted: () => live.elements,
         getFiles: () => live.files,
         scrollToContent: () => {},
-        toggleSidebar: () => {},
+        toggleSidebar: (which: unknown) => { fake.sidebars.push(which); },
       });
       // Excalidraw starts its scene a moment after mounting.
       const timer = setTimeout(() => { live.elements = [...initialData.elements]; live.appState = { ...live.appState, ...initialData.appState, isLoading: false }; Object.assign(live.files, initialData.files); update(); });
@@ -103,7 +105,7 @@ const drawn = () => screen.getByTestId('drawn').textContent;
 const go = (stepId: string) => act(async () => { await store.select(target(stepId)); });
 
 beforeEach(async () => {
-  fake.mounts = 0; fake.fonts = undefined; camera.current = undefined;
+  fake.mounts = 0; fake.fonts = undefined; fake.sidebars = []; fake.dialogs = []; camera.current = undefined;
   documents = new Map(ids.map((id) => [id, { document: { ...createStep({ id }), elements: [element(`${id}-shape`)] } as Step, revision: 'r0' }]));
   const drafts = new Map<string, Draft>();
   const recovery: Recovery = { read: async (key) => drafts.get(key), write: async (key, draft) => { drafts.set(key, structuredClone(draft)); }, remove: async (key) => { drafts.delete(key); } };
@@ -226,5 +228,42 @@ describe('the next step\'s app state', () => {
   });
   it('goes back to selection from the image tool, as on opening', () => {
     expect(nextStepState(restored, { ...current, activeTool: { ...current.activeTool, type: 'image' } } as unknown as AppState, { zen: false, view: false }).activeTool.type).toBe('selection');
+  });
+});
+
+describe('the gear menu in the activity bar', () => {
+  it('gets a handle on the canvas while it shows a step: grid, zen and view mode, export, library and the canvas colour', async () => {
+    const menu = createCanvasMenu();
+    function WithMenu() {
+      useSyncExternalStore(store.subscribe, store.getSnapshot);
+      return <StepCanvas api={api} store={store} session={store.current()} theme="light" keepFocus={() => false} camera={camera} menu={menu} />;
+    }
+    const { unmount } = render(<WithMenu />);
+    await waitFor(() => expect(menu.get()).toBeDefined());
+    expect(menu.get()!.modes).toEqual({ grid: false, zen: false, view: false });
+    expect(menu.get()!.background).toBe('#ffffff');
+    act(() => menu.get()!.toggle('grid'));
+    await waitFor(() => expect(menu.get()!.modes.grid).toBe(true));
+    act(() => menu.get()!.toggle('zen'));
+    await waitFor(() => expect(menu.get()!.modes).toEqual({ grid: true, zen: true, view: false }));
+    act(() => menu.get()!.toggle('zen'));
+    // The colour is the step's, saved with it.
+    act(() => menu.get()!.setBackground('#fffce8'));
+    await waitFor(() => expect(menu.get()!.background).toBe('#fffce8'));
+    await waitFor(() => expect(store.current()!.document.appState.viewBackgroundColor).toBe('#fffce8'));
+    expect(store.current()!.document.appState.gridModeEnabled).toBe(true);
+    // Excalidraw's own export dialog and its library.
+    act(() => menu.get()!.exportImage());
+    act(() => menu.get()!.toggleLibrary());
+    expect(fake.dialogs).toEqual([{ name: 'imageExport' }]);
+    expect(fake.sidebars).toEqual([{ name: 'default', tab: 'library' }]);
+    // Zen and view mode carry over to the next step; the grid and the colour are the step's own.
+    await go('s2');
+    await waitFor(() => expect(store.current()!.target.stepId).toBe('s2'));
+    await waitFor(() => expect(menu.get()!.background).toBe('#ffffff'));
+    expect(menu.get()!.modes.grid).toBe(false);
+    // Without the canvas, the menu has nothing to act on.
+    unmount();
+    expect(menu.get()).toBeUndefined();
   });
 });

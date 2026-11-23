@@ -4,13 +4,14 @@ import { createPortal } from 'react-dom';
 /**
  * Keyboard for a menu inside a popover: on open the checked item, or the first, takes focus; arrow keys,
  * Home and End move. Items marked `aria-disabled` can be reached, so their reason can be read, but not used.
+ * A menu of options rather than one choice (`start: 'first'`) opens on its first item whatever is checked.
  */
-export function useMenuKeys(list: RefObject<HTMLElement | null>) {
+export function useMenuKeys(list: RefObject<HTMLElement | null>, start: 'checked' | 'first' = 'checked') {
   const items = () => [...(list.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([disabled])') ?? [])];
   // Once, on open. The popover is placed before effects run, so its items can take focus here.
   useEffect(() => {
     const all = items();
-    (all.find((item) => item.getAttribute('aria-checked') === 'true') ?? all[0])?.focus();
+    ((start === 'checked' ? all.find((item) => item.getAttribute('aria-checked') === 'true') : undefined) ?? all[0])?.focus();
   }, []);
   return (event: KeyboardEvent<HTMLDivElement>) => {
     const keys: Record<string, number | 'first' | 'last'> = { ArrowDown: 1, ArrowUp: -1, Home: 'first', End: 'last' };
@@ -28,6 +29,8 @@ type Props = {
   onClose: () => void;
   /** Where the popover lines up with its anchor. */
   align?: 'start' | 'end';
+  /** Under the anchor (or above it, without room), or beside it on its right, ending level with its foot. */
+  side?: 'below' | 'right';
   role: 'dialog' | 'menu';
   label: string;
   className?: string;
@@ -39,7 +42,7 @@ type Props = {
  * A raised surface mounted on the body, so no panel's overflow or stacking can clip it.
  * Escape and a press outside close it and return focus to the anchor.
  */
-export function Popover({ anchor, onClose, align = 'start', role, label, className = '', children, onKeyDown }: Props) {
+export function Popover({ anchor, onClose, align = 'start', side = 'below', role, label, className = '', children, onKeyDown }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   // Placed straight on the element, before paint and before any effect: a menu that focuses its first item
@@ -51,9 +54,10 @@ export function Popover({ anchor, onClose, align = 'start', role, label, classNa
       const a = anchor.getBoundingClientRect();
       const { width, height } = element.getBoundingClientRect();
       const margin = 8;
-      const left = align === 'end' ? a.right - width : a.left;
+      let left = align === 'end' ? a.right - width : a.left;
       let top = a.bottom + 6;
-      if (top + height > window.innerHeight - margin) top = Math.max(margin, a.top - height - 6);
+      if (side === 'right') { left = a.right + margin; top = Math.max(margin, a.bottom - height); }
+      else if (top + height > window.innerHeight - margin) top = Math.max(margin, a.top - height - 6);
       const clampedLeft = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - width - margin));
       element.style.left = `${clampedLeft}px`;
       element.style.top = `${top}px`;
@@ -61,7 +65,7 @@ export function Popover({ anchor, onClose, align = 'start', role, label, classNa
     place();
     window.addEventListener('resize', place);
     return () => window.removeEventListener('resize', place);
-  }, [anchor, align]);
+  }, [anchor, align, side]);
 
   useEffect(() => {
     const press = (event: PointerEvent) => {

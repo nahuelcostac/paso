@@ -93,6 +93,16 @@
   --danger-soft: light-dark(#fdecea, #3b2323);
   --focus: light-dark(#71717a, #a1a1aa); /* a grey that reaches 3:1 on every layer */
 
+  /* The activity bar and the frame it makes around the window's content: black in both themes, as in VS Code's dark
+     bar, so the app reads as one object held in a black frame. Its icons are light greys; the open panel's icon is
+     white on a soft round highlight. The same values in both themes, on purpose. */
+  --bar: light-dark(#000000, #000000);
+  --bar-ink: light-dark(#a1a1aa, #a1a1aa); /* an icon at rest: 8:1 on the bar */
+  --bar-ink-active: light-dark(#fafafa, #fafafa); /* the open panel, the view on screen, a hovered icon */
+  --bar-hover: light-dark(#1f1f23, #1f1f23); /* the round highlight under the pointer */
+  --bar-active: light-dark(#2e2e33, #2e2e33); /* the round highlight of the open panel or the view on screen */
+  --bar-focus: light-dark(#d4d4d8, #d4d4d8); /* the focus ring on the bar: 14:1 on black */
+
   /* ---------------------------------------------------------------- typography
      Inter everywhere, numbers in tabular figures. Sizes follow T3 Code's scale (its root is 16px): text-sm (14px) for
      the interface, text-xs (12px) for meta. 12px is the minimum, except the spaced uppercase eyebrow (11px). */
@@ -102,7 +112,7 @@
   --text-11: 11px; /* eyebrow, uppercase and spaced */
   --text-12: 12px; /* meta, step numbers */
   --text-14: 14px; /* default UI: buttons, fields, menu items, sidebar rows, the agent conversation (T3 Code's text-sm) */
-  --text-15: 15px; /* the mark's name in the sidebar's head, Present's messages */
+  --text-15: 15px; /* the mark's name in the projects panel's head, Present's messages */
   --text-20: 20px; /* scene titles */
   --text-28: 28px; /* project title on the storyboard */
 
@@ -131,7 +141,12 @@
   --panel-projects: 240px;
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
   --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
-  --window-controls-w: 0px; /* the window's own buttons over the sidebar's head: none in a browser */
+  --window-controls-w: 0px; /* the window's own buttons, over the frame's top left: none in a browser */
+  --bar-w: 52px; /* the activity bar; FRAME_W in Splitter.tsx adds --frame-gap */
+  --bar-button: 40px; /* its round buttons, 20px icons */
+  --frame-gap: 8px; /* the black frame on the content's right and bottom, and its top in a browser */
+  --frame-top: var(--frame-gap); /* the frame's top: taller in the desktop app on macOS, for the window's buttons */
+  --frame-radius: 12px; /* the content's corners inside the frame */
   --carousel-h: 108px;
   --carousel-over-bar-h: 100px; /* the strip above its bar */
   --step-bar-h: 36px; /* the bar under the strip, which stays when it is hidden */
@@ -168,8 +183,9 @@
   --thumb-filter: none;
 }
 
-/* The desktop app on macOS: close, minimise and zoom sit over the sidebar's head, 16px in, and take 72px with their gap. */
-:root[data-window-controls='mac'] { --window-controls-w: 72px; }
+/* The desktop app on macOS: close, minimise and zoom sit on the frame's top left, 16px in, centred on a 40px band that
+   moves the window, and take 72px with their gap. */
+:root[data-window-controls='mac'] { --window-controls-w: 72px; --frame-top: 40px; }
 
 /* Non-colour theme values cannot use light-dark(). This filter is Excalidraw's own
    dark-mode filter, so a thumbnail always matches the canvas it came from. */

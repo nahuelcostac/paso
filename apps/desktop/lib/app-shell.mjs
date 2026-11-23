@@ -33,13 +33,13 @@ export function allowsPermission(permission, requestingUrl) {
   return permission === 'fullscreen' && isAppUrl(requestingUrl);
 }
 
-/** Where macOS draws the window's close, minimise and zoom buttons: in the sidebar's head, its centre 30px down. */
-export const TRAFFIC_LIGHTS = { x: 16, y: 24 };
+/** Where macOS draws the window's close, minimise and zoom buttons: on the black frame's 40px top, its centre 20px down. */
+export const TRAFFIC_LIGHTS = { x: 16, y: 14 };
 
 /**
- * The window's frame. On macOS it has no title bar: the window's buttons sit in the sidebar's head, with the sidebar's
- * toggle after them, and the page leaves them room (see “Sidebar” in docs/design/direction.md). Elsewhere the system's
- * frame stays.
+ * The window's frame. On macOS it has no title bar: the window's buttons sit on the top left of the page's black frame,
+ * above the activity bar, and the page makes that band taller for them (see “Desktop window” in
+ * docs/design/direction.md). Elsewhere the system's frame stays.
  * @param {NodeJS.Platform} platform
  * @returns {Partial<import('electron').BrowserWindowConstructorOptions>}
  */

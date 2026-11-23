@@ -405,35 +405,41 @@ describe('the board and its overview', () => {
     expect(window.location.hash).toBe('#/two/canvas');
   });
 
-  it('switches between the Canvas and the Studio from the same corner, and goes back with Escape and from a step', async () => {
+  it('switches to the Studio from the activity bar, and goes back with the same button, Escape and a step', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera', 'Segunda']);
     window.location.hash = '#/one/canvas/s2/s2t2';
     render(<App config={config} />);
-    const canvas = await screen.findByRole('main', { name: 'Canvas' }, patience);
-    // The switch shows the open view, under Present.
-    const views = within(canvas).getByRole('group', { name: 'View' });
-    expect(within(views).getByRole('button', { name: 'Canvas' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(within(views).getByRole('button', { name: 'Studio' }));
+    // There is no view switch in the corner any more: it keeps Present, and the bar says which view is open.
+    const present = await screen.findByRole('button', { name: 'Present' }, patience);
+    expect(present.closest('.canvas__corner')).not.toBeNull();
+    expect(screen.queryByRole('group', { name: 'View' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Canvas' })).not.toBeInTheDocument();
+    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
+    const studio = within(bar).getByRole('button', { name: 'Studio' });
+    expect(studio).toHaveAttribute('aria-pressed', 'false');
+    await user.click(studio);
     const board = await screen.findByRole('main', { name: 'Studio' }, patience);
     expect(window.location.hash).toBe('#/one/storyboard/s2/s2t2');
+    expect(studio).toHaveAttribute('aria-pressed', 'true');
     await within(board).findByRole('heading', { level: 2, name: 'Segunda' }, patience);
-    // The Studio keeps the same corner: Present, then the switch, with the Studio pressed.
     expect(within(board).getByRole('button', { name: 'Present' })).toBeInTheDocument();
-    const back = within(board).getByRole('group', { name: 'View' });
-    expect(within(back).getByRole('button', { name: 'Studio' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(within(back).getByRole('button', { name: 'Canvas' }));
+    expect(within(board).queryByRole('group', { name: 'View' })).not.toBeInTheDocument();
+    // The same button goes back to the Canvas.
+    await user.click(studio);
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(window.location.hash).toBe('#/one/canvas/s2/s2t2');
+    expect(studio).toHaveAttribute('aria-pressed', 'false');
 
-    await user.click(await screen.findByRole('button', { name: 'Studio' }, patience));
-    await screen.findByRole('main', { name: 'Studio' }, patience);
+    // From the bar, the focus lands on the Studio's title, so Escape goes back.
+    await user.click(studio);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Uno' })).toHaveFocus(), patience);
     await user.keyboard('{Escape}');
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(window.location.hash).toBe('#/one/canvas/s2/s2t2');
 
-    await user.click(await screen.findByRole('button', { name: 'Studio' }, patience));
+    await user.click(studio);
     const again = await screen.findByRole('main', { name: 'Studio' }, patience);
     // It shows the selected scene only; another one is chosen in the sidebar.
     expect(within(again).queryByRole('region', { name: 'Scene 1: Primera' })).not.toBeInTheDocument();
@@ -486,36 +492,107 @@ describe('the board and its overview', () => {
     expect((await readProject('one')).sceneIds).toEqual(['s1']);
   });
 
-  it('has no header: one toggle at the top left folds the sidebar away and stays there to open it again', async () => {
+  it('has no header: a black activity bar on the left opens one panel at a time, and remembers which', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
-    render(<App config={config} />);
+    await scenes('one', ['Primera']);
+    window.location.hash = '#/one/canvas/s1/s1t1';
+    const { unmount } = render(<App config={config} />);
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
+    expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+    expect(within(bar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Projects', 'Agent chat', 'Studio', 'Settings']);
+    for (const button of within(bar).getAllByRole('button')) expect(button).toHaveAttribute('title');
+    // The projects are open at first, in the left spot, with the edge to drag.
     const sidebar = screen.getByRole('complementary', { name: 'Projects and diagrams' });
     expect(sidebar).toHaveTextContent(/^Paso(?!\.)/);
+    const projects = within(bar).getByRole('button', { name: 'Projects' });
+    expect(projects).toHaveAttribute('aria-expanded', 'true');
+    expect(projects).toHaveAttribute('aria-controls', 'projects-panel');
+    expect(sidebar).toHaveAttribute('id', 'projects-panel');
     expect(screen.getByRole('separator', { name: 'Sidebar width' })).toHaveAttribute('aria-valuenow', '240');
-    const toggle = screen.getByRole('button', { name: 'Hide sidebar' });
-    expect(toggle).toHaveAttribute('aria-controls', 'projects-panel');
-    expect(toggle.querySelector('svg')).toHaveClass('lucide-panel-left');
-    // After the sidebar in the document: the desktop app reads its drag areas in order, and the head is one of them.
-    expect(sidebar.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // “Search”, then the two ways to make something new as icons, in one row.
     const row = sidebar.querySelector('.nav-actions')!;
     expect([...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['Search', 'New project', 'New diagram']);
     expect(within(sidebar).getByRole('button', { name: 'New project' })).toHaveTextContent(/^$/);
-    await user.click(toggle);
+    // Its button folds it: nothing is left of it, not even the edge to drag.
+    await user.click(projects);
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
-    // The same button, in the same place: nothing else is left of the sidebar, not even the edge to drag.
-    expect(screen.getByRole('button', { name: 'Show sidebar' })).toBe(toggle);
-    expect(toggle).toHaveFocus();
+    expect(projects).toHaveAttribute('aria-expanded', 'false');
+    expect(projects).not.toHaveAttribute('aria-controls');
+    expect(projects).toHaveFocus();
     expect(screen.queryByRole('separator', { name: 'Sidebar width' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New project' })).not.toBeInTheDocument();
-    expect(document.querySelector('.app')).toHaveClass('app--panel-closed', 'app--left-floating');
-    await user.click(toggle);
+    expect(window.localStorage.getItem('paso.side-panel')).toBe('none');
+    await user.click(projects);
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
-    expect(toggle).toHaveAccessibleName('Hide sidebar');
-    expect(document.querySelector('.app')).not.toHaveClass('app--left-floating');
+
+    // The chat has no place on a project's Canvas: its button opens the Studio with the chat, which takes the left spot.
+    const chat = within(bar).getByRole('button', { name: 'Agent chat' });
+    expect(chat).toHaveAttribute('aria-expanded', 'false');
+    expect(chat).toHaveAttribute('title', 'Agent chat, in the Studio');
+    await user.click(chat);
+    await screen.findByRole('main', { name: 'Studio' }, patience);
+    const panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
+    expect(panel).toHaveAttribute('id', 'agent-panel');
+    expect(chat).toHaveAttribute('aria-expanded', 'true');
+    expect(projects).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Chat width' })).toHaveAttribute('aria-valuenow', '360');
+    expect(document.querySelector('.app')).toHaveClass('app--agent');
+    // One at a time: the projects take the spot back, and the chat's own button folds it.
+    await user.click(projects);
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+    await user.click(chat);
+    expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem('paso.side-panel')).toBe('agent');
+    // Back on the Canvas the chat is not there, and the spot is empty; the Studio brings it back.
+    await user.click(within(bar).getByRole('button', { name: 'Studio' }));
+    await screen.findByRole('main', { name: 'Canvas' }, patience);
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+    expect(chat).toHaveAttribute('aria-expanded', 'false');
+
+    // Remembered across a relaunch.
+    unmount();
+    window.location.hash = '#/one/storyboard/s1/s1t1';
+    render(<App config={config} />);
+    expect(await screen.findByRole('complementary', { name: 'Agent' }, patience)).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+  });
+
+  it('moves through the activity bar with the keyboard and keeps one tab stop', async () => {
+    const user = userEvent.setup();
+    await seed('Uno', 'one');
+    await scenes('one', ['Primera']);
+    window.location.hash = '#/one/canvas/s1/s1t1';
+    render(<App config={config} />);
+    await screen.findByRole('main', { name: 'Canvas' }, patience);
+    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
+    const [projects, chat, studio, settings] = within(bar).getAllByRole('button');
+    expect([projects, chat, studio, settings].map((button) => button.tabIndex)).toEqual([0, -1, -1, -1]);
+    projects.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(chat).toHaveFocus();
+    await user.keyboard('{End}');
+    expect(settings).toHaveFocus();
+    expect([projects, chat, studio, settings].map((button) => button.tabIndex)).toEqual([-1, -1, -1, 0]);
+    await user.keyboard('{ArrowDown}');
+    expect(settings).toHaveFocus();   // it stops at the ends
+    await user.keyboard('{ArrowUp}');
+    expect(studio).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(projects).toHaveFocus();
+    // The gear opens its menu by keyboard, on its first item, and Escape gives the focus back.
+    settings.focus();
+    await user.keyboard('{Enter}');
+    const menu = await screen.findByRole('menu', { name: 'Settings' });
+    expect(settings).toHaveAttribute('aria-expanded', 'true');
+    expect(within(menu).getByRole('menuitem', { name: 'Export image…' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(within(menu).getByRole('menuitemcheckbox', { name: 'Show grid' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(settings).toHaveFocus();
   });
 
   it('opens each diagram again on the step where it was left', async () => {

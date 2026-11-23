@@ -8,7 +8,6 @@ import { ActionError, type ServiceEvent } from '../state/projects-store';
 import { StoryboardStore, useStoryboard, type SceneEntry } from '../state/storyboard-store';
 import { Dialog } from './Dialog';
 import { SceneSection } from './SceneSection';
-import { ViewToggle } from './ViewToggle';
 import '../styles/storyboard.css';
 
 type Props = {
@@ -44,7 +43,7 @@ function insertAt(order: string[], from: number, to: number) {
 
 /**
  * The Studio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
- * It opens from the Canvas | Studio switch in the corner; a step, the same switch or Escape goes back to the board.
+ * It opens from “Studio” in the activity bar; a step, the same button or Escape goes back to the board.
  */
 export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, corner, renameStep }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);
@@ -227,8 +226,11 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
     if (state.phase !== 'ready' || !selectedScene || selectedScene.id === route.sceneId) return;
     navigate({ ...route, sceneId: selectedScene.id, stepId: selectedScene.stepIds[0] }, { replace: true });
   }, [state.phase, selectedScene, route, navigate]);
-  // Opened from the board, whose switch is gone now: focus lands on the title, so Escape and Tab work from here.
-  useEffect(() => { if (document.activeElement === document.body) title.current?.focus({ preventScroll: true }); }, []);
+  // Opened from the board or from the activity bar: focus lands on the title, so Escape and Tab work from here.
+  useEffect(() => {
+    const active = document.activeElement;
+    if (active === document.body || active?.closest('.activity-bar')) title.current?.focus({ preventScroll: true });
+  }, []);
   return (
     <main
       className="board" aria-label="Studio" aria-busy={state.phase === 'loading'} data-dragging={drag?.moved || undefined} ref={setBoard}
@@ -239,10 +241,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
         back();
       }}
     >
-      <div className="canvas__corner board__corner">
-        {corner}
-        <ViewToggle route={route} navigate={navigate} />
-      </div>
+      <div className="canvas__corner board__corner">{corner}</div>
       {notices && <div className="board__top">{notices}</div>}
       <div className="board__head">
         <div className="board__heading">

@@ -324,7 +324,6 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
         <button type="button" className="icon-btn" aria-label="New conversation" title="New conversation" disabled={!sessionId} onClick={() => store.newConversation(projectId, targetSceneId)}>
           <SquarePen className="i" aria-hidden="true" />
         </button>
-        {/* The head's right end is kept for the chat's toggle (PanelToggle), which stays there when the chat folds. */}
       </div>
 
       <div ref={log} className="agent__log" role="log" aria-label="Conversation with the agent">

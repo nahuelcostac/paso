@@ -9,7 +9,7 @@ import { useThumbnails } from './use-thumbnails';
 import { useTheme } from './use-theme';
 import './excalidraw-runtime';
 import type { CanvasCamera } from './canvas-camera';
-import { ViewToggle } from '../components/ViewToggle';
+import type { CanvasMenu } from './canvas-menu';
 import { CameraControl, CameraDraw, CameraOverlay, KeptCameraOverlay, type KeptCamera } from './CameraControls';
 import { createViewStore } from './canvas-view';
 import { useSceneCameras } from './use-scene-cameras';
@@ -39,7 +39,7 @@ function keyboardInCarousel() {
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
-export default function Canvas({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents, loose = false }: {
+export default function Canvas({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents, loose = false, menu }: {
   api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
   scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
   route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
@@ -52,6 +52,8 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
   subscribeEvents?: (listener: (event: ServiceEvent) => void) => () => void;
   /** A loose diagram: a plain whiteboard, whose step strip shows on request or when it has several steps. */
   loose?: boolean;
+  /** The activity bar's gear menu: Excalidraw's main menu, outside the canvas. */
+  menu?: CanvasMenu;
 }) {
   useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [error, setError] = useState<string>();
@@ -153,11 +155,10 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
       }}>Download copy and load the service's version</button>}
     </div>}
     <div className="canvas canvas--editor">
-      {/* A loose diagram with one step is a plain whiteboard: nothing to present, frame or see in the Studio. A second
-          step brings the corner back. */}
+      {/* A loose diagram with one step is a plain whiteboard: nothing to present or frame. A second step brings the
+          corner back. */}
       {!(loose && stepIds.length <= 1) && <div className="canvas__corner">
         {corner}
-        <ViewToggle route={route} navigate={navigate} />
         {session && <CameraControl
           camera={session.document.camera} first={shownIds?.[0] === shownStepId} kept={kept} drawing={framing} onDraw={() => setFraming((on) => !on)}
           onClear={() => { setFraming(false); store.setCamera(session, undefined); }}
@@ -166,7 +167,7 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
       </div>}
       {/* One canvas for the diagram: moving to another step swaps the drawing in it, with no loading in between. */}
       {canvasOpen ? <Suspense fallback={<Loading>Loading editor…</Loading>}>
-        <StepCanvas key={projectId} api={api} store={store} session={wanted} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} onShow={setShown} />
+        <StepCanvas key={projectId} api={api} store={store} session={wanted} theme={theme} keepFocus={keyboardInCarousel} camera={camera} onStepKey={stepKey} view={view} onShow={setShown} menu={menu} />
       </Suspense> : <div className="canvas__placeholder"><p className="canvas__placeholder-title" aria-hidden="true">{projectName}</p><p>{scenes === undefined ? 'Loading…' : scene ? 'This scene has no steps. Use “Add step” to start drawing.' : 'Create a scene from the sidebar to start drawing.'}</p></div>}
       {typeof session?.document.camera === 'object' && !framing && <CameraOverlay camera={session.document.camera} view={view} onChange={(next) => store.setCamera(session, next)} />}
       {session && kept?.camera && !framing && <KeptCameraOverlay camera={kept.camera} number={kept.number} view={view} onOpen={() => navigate({ ...routeRef.current, sceneId: session.target.sceneId, stepId: shownIds?.[kept.number - 1] })} />}
