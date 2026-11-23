@@ -57,5 +57,6 @@ describe('folded activity bar', () => {
     const corner = rule(app, `${macFolded}::before`);
     expect(corner).toContain('position: fixed; z-index: 8; top: 0; left: 0');
     expect(corner).toContain('width: var(--window-controls-w); height: var(--bar-top); background: var(--bar); -webkit-app-region: drag');
+    expect(corner).toContain('border-bottom-right-radius: var(--radius-md)');
   });
 });

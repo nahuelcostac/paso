@@ -140,6 +140,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 :root[data-window-controls='mac'] .app--folded::before {
   content: ''; position: fixed; z-index: 8; top: 0; left: 0;
   width: var(--window-controls-w); height: var(--bar-top); background: var(--bar); -webkit-app-region: drag;
+  border-bottom-right-radius: var(--radius-md);
 }
 /* The shape properties sit just below the native controls. */
 :root[data-window-controls='mac'] .app--folded .canvas--editor .excalidraw .selected-shape-actions { margin-top: var(--space-2); }
