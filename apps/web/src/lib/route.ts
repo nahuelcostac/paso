@@ -11,7 +11,7 @@ export function parseRoute(hash: string): Route {
   const [projectId, view, sceneId, stepId] = hash.replace(/^#\/?/, '').split('/');
   return {
     projectId: projectId && /^[A-Za-z0-9_-]{1,128}$/.test(projectId) ? projectId : null,
-    // The board is where a diagram opens. The Studio ('storyboard') is its overview, opened from the Canvas | Studio switch.
+    // The board is where a diagram opens. The Studio ('storyboard') is its overview, opened from “Studio” in the activity bar.
     view: view === 'storyboard' ? 'storyboard' : 'canvas',
     ...(sceneId && /^[A-Za-z0-9_-]{1,128}$/.test(sceneId) ? { sceneId } : {}),
     ...(stepId && /^[A-Za-z0-9_-]{1,128}$/.test(stepId) ? { stepId } : {}),

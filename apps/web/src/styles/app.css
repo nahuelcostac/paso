@@ -3,7 +3,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; }
 body {
-  background: var(--page);
+  background: var(--bar);
   color: var(--ink);
   font: var(--weight-regular) var(--text-14) / var(--leading-ui) var(--font-ui);
   font-feature-settings: 'cv11', 'tnum';
@@ -24,29 +24,46 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 /* The small spaced uppercase label above a title: “SCENE 1 OF 3”, “STEP 01”. */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
-/* Shell: no header. Three columns: the sidebar (or its folded strip), the board, and the agent (or its folded strip).
-   Each side keeps its own controls, so nothing runs across the top of the window. */
+/* The window: the activity bar down its left edge and the panel in the left spot (the projects or the agent's chat),
+   black, then the main view, flush with the window's other edges and meeting the black in a straight edge. No
+   header: nothing runs across the top. App sets --left to the docked panel's width. */
 .app {
-  --left: var(--panel-projects); --right: 0px;
   display: grid; height: 100%;
-  grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr) var(--right);
+  grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr);
+  background: var(--bar);
 }
-.app--panel-closed { --left: 0px; }
-.app--agent { --right: var(--panel-agent); }
+.shell {
+  position: relative; display: grid; min-width: 0; min-height: 0;
+  grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr);
+}
+.main {
+  grid-column: 2; grid-row: 1; position: relative; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  min-width: 0; min-height: 0; border-left: 1px solid var(--bar-line); background: var(--page); overflow: hidden;
+}
+/* The panels in the left spot: black in both themes, as the bar. They take the dark theme's values of every token
+   (light-dark() resolves by the element's colour scheme), on the bar's black instead of the chrome's grey. */
+.projects, .agent {
+  color-scheme: dark;
+  --surface: var(--panel-bg);
+  --border: 1px solid var(--line);
+  --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 5px var(--focus);
+  background: var(--surface); color: var(--ink);
+}
 
 /* A side's inner edge, as in Overleaf: a small tab with a chevron folds and unfolds it, and the edge drags to change its
    width. It sits on the line between the side and the board, at the middle of the window. A thin ink line shows the
    edge on hover and while dragging (the focus colour with the keyboard). Over the content, the sidebar and the chat's
    drawer cover it. */
-.app { position: relative; }
 .splitter { position: absolute; top: 0; bottom: 0; width: 0; z-index: 7; }
 .splitter--left { left: var(--left); }
-.splitter--right { right: var(--right); z-index: 5; }
+.splitter--right { right: 0; z-index: 5; }
 .splitter__edge { position: absolute; top: 0; bottom: 0; left: -5px; width: 10px; cursor: col-resize; touch-action: none; }
 .splitter__edge::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: var(--accent); opacity: 0; transition: opacity var(--motion-fast); }
 .splitter__edge:hover::after, .splitter[data-dragging] .splitter__edge::after { opacity: 1; }
 .splitter__edge:focus-visible { box-shadow: none !important; }
 .splitter__edge:focus-visible::after { opacity: 1; background: var(--focus); }
+/* Beside a black panel, the line sits on the black, in the bar's light grey. */
+.splitter--left .splitter__edge::after { left: 2px; background: var(--bar-focus); }
 .splitter__tab {
   position: absolute; top: 50%; left: -8px; translate: 0 -50%;
   display: grid; place-items: center; width: 16px; height: 40px; padding: 0;
@@ -70,49 +87,59 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .splitter--right[data-folded] .splitter__tab { left: 0; }
 .splitter--left[data-folded] .splitter__edge { left: -2px; width: 8px; }
 .splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
-.board, .main-message, .canvas-page, .canvas { grid-column: 2; grid-row: 1; }
+.main > * { grid-column: 1; grid-row: 1; }
 
-/* Each side's toggle, as in Notion: a ghost button with the side's panel icon, at one place on the page whether the side
-   shows or not. The sidebar's sits at the top left, centred on its 60px head, after the window's own buttons in the
-   desktop app; folded, it stays there over the board, whose top left controls make room for it. The chat's sits at
-   the right end of its head, and folded in its rail, at the same spot. */
-.panel-toggle {
-  position: absolute; z-index: 16; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-md);
-  color: var(--ink-3); -webkit-app-region: no-drag;
+/* The activity bar, as in VS Code: black in both themes, the panels and the Studio at the top, the gear at the foot.
+   Round 40px buttons with 20px icons in light grey; the open panel and the view on screen are white on a soft round
+   highlight. The focus ring is light, so it shows on the black. */
+.activity-bar {
+  --focus-ring: 0 0 0 2px var(--bar), 0 0 0 4px var(--bar-focus);
+  grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+  min-height: 0; padding: var(--bar-top) 0 var(--space-3); overflow: hidden auto; scrollbar-width: none;
 }
-.panel-toggle:hover { background: var(--surface-sunken); color: var(--ink); }
-.panel-toggle svg.i { width: 18px; height: 18px; }
-.panel-toggle--left { top: 14px; left: calc(var(--window-controls-w) + var(--space-3)); }
-.panel-toggle--right { z-index: 7; top: 10px; right: var(--space-2); }
-.app--agent-drawer .panel-toggle--right { top: 18px; right: var(--space-4); }
-/* What the sidebar's toggle takes from the left of the window, gap included. */
-.app { --toggle-corner: calc(var(--window-controls-w) + 52px); }
-/* Excalidraw's main menu (export, preferences…) sits right before its toolbar, the two centred on the board as one
-   group, so the top left corner stays free for the sidebar's toggle. Its column also holds the selected shape's
-   properties: `display: contents` lets the menu join the toolbar's row while the properties stay on the left, below. */
-.canvas--editor .excalidraw .App-menu_top { grid-template-columns: 1fr auto auto 1fr; column-gap: var(--space-2); row-gap: var(--space-4); }
-.canvas--editor .excalidraw .App-menu_top__left { display: contents; }
-.canvas--editor .excalidraw .App-menu_top__left > :first-child { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
-.canvas--editor .excalidraw .App-menu_top__left > :not(:first-child) { grid-column: 1 / 3; grid-row: 2; justify-self: start; }
-.canvas--editor .excalidraw .App-menu_top > .shapes-section { grid-column: 3; grid-row: 1; }
-.canvas--editor .excalidraw .App-menu_top > .layer-ui__wrapper__top-right { grid-column: 4; grid-row: 1; }
-/* In the Studio the page starts under the toggle's row instead: the title and the notices keep clear of it. */
-.app--left-floating .board { padding-top: 60px; }
-.app--left-floating .board__top { margin-top: 0; }
-/* Folded, the chat leaves nothing, as in T3 Code: its toggle stays where it was, and the Studio's top right corner
-   (Present and the view switch) moves left to leave it room. */
-.app--agent-folded .board__corner { right: calc(var(--space-4) + 32px); }
-/* Without a title bar (the desktop app on macOS), the window moves by the sidebar's head, the chat's head, or the
-   corner by its buttons while the sidebar is folded. Over the board nothing moves it: the drawing needs the pointer. */
-.window-grip { display: none; }
-:root[data-window-controls='mac'] .window-grip { display: block; position: absolute; z-index: 16; top: 0; left: 0; width: var(--toggle-corner); height: 60px; -webkit-app-region: drag; }
-.projects__head, .agent__head { -webkit-app-region: drag; }
-.projects__head button, .agent__head button { -webkit-app-region: no-drag; }
+.activity-bar__group { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
+.activity-bar__button {
+  position: relative; display: grid; place-items: center; width: var(--bar-button); height: var(--bar-button);
+  border-radius: var(--radius-pill); color: var(--bar-ink);
+}
+.activity-bar__button svg.i { width: 20px; height: 20px; }
+.activity-bar__button:hover { background: var(--bar-hover); color: var(--bar-ink-active); }
+.activity-bar__button[aria-expanded='true'], .activity-bar__button[aria-pressed='true'] { background: var(--bar-active); color: var(--bar-ink-active); }
+.activity-bar__button:active:not([aria-haspopup]) { scale: 0.95; }
+/* The agent works while its chat is out of view: a pink dot, the agent's mark, on its button. */
+.activity-bar__badge { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--bar); }
+/* The gear's menu: what Excalidraw's main menu held, beside the gear. */
+.popover.settings-menu { width: 264px; max-width: calc(100vw - 16px); }
+.settings-menu hr { margin: var(--space-1) var(--space-2); border: 0; border-top: var(--border); }
+.settings-menu .menu__label { flex: 1; min-width: 0; }
+.settings-menu .menu__check svg.i { color: var(--muted); }
+.settings-menu [aria-checked='true'] .menu__check svg.i { color: var(--ink); }
+.settings-menu [aria-disabled='true'] { color: var(--ink-3); cursor: not-allowed; }
+.settings-menu [aria-disabled='true']:hover { background: none; }
+.settings-menu__note { margin: 0 0 var(--space-1); padding: 6px var(--space-2); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--ink-3); font-size: var(--text-12); line-height: 1.35; }
+.settings-menu__heading { padding: 6px var(--space-2) 2px; color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); }
+.settings-menu__row { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-h-sm); padding: 0 var(--space-1) 0 var(--space-2); }
+.settings-menu__row-label { flex: 1; color: var(--ink); }
+/* Theme, and the canvas colours: small square choices in a row. The chosen one is the selected grey. */
+.settings-menu__choices { display: flex; gap: 2px; }
+.menu .settings-menu__choice { display: grid; place-items: center; width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; border-radius: var(--radius-sm); }
+.menu .settings-menu__choice[aria-checked='true'] { background: var(--accent-soft); }
+.menu .settings-menu__choice[aria-checked='true'] svg.i { color: var(--ink); }
+.settings-menu__swatches { padding: 0 var(--space-1) var(--space-1) var(--space-2); }
+.settings-menu__swatch > span { width: 18px; height: 18px; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--line-strong); filter: var(--thumb-filter); }
+.settings-menu__swatch[aria-disabled='true'] > span { opacity: var(--disabled-opacity); }
+/* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
+.canvas--editor .excalidraw .main-menu-trigger { display: none; }
+/* Without a title bar (the desktop app on macOS), the window moves by the black around the window's buttons and the
+   app's icon: the bar and the panel's top row, never their buttons. Never by the main view either, where the drawing
+   needs the pointer. */
+:root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand { -webkit-app-region: drag; }
+:root[data-window-controls='mac'] .activity-bar__button { -webkit-app-region: no-drag; }
 
 /* The agent at work with its panel folded: a floating pill at the foot of the Studio, by the chat's tab, with a pink
    pulse, the step it is changing as a pink chip, and Stop. */
 .agent-working {
-  position: absolute; z-index: 5; right: calc(var(--right) + var(--space-4)); bottom: var(--space-4);
+  position: absolute; z-index: 5; right: var(--space-4); bottom: var(--space-4);
   display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
   border-radius: var(--radius-pill); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
 }
@@ -128,11 +155,14 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .brand__tile { fill: var(--ink); }
 .brand__step { fill: none; stroke: var(--on-ink); }
 .brand__name { font-size: 21px; font-weight: var(--weight-bold); letter-spacing: -0.04em; line-height: 1; }
-/* In the sidebar's head the mark is small, as T3 Code's name beside the window's buttons: the tile as large as the
-   toggle's icon before it. */
-.projects__head .brand { gap: var(--space-2); }
-.projects__head .brand__mark { width: 18px; height: 18px; }
-.projects__head .brand__name { font-size: var(--text-15); letter-spacing: -0.02em; }
+/* The app's icon and name at the top of the panel in the left spot, as tall as the bar's top, right after the window's
+   buttons in the desktop app. Small, as T3 Code's name: an 18px tile and the name at 15px. Not a control. */
+/* Its tile lines up with the icons of the rows below (the filter, Search): the nav's 8px, the row's 10px, less 1px for
+   the 18px tile over their 16px icons. */
+.panel-brand { flex: none; display: flex; align-items: center; height: var(--bar-top); padding: 0 var(--space-3) 0 calc(var(--space-2) + 10px - 1px); cursor: default; }
+.panel-brand .brand { gap: var(--space-2); }
+.panel-brand .brand__mark { width: 18px; height: 18px; }
+.panel-brand .brand__name { font-size: var(--text-15); letter-spacing: -0.02em; }
 
 .menu--scenes { min-width: 220px; max-width: min(320px, calc(100vw - 16px)); }
 .menu--scenes hr { margin: var(--space-1) var(--space-2); border: 0; border-top: var(--border); }
@@ -163,17 +193,11 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 
 /* Sidebar: the projects, laid out like tldraw's. A paper column docked to the left, the full height of the window, with
    the mark at its head; the header runs beside it. On a narrow window it opens over the content instead. */
-.projects { grid-column: 1; grid-row: 1; position: relative; z-index: 6; display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-right: var(--border); }
+.projects { grid-column: 1; grid-row: 1; position: relative; z-index: 6; display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
 .projects-scrim { display: none; }
-.projects__head { flex: none; display: flex; align-items: center; height: 60px; padding: 0 var(--space-3) 0 var(--toggle-corner); }
 .projects__nav { flex: none; padding: 0 var(--space-2); }
 .projects__nav hr { margin: var(--space-2) var(--space-1); border: 0; border-top: var(--border); }
 /* The workspace's name in bold with a chevron, like tldraw's. */
-.workspace-switch { display: flex; align-items: center; gap: 6px; width: 100%; max-width: 100%; height: var(--control-h); padding: 0 10px; border-radius: var(--radius-md); font-weight: var(--weight-bold); text-align: left; }
-.workspace-switch:hover:not(:disabled), .workspace-switch[aria-expanded='true'] { background: var(--surface-sunken); }
-.workspace-switch:disabled { opacity: 1; cursor: default; }
-.workspace-switch__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-switch svg.i { color: var(--muted); }
 /* A sidebar row, as T3 Code's: 32px, 10px in, the icon 10px from the text. */
 .nav-row { display: flex; align-items: center; gap: 10px; width: 100%; height: var(--control-h); padding: 0 10px; border-radius: var(--radius-md); color: var(--ink-2); font-weight: var(--weight-medium); text-align: left; }
 .nav-row svg.i { color: var(--muted); }
@@ -191,9 +215,9 @@ button.nav-row:hover:not(:disabled) { background: var(--surface-sunken); color: 
 /* The project filter, after T3 Code's: what the list shows, under the workspace, and its searchable list. The list's
    field is the popovers' field (.picker__search) and its options are .menu's items: 28px, 8px in, 4px corners. */
 .project-filter[aria-expanded='true'] { background: var(--surface-sunken); color: var(--ink); }
+/* A list narrowed to one project or to the loose diagrams: the filter shows that choice's icon on the selected grey. */
+.project-filter[data-filtered] { background: var(--accent-soft); color: var(--accent-ink); }
 .project-filter:disabled { opacity: 1; cursor: default; }
-.project-filter__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-filter svg.project-filter__chevron { width: 14px; height: 14px; }
 .popover.project-filter-menu { width: 256px; max-width: calc(100vw - 16px); }
 .project-filter-menu .picker__search { margin: 0 0 var(--space-1); }
 .project-filter-menu__list { max-height: min(320px, 50vh); overflow-y: auto; scrollbar-width: thin; }
@@ -396,8 +420,6 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
   position: relative; overflow: hidden auto; min-width: 0; padding: 44px 56px var(--space-7);
   /* A thin thumb with no track: a grey track would sit as a stripe against the chat's card. */
   scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
-  /* The chat's tab reaches 8px into the board: a clear border of that width keeps the scrollbar out from under it. */
-  border-right: 8px solid transparent;
 }
 .board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: 180px; }
 /* In the Studio the corner scrolls with the page, and the title keeps clear of it. */
@@ -430,30 +452,26 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .editor-message { display: grid; place-content: center; gap: var(--space-2); height: 100%; color: var(--ink-2); }
 
 /* Under 1160px the save state keeps its place for screen readers but gives its room to the agent status. */
-/* A narrow window: the sidebar opens over the content, with a scrim beside it that closes it. */
-@media (max-width: 1063px) {
-  .app { --left: 0px; }
-  .projects { position: fixed; inset: 0 auto 0 0; width: min(280px, calc(100vw - 48px)); z-index: 15; border-right: 0; box-shadow: 0 0 0 1px var(--line), var(--shadow-lg); }
-  .projects-scrim { display: block; position: fixed; inset: 0; z-index: 14; background: var(--scrim); }
+/* A narrow window: the left spot's panel opens over the main view, as a black drawer against the bar, the full height
+   of the window, with rounded right corners. The projects have a scrim beside them that closes them; the chat leaves the
+   board in view and usable. */
+.app--narrow .projects, .agent[data-narrow] {
+  position: fixed; z-index: 15; top: 0; bottom: 0; left: var(--bar-w);
+  border-right: 1px solid var(--bar-line); box-shadow: var(--shadow-lg); overflow: hidden;
 }
+.app--narrow .projects { width: min(280px, calc(100vw - var(--bar-w) - 48px)); }
+.app--narrow .projects-scrim { display: block; position: fixed; z-index: 14; inset: 0 0 0 var(--bar-w); background: var(--scrim); }
 /* A narrower window: the board's padding shrinks before anything else does. */
 @media (max-width: 1099px) {
   .board { padding: var(--space-6) var(--space-5) var(--space-7); }
 }
 
 
-/* Present sits over the top right corner, where Excalidraw's library button was, at the height of its islands. Under it,
-   the Canvas | Studio switch. Both views keep this corner, so the switch never moves. The column is as wide as the
-   switch, and Present fills it. */
+/* Present sits over the top right corner, where Excalidraw's library button was, at the height of its islands. On the
+   Canvas, “Frame” is under it, and Present is as wide. */
 .canvas__corner { position: absolute; z-index: 4; top: var(--space-4); right: var(--space-4); display: grid; grid-template-columns: max-content; gap: var(--space-2); }
 .canvas__corner .btn--primary { height: var(--control-h-lg); justify-content: center; }
-/* The switch: a white island like Excalidraw's own controls. The open view is a grey fill with ink. */
-.view-toggle { display: flex; gap: 2px; height: 36px; padding: 3px; border-radius: var(--radius-md); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); }
-.view-toggle__option { display: inline-flex; flex: 1; align-items: center; justify-content: center; gap: 6px; min-width: 30px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-3); font: inherit; font-size: var(--text-14); font-weight: var(--weight-medium); cursor: pointer; }
-.view-toggle__option:hover { background: var(--surface-sunken); color: var(--ink); }
-.view-toggle__option[aria-pressed='true'] { background: var(--accent-soft); color: var(--ink); cursor: default; }
-.view-toggle__option:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-/* “Frame”, under the switch, and the cross that removes the step's camera once there is one. */
+/* “Frame”, under Present, and the cross that removes the step's camera once there is one. */
 .camera-control { display: flex; height: 36px; border-radius: var(--radius-md); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); overflow: hidden; }
 .camera-control button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: var(--text-14); font-weight: var(--weight-medium); cursor: pointer; }
 .camera-control button:hover { background: var(--surface-sunken); color: var(--ink); }
@@ -502,20 +520,18 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
    the strip shown, at the same spot inside the strip, which keeps that end free. With several steps it carries the
    pager's “02 / 03”. */
 .camera-control__take[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
-/* Excalidraw's toolbar stays centred: on a narrower board Present and the switch keep only their icons, so the two
-   never meet. The Studio has no toolbar, so it keeps the labels until it is much narrower. */
+/* Excalidraw's toolbar stays centred: on a narrower board Present and “Frame” keep only their icons, so they never
+   meet. The Studio has no toolbar, so it keeps the label until it is much narrower. */
 .canvas--editor { container: board / inline-size; }
 .board { container: studio / inline-size; }
 @container board (max-width: 860px) {
   .camera-control__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .canvas__corner .btn--primary { padding: 0; font-size: 0; gap: 0; }
   .canvas__corner .btn--primary svg.i { margin: 0; }
-  .view-toggle__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 @container studio (max-width: 520px) {
   .canvas__corner .btn--primary { padding: 0; font-size: 0; gap: 0; }
   .canvas__corner .btn--primary svg.i { margin: 0; }
-  .view-toggle__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 /* Why Present could not start: beside it, to its left, so the corner's column keeps its width. */
 .present-error { position: absolute; top: 0; right: calc(100% + var(--space-2)); display: inline-flex; align-items: center; gap: var(--space-1); width: max-content; max-width: 320px; padding: 0 var(--space-1) 0 var(--space-3); height: 36px; border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); font-size: var(--text-12); box-shadow: var(--shadow-sm); }

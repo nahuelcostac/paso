@@ -14,8 +14,10 @@ import { ThumbnailCache } from './editor/thumbnails';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { SceneList } from './components/SceneList';
 import { AgentWorking } from './components/AgentWorking';
-import { AGENT_WIDTH, BOARD_MIN, Splitter, chatRoom, useAgentWidth, useProjectsWidth } from './components/Splitter';
-import { PanelToggle } from './components/PanelToggle';
+import { BOARD_MIN, Splitter, useAgentWidth, useProjectsWidth } from './components/Splitter';
+import { ActivityBar, type SidePanel } from './components/ActivityBar';
+import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
+import { createCanvasMenu } from './editor/canvas-menu';
 import { PresentButton } from './present/PresentButton';
 import { useScenes } from './state/scenes';
 import { ActionError, ProjectsStore, useProjects, type ProjectRow } from './state/projects-store';
@@ -26,18 +28,8 @@ import { stepCount } from './components/LooseRow';
 
 const Canvas = lazy(() => import('./editor/Canvas'));
 
-/** Below this the canvas would not fit beside the panel. */
+/** Below this the canvas would not fit beside a panel: the left spot's panel opens over the content, as a drawer. */
 const NARROW = '(max-width: 1063px)';
-
-function useWindowWidth() {
-  const [width, setWidth] = useState(() => window.innerWidth);
-  useEffect(() => {
-    const sync = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', sync);
-    return () => window.removeEventListener('resize', sync);
-  }, []);
-  return width;
-}
 
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
@@ -51,16 +43,34 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-function usePanelOpen() {
-  const [open, setOpen] = useState(() => !window.matchMedia(NARROW).matches);
+const SIDE_KEY = 'paso.side-panel';
+/** The panel left open in the left spot, remembered in this browser (and in the desktop app, whose origin stays). */
+function storedSide(): SidePanel | null {
+  try {
+    const value = window.localStorage.getItem(SIDE_KEY);
+    return value === 'agent' ? 'agent' : value === 'none' ? null : 'projects';
+  } catch { return 'projects'; }
+}
+
+/**
+ * Which panel has the left spot, as in VS Code: projects, the agent's chat, or neither. A choice made with room to dock
+ * is remembered; on a narrow window the panel is a drawer, closed at first, and opening it is for the moment only.
+ * Crossing the threshold closes the drawer, or brings back the remembered panel.
+ */
+function useSidePanel(narrow: boolean) {
+  const [side, setSide] = useState<SidePanel | null>(() => narrow ? null : storedSide());
+  const crossed = useRef(narrow);
   useEffect(() => {
-    const query = window.matchMedia(NARROW);
-    // Crossing the threshold resets the choice: open when there is room, closed when there is not.
-    const sync = () => setOpen(!query.matches);
-    query.addEventListener('change', sync);
-    return () => query.removeEventListener('change', sync);
+    if (crossed.current === narrow) return;
+    crossed.current = narrow;
+    setSide(narrow ? null : storedSide());
+  }, [narrow]);
+  const choose = useCallback((next: SidePanel | null) => {
+    setSide(next);
+    if (window.matchMedia(NARROW).matches) return;
+    try { window.localStorage.setItem(SIDE_KEY, next ?? 'none'); } catch { /* a convenience: it just won't be remembered */ }
   }, []);
-  return [open, setOpen] as const;
+  return [side, choose] as const;
 }
 
 /** `recovery` is where unsaved drafts are kept. It is the browser's IndexedDB unless a host or a test supplies another. */
@@ -88,27 +98,19 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const agentState = useAgent(agentStore);
   useSyncExternalStore(steps.subscribe, steps.getSnapshot);
   const [route, navigate] = useRoute();
-  const [panelOpen, setPanelOpen] = usePanelOpen();
   const [creating, setCreating] = useState(false);
-  // Under this the sidebar opens over the content.
-  const leftNarrow = useMediaQuery(NARROW);
-  // The chat lives in the overview, beside the scenes it changes. It docks while the cards keep their minimum;
-  // otherwise it folds into its strip and opens as a drawer. The board has the whole width to itself.
+  // Under this the panel in the left spot opens over the content, as a drawer.
+  const narrow = useMediaQuery(NARROW);
+  const [side, chooseSide] = useSidePanel(narrow);
   const boardMin = BOARD_MIN.storyboard;
   const overview = route.view === 'storyboard';
-  // The sidebar's width, which the person drags. Folded, or over the content on a narrow window, it leaves nothing: only
-  // its toggle stays, over the board's top left corner.
+  // Each panel's width, which the person drags, remembered apart.
   const projectsWidth = useProjectsWidth(boardMin);
-  const leftDocked = panelOpen && !leftNarrow;
-  const left = leftDocked ? projectsWidth.width : 0;
-  const narrow = chatRoom(useWindowWidth(), left, boardMin) < AGENT_WIDTH.min;
-  // The agent panel: a drawer on a narrow window, otherwise a column the person can hide.
-  const [agentOpen, setAgentOpen] = useState(false);
-  const [agentDocked, setAgentDocked] = useState(true);
+  const agentWidth = useAgentWidth(narrow, boardMin);
+  // What Excalidraw's main menu held, in the activity bar's gear: it acts on the Canvas's drawing while one is shown.
+  const canvasMenu = useMemo(createCanvasMenu, []);
   // Drafts belong to a diagram, not to an individual scene or a mounted panel.
   const [agentDrafts, setAgentDrafts] = useState<Record<string, string>>({});
-  const agentShown = narrow ? agentOpen : agentDocked;
-  const agentWidth = useAgentWidth(left, narrow, boardMin);
 
   const routeRef = useRef(route);
   routeRef.current = route;
@@ -140,6 +142,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const sceneId = scenes?.find((item) => item.document.id === route.sceneId)?.document.id;
   const [creatingScene, setCreatingScene] = useState(false);
   const [sceneError, setSceneError] = useState<string>();
+  /** A workspace that couldn't be opened, added or removed, from the activity bar's switcher. */
+  const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null);
   /** The project the sidebar acts on: the open one, or another expanded there. */
   const isOpen = (projectId: string) => openProject?.id === projectId;
   const scenesOf = async (projectId: string) => {
@@ -224,7 +228,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     catch (error) { throw new ActionError(error instanceof Error ? error.message : 'Try again.'); }
     await store.addedLoose();
     navigate({ projectId: LOOSE_PROJECT_ID, view: 'canvas', ...created });
-    if (window.matchMedia(NARROW).matches) setPanelOpen(false);
+    closeDrawer();
   };
   /** Steps of a loose diagram with work that is not on the service. Such a diagram is not moved. */
   const unsavedIn = (projectId: string, sceneId: string) => steps.unresolved().some(({ target }) => target.projectId === projectId && target.sceneId === sceneId);
@@ -291,7 +295,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     document.title = row?.kind === 'ok' ? `${row.project.name} · Paso` : 'Paso';
   }, [row]);
 
-  const startCreating = () => { setPanelOpen(true); setCreating(true); };
+  const startCreating = () => { chooseSide('projects'); setCreating(true); };
 
   // Another workspace was opened, here or in another window: its first project opens, as on a fresh start.
   const workspaceId = state.workspaces?.activeId;
@@ -314,8 +318,14 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     }
   };
 
-  // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram, which has no Studio.
+  // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram, which has no Studio. Both
+  // take the left spot, one at a time; on a project's Canvas the chat is not there, and the spot shows nothing for it.
   const chatHere = overview || plainLoose;
+  const shown = side === 'agent' && !(openProject && chatHere) ? null : side;
+  const docked = narrow ? null : shown;
+  const left = docked === 'projects' ? projectsWidth.width : docked === 'agent' ? agentWidth.width : 0;
+  /** A drawer steps aside once something is chosen in it. Docked, the panel stays. */
+  const closeDrawer = () => { if (window.matchMedia(NARROW).matches) chooseSide(null); };
   useEffect(() => {
     if (plainLoose && overview) navigate({ ...routeRef.current, view: 'canvas' }, { replace: true });
   }, [plainLoose, overview, navigate]);
@@ -324,8 +334,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const sceneDocuments = useMemo(() => scenes?.map((item) => item.document) ?? [], [scenes]);
   const marks = useMemo(() => stepMarks(agentState.turns, agentState.runs[openProject?.id ?? ''], openProject?.id), [agentState.turns, agentState.runs, openProject?.id]);
   const working = useMemo(() => activeTurn(agentState.turns, openProject?.id), [agentState.turns, openProject?.id]);
-  // Without the panel in view, the top bar says who is changing which step.
-  const statusShown = Boolean(openProject && chatHere && working && !agentShown);
+  // Without the panel in view, a pill says who is changing which step, and the chat's button in the bar has a dot.
+  const statusShown = Boolean(openProject && chatHere && working && shown !== 'agent');
   const workingAt = working?.step && sceneDocuments.length ? (() => {
     for (const [index, scene] of sceneDocuments.entries()) {
       const at = scene.stepIds.indexOf(working.step!.stepId);
@@ -335,26 +345,33 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   })() : undefined;
 
   // Failures with no place of their own. They sit in the sidebar, or above the step strip while it is folded.
-  const notices = failedStep || sceneError ? <>
+  const notices = failedStep || sceneError || workspaceNotice ? <>
     {failedStep && <div className="notice notice--error" role="alert">
       <span>A step in another scene couldn't be saved.</span>
       <button type="button" className="notice__action" onClick={() => navigate({ ...failedStep.target, view: 'canvas' })}>Review unsaved step</button>
+    </div>}
+    {workspaceNotice && <div className="notice notice--error" role="alert">
+      <span>{workspaceNotice}</span>
+      <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setWorkspaceNotice(null)}>×</button>
     </div>}
     {sceneError && <div className="notice notice--error" role="alert">
       <span>{sceneError}</span>
       <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setSceneError(undefined)}>×</button>
     </div>}
   </> : undefined;
-  // The agent folds away entirely, leaving only its toggle; on a narrow window it stays folded and opens as a drawer.
-  const agentFolded = Boolean(openProject && chatHere && (narrow || !agentDocked));
-  const toggleAgent = () => narrow ? setAgentOpen(!agentOpen) : setAgentDocked(!agentDocked);
   const hideAgent = () => {
-    if (narrow) setAgentOpen(false); else setAgentDocked(false);
-    // Focus goes back to the toggle that opened it.
-    document.querySelector<HTMLElement>('.panel-toggle--right')?.focus();
+    chooseSide(null);
+    // Focus goes back to the button that opened it.
+    document.querySelector<HTMLElement>('.activity-bar__button[data-id="agent"]')?.focus();
+  };
+  // The bar's buttons: each panel's opens it in the left spot and closes the other, and closes it when it is the one in
+  // view. On a project's Canvas the chat is in the Studio, so its button opens the Studio with the chat.
+  const togglePanel = (panel: SidePanel) => {
+    if (panel === 'agent' && openProject && !chatHere) { chooseSide('agent'); navigate({ ...routeRef.current, view: 'storyboard' }); return; }
+    chooseSide(shown === panel ? null : panel);
   };
 
-  // Present, in the top right corner of both views, above the Canvas | Studio switch. Leaving it keeps the view.
+  // Present, in the top right corner of both views. Leaving it keeps the view.
   const presentButton = row?.kind === 'ok' ? <PresentButton
     key={`${row.id}/${onlySceneId ?? ''}`} api={api} store={steps} subscribeEvents={store.subscribeEvents} projectId={row.id}
     scene={scenes?.find((item) => item.document.id === sceneId)?.document} stepId={route.stepId}
@@ -363,111 +380,112 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
 
   return (
     <div
-      className={`app${panelOpen ? '' : ' app--panel-closed'}${leftDocked ? '' : ' app--left-floating'}${openProject && chatHere && agentDocked && !narrow ? ' app--agent' : ''}${agentFolded ? ' app--agent-folded' : ''}${openProject && chatHere && narrow ? ' app--agent-drawer' : ''}`}
-      style={{ '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
+      className={`app${shown ? ` app--${shown}` : ''}${narrow ? ' app--narrow' : ''}`}
+      style={{ '--left': `${left}px`, '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
-      {/* A docked side's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
-      {leftDocked && <Splitter
-        side="left" open onToggle={() => setPanelOpen(false)} hide="Hide sidebar" show="Show sidebar"
-        controls="projects-panel" label="Sidebar width" resize={projectsWidth} tab={false}
-      />}
-      {openProject && chatHere && agentDocked && !narrow && <Splitter
-        side="right" open onToggle={() => setAgentDocked(false)} hide="Hide agent" show="Show agent" controls="agent-panel"
-        label="Chat width" resize={agentWidth} tab={false}
-      />}
-      {agentFolded && openProject && statusShown && working && <AgentWorking
-        working={{
-          sentence: `${HARNESS_NAMES[working.turn.harness]} is ${workingAt ? 'changing a step' : 'working'}`,
-          step: workingAt ? {
-            label: `Go to step ${workingAt.stepNumber} of scene ${workingAt.sceneNumber}`, number: workingAt.stepNumber,
-            onOpen: () => navigate({ projectId: openProject.id, view: 'canvas', sceneId: workingAt.sceneId, stepId: working.step!.stepId }),
-          } : undefined,
-          onStop: () => void agentStore.stop(openProject.id),
-        }}
-      />}
-      {panelOpen && (
-        // On a narrow window the sidebar opens over the content, and a press beside it closes it.
-        <div className="projects-scrim" aria-hidden="true" onPointerDown={() => setPanelOpen(false)} />
-      )}
-      {panelOpen && (
-        <ProjectsPanel
-          api={api}
-          store={store}
-          onSwitchWorkspace={switchWorkspace}
-          notices={notices}
-          // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
-          sceneList={(projectRow, transfer) => {
-            const open = isOpen(projectRow.id);
-            if (open && !scenes) return null;
-            const listed = open ? sceneDocuments : projectRow.sceneList;
-            return <SceneList
-              diagram={projectRow.project.name} scenes={listed} currentId={open ? sceneId : undefined} busy={creatingScene}
-              // In the overview a scene is selected where it is, for the chat; on the board it opens.
-              onSelect={(id) => {
-                navigate({ projectId: projectRow.id, view: open ? route.view : 'canvas', sceneId: id, stepId: listed.find((scene) => scene.id === id)?.stepIds[0] });
-                if (!open && window.matchMedia(NARROW).matches) setPanelOpen(false);
-              }}
-              onCreate={() => void createScene(projectRow.id)}
-              onRename={(id, name) => renameScene(projectRow.id, id, name)}
-              onDelete={(id) => deleteScene(projectRow.id, id)}
-              transfer={transfer}
-            />;
-          }}
-          state={state}
-          looseCurrentId={looseOpen ? route.sceneId ?? null : null}
-          onOpenLoose={(id) => {
-            openLoose(id);
-            if (window.matchMedia(NARROW).matches) setPanelOpen(false);
-          }}
-          onCreateLoose={createLoose}
-          onMoveScene={transferScene}
-          onReorderScene={reorderScene}
-          onDeleteLoose={deleteLoose}
-          currentId={route.projectId}
-          creating={creating}
-          onCreatingChange={setCreating}
-          onCreated={diagramCreated}
-          onOpen={(id) => {
-            openDiagram(id);
-            // Over the content on a narrow window: it steps aside once a project is chosen.
-            if (window.matchMedia(NARROW).matches) setPanelOpen(false);
-          }}
-          onDeleted={(id) => {
-            if (id !== route.projectId) return;
-            const next = store.getState().rows.find((candidate) => candidate.kind === 'ok');
-            navigate({ projectId: next?.id ?? null, view: 'canvas', ...(next ? lastPlace.current[next.id] : {}) }, { replace: true });
-          }}
-        />
-      )}
-      {row?.kind === 'ok' ? <>
-        {route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
-          <Canvas
-            key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
-            notices={panelOpen ? undefined : notices}
-            corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen}
-          />
-        </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={panelOpen ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}
-        {/* The agent sits beside the overview, where its changes show across the scenes. */}
-        {chatHere && (narrow || agentDocked) && <AgentPanel
-          store={agentStore} projectId={row.id} projectName={row.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
-          input={agentDrafts[JSON.stringify([row.id, onlySceneId ?? null])] ?? ''}
-          setInput={(value) => {
-            const key = JSON.stringify([row.id, onlySceneId ?? null]);
-            setAgentDrafts((drafts) => ({ ...drafts, [key]: typeof value === 'function' ? value(drafts[key] ?? '') : value }));
-          }}
-          narrow={narrow} open={agentOpen} onClose={hideAgent}
-          onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'canvas', sceneId: id, stepId })}
-          scenesReady={scenes !== undefined}
-          onOpenScene={(id) => navigate({ projectId: row.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
+      <ActivityBar
+        panel={shown} onPanel={togglePanel} chat={openProject ? (chatHere ? 'here' : 'studio') : 'none'}
+        working={Boolean(openProject && working && shown !== 'agent')}
+        studio={openProject && !plainLoose ? overview : undefined}
+        onStudio={() => navigate({ ...routeRef.current, view: overview ? 'canvas' : 'storyboard' })}
+        canvasMenu={canvasMenu}
+        workspace={(stop) => <WorkspaceSwitcher api={api} store={store} state={state} onSwitchWorkspace={switchWorkspace} onNotice={setWorkspaceNotice} {...stop} />}
+      />
+      <div className="shell">
+        {/* The docked panel's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
+        {docked && <Splitter
+          key={docked} side="left" open onToggle={() => chooseSide(null)}
+          hide={docked === 'projects' ? 'Hide projects' : 'Hide agent'} show={docked === 'projects' ? 'Show projects' : 'Show agent'}
+          controls={docked === 'projects' ? 'projects-panel' : 'agent-panel'} label={docked === 'projects' ? 'Sidebar width' : 'Chat width'}
+          resize={docked === 'projects' ? projectsWidth : agentWidth} tab={false}
         />}
-      </> : <MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} />}
-      {/* Each side's toggle, as in Notion: one place on the page whether the side shows or not. The sidebar's sits at the
-          top left, after the window's own buttons in the desktop app; the chat's in its head, or its rail when folded.
-          They come last: the desktop app reads the window's drag areas in document order, and the heads under them
-          are drag areas, so a toggle placed before them would lose its clicks to the window. */}
-      <div className="window-grip" aria-hidden="true" />
-      <PanelToggle side="left" open={panelOpen} onToggle={() => setPanelOpen(!panelOpen)} hide="Hide sidebar" show="Show sidebar" controls="projects-panel" />
-      {openProject && chatHere && <PanelToggle side="right" open={agentShown} onToggle={toggleAgent} hide="Hide agent" show="Show agent" controls="agent-panel" />}
+        {openProject && statusShown && working && <AgentWorking
+          working={{
+            sentence: `${HARNESS_NAMES[working.turn.harness]} is ${workingAt ? 'changing a step' : 'working'}`,
+            step: workingAt ? {
+              label: `Go to step ${workingAt.stepNumber} of scene ${workingAt.sceneNumber}`, number: workingAt.stepNumber,
+              onOpen: () => navigate({ projectId: openProject.id, view: 'canvas', sceneId: workingAt.sceneId, stepId: working.step!.stepId }),
+            } : undefined,
+            onStop: () => void agentStore.stop(openProject.id),
+          }}
+        />}
+        {shown === 'projects' && (
+          // On a narrow window the projects open over the content, and a press beside them closes them.
+          <div className="projects-scrim" aria-hidden="true" onPointerDown={() => chooseSide(null)} />
+        )}
+        {shown === 'projects' && (
+          <ProjectsPanel
+            store={store}
+            notices={notices}
+            // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
+            sceneList={(projectRow, transfer) => {
+              const open = isOpen(projectRow.id);
+              if (open && !scenes) return null;
+              const listed = open ? sceneDocuments : projectRow.sceneList;
+              return <SceneList
+                diagram={projectRow.project.name} scenes={listed} currentId={open ? sceneId : undefined} busy={creatingScene}
+                // In the overview a scene is selected where it is, for the chat; on the board it opens.
+                onSelect={(id) => {
+                  navigate({ projectId: projectRow.id, view: open ? route.view : 'canvas', sceneId: id, stepId: listed.find((scene) => scene.id === id)?.stepIds[0] });
+                  if (!open) closeDrawer();
+                }}
+                onCreate={() => void createScene(projectRow.id)}
+                onRename={(id, name) => renameScene(projectRow.id, id, name)}
+                onDelete={(id) => deleteScene(projectRow.id, id)}
+                transfer={transfer}
+              />;
+            }}
+            state={state}
+            looseCurrentId={looseOpen ? route.sceneId ?? null : null}
+            onOpenLoose={(id) => {
+              openLoose(id);
+              closeDrawer();
+            }}
+            onCreateLoose={createLoose}
+            onMoveScene={transferScene}
+            onReorderScene={reorderScene}
+            onDeleteLoose={deleteLoose}
+            currentId={route.projectId}
+            creating={creating}
+            onCreatingChange={setCreating}
+            onCreated={diagramCreated}
+            onOpen={(id) => {
+              openDiagram(id);
+              // Over the content on a narrow window: it steps aside once a project is chosen.
+              closeDrawer();
+            }}
+            onDeleted={(id) => {
+              if (id !== route.projectId) return;
+              const next = store.getState().rows.find((candidate) => candidate.kind === 'ok');
+              navigate({ projectId: next?.id ?? null, view: 'canvas', ...(next ? lastPlace.current[next.id] : {}) }, { replace: true });
+            }}
+          />
+        )}
+        {row?.kind === 'ok' ? <>
+          {/* The main view, flush with the window's edges, meeting the black in a straight edge. */}
+          <div className="main">{route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
+            <Canvas
+              key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
+              notices={shown === 'projects' ? undefined : notices}
+              corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen} menu={canvasMenu}
+            />
+          </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}</div>
+          {/* The agent sits in the left spot beside the overview, where its changes show across the scenes. As a drawer it
+              stays mounted, closed. */}
+          {chatHere && (narrow || shown === 'agent') && <AgentPanel
+            store={agentStore} projectId={row.id} projectName={row.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
+            input={agentDrafts[JSON.stringify([row.id, onlySceneId ?? null])] ?? ''}
+            setInput={(value) => {
+              const key = JSON.stringify([row.id, onlySceneId ?? null]);
+              setAgentDrafts((drafts) => ({ ...drafts, [key]: typeof value === 'function' ? value(drafts[key] ?? '') : value }));
+            }}
+            narrow={narrow} open={shown === 'agent'} onClose={hideAgent}
+            onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'canvas', sceneId: id, stepId })}
+            scenesReady={scenes !== undefined}
+            onOpenScene={(id) => navigate({ projectId: row.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
+          />}
+        </> : <div className="main"><MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} /></div>}
+      </div>
     </div>
   );
 }

@@ -4,10 +4,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AGENT_WIDTH, FOLDED, PROJECTS_WIDTH, Splitter, useAgentWidth, useProjectsWidth } from './Splitter';
+import { AGENT_WIDTH, PROJECTS_WIDTH, Splitter, useAgentWidth, useProjectsWidth } from './Splitter';
 
-function Chat({ left = PROJECTS_WIDTH.initial }: { left?: number }) {
-  const width = useAgentWidth(left, false);
+function Chat() {
+  const width = useAgentWidth(false);
   const [open, setOpen] = useState(true);
   return <div data-testid="app" data-open={open} style={{ '--panel-agent': `${width.width}px` } as React.CSSProperties}>
     <Splitter side="right" open={open} onToggle={() => setOpen(!open)} hide="Hide agent" show="Show agent" controls="agent-panel" label="Chat width" resize={width} />
@@ -48,25 +48,22 @@ describe('the chat width', () => {
     expect(screen.getByTestId('app').style.getPropertyValue('--panel-agent')).toBe(`${now()}px`);
   });
 
-  it('stays between 320px and 720px, and never takes the 440px the board keeps', async () => {
+  it('stays between 320px and 720px, and never takes the 440px the board keeps beside the activity bar', async () => {
     const user = userEvent.setup();
     render(<Chat />);
     handle().focus();
     await user.keyboard('{Home}');
     expect(now()).toBe(320);
     await user.keyboard('{End}');
-    expect(now()).toBe(720);   // 1440 - 240 projects - 440 board leaves 760: the cap wins
+    expect(now()).toBe(720);   // 1440 - 52 bar - 440 board leaves 948: the cap wins
     cleanup();
-    window.innerWidth = 1100;
+    window.innerWidth = 1000;
     render(<Chat />);
-    expect(handle()).toHaveAttribute('aria-valuemax', '420');   // 1100 - 240 - 440
-    expect(now()).toBe(420);   // the remembered 720 shows narrower, and is not forgotten
-    cleanup();
-    render(<Chat left={300} />);
-    expect(now()).toBe(360);   // a wider sidebar leaves less: 1100 - 300 - 440
+    expect(handle()).toHaveAttribute('aria-valuemax', '508');   // 1000 - 52 bar - 440 board
+    expect(now()).toBe(508);   // the remembered 720 shows narrower, and is not forgotten
     cleanup();
     window.innerWidth = 1440;
-    render(<Chat left={FOLDED} />);
+    render(<Chat />);
     expect(now()).toBe(720);
   });
 

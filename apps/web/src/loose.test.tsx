@@ -537,14 +537,19 @@ describe('the step strip of a loose diagram', () => {
     expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();
   });
 
-  it('is a plain whiteboard with one step: no Present, no view switch, the agent beside the Canvas', async () => {
+  it('is a plain whiteboard with one step: no Present, no Studio, the agent beside the Canvas', async () => {
     await seedLoose('d', 'Pizarra');
     window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     const { unmount } = render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
     expect(document.querySelector('.canvas__corner')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Present/ })).not.toBeInTheDocument();
+    // The activity bar has no Studio for it, and its chat opens in the left spot, beside the Canvas.
+    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
+    expect(within(bar).queryByRole('button', { name: 'Studio' })).not.toBeInTheDocument();
+    await userEvent.setup().click(within(bar).getByRole('button', { name: 'Agent chat' }));
     expect(await screen.findByRole('textbox', { name: /agent/i }, patience)).toBeInTheDocument();
+    expect(screen.getByTestId('canvas')).toBeInTheDocument();
     unmount();
     // The Studio has nothing to show for it: an old address lands on the Canvas.
     window.history.replaceState(null, '', '#/_loose/storyboard/d/d-step-0');
@@ -595,5 +600,59 @@ describe('the step strip of a loose diagram', () => {
     await waitFor(() => expect(window.location.hash).toBe('#/p/canvas/d/d-step-0'), patience);
     await waitFor(() => expect(strip()).toBeInTheDocument(), patience);
     expect(screen.getByRole('button', { name: 'Hide steps' })).toBeInTheDocument();
+  });
+});
+
+describe('the gear in the activity bar', () => {
+  afterEach(() => { delete document.documentElement.dataset.theme; });
+
+  it('holds Excalidraw\'s main menu in the gear: it acts on the Canvas, and only the theme works in the Studio', async () => {
+    const user = userEvent.setup();
+    await seedProject('p', 'Proyecto');
+    window.history.replaceState(null, '', '#/p/canvas/p-scene');
+    render(<App config={config} recovery={memory()} />);
+    await screen.findByTestId('canvas', {}, patience);
+    const settings = within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Settings' });
+    expect(settings).toHaveAttribute('aria-haspopup', 'menu');
+    await user.click(settings);
+    let menu = await screen.findByRole('menu', { name: 'Settings' });
+    expect([...menu.querySelectorAll('[role^="menuitem"]')].map((item) => item.getAttribute('aria-label'))).toEqual([
+      'Export image…', 'Show grid', 'Zen mode', 'View mode', 'Light theme', 'Dark theme', 'System theme',
+      'Library', 'White', 'Light grey', 'Light blue', 'Light yellow', 'Light rose', 'Other colour…',
+    ]);
+    expect(menu.querySelector('[aria-disabled="true"]')).toBeNull();
+    await user.click(within(menu).getByRole('menuitemcheckbox', { name: 'Show grid' }));
+    expect(within(menu).getByRole('menuitemcheckbox', { name: 'Show grid' })).toHaveAttribute('aria-checked', 'true');
+    await user.click(within(menu).getByRole('menuitemradio', { name: 'Light blue' }));
+    expect(within(menu).getByRole('menuitemradio', { name: 'Light blue' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('canvas-look')).toHaveTextContent('grid #f5faff');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Export image…' }));
+    expect(screen.queryByRole('menu', { name: 'Settings' })).not.toBeInTheDocument();
+    await user.click(settings);
+    await user.click(within(await screen.findByRole('menu', { name: 'Settings' })).getByRole('menuitem', { name: 'Library' }));
+    expect(screen.getByTestId('canvas-asked')).toHaveTextContent('export,library');
+    await user.click(settings);
+    menu = await screen.findByRole('menu', { name: 'Settings' });
+    await user.click(within(menu).getByRole('menuitemradio', { name: 'Dark theme' }));
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(within(menu).getByRole('menuitemradio', { name: 'Dark theme' })).toHaveAttribute('aria-checked', 'true');
+    await user.keyboard('{Escape}');
+
+    // In the Studio there is no canvas: its options stay in place, greyed, with a note; the theme still works.
+    await user.click(within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Studio' }));
+    await screen.findByRole('main', { name: 'Studio' }, patience);
+    await user.click(settings);
+    menu = await screen.findByRole('menu', { name: 'Settings' });
+    const note = within(menu).getByText('Open a step on the Canvas to use the drawing options.');
+    for (const name of ['Export image…', 'Library']) expect(within(menu).getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(menu).getByRole('menuitemcheckbox', { name: 'Show grid' })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(menu).getByRole('menuitemradio', { name: 'White' })).toHaveAccessibleDescription(note.textContent!);
+    expect(within(menu).getByRole('menuitemradio', { name: 'Light theme' })).not.toHaveAttribute('aria-disabled');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Export image…' }));
+    expect(screen.getByRole('menu', { name: 'Settings' })).toBeInTheDocument();   // nothing happens, and it stays open
+    await user.click(within(menu).getByRole('menuitemradio', { name: 'Light theme' }));
+    expect(document.documentElement.dataset.theme).toBe('light');
+    await user.click(within(menu).getByRole('menuitemradio', { name: 'System theme' }));
+    expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 });

@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isLooseProject, LOOSE_PROJECT_ID, type Scene } from '@paso/shared';
-import { ChevronsUpDown, CloudOff, Folder, FolderPlus, Layers, Search, ServerOff, Shapes, SquarePen, TriangleAlert, X } from 'lucide-react';
-import type { ApiClient } from '../lib/api';
-import { nativeFolderChooser } from '../lib/desktop';
+import { CloudOff, Folder, FolderPlus, Layers, Search, ServerOff, Shapes, SquarePen, TriangleAlert, X } from 'lucide-react';
 import { describeContents, fold, groupByRecency } from '../lib/format';
 import { shownFilter, showsUnder } from '../lib/project-filter';
-import { ActionError, workspaceErrorText, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
+import { ActionError, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
 import { Brand } from './Brand';
 import { Dialog } from './Dialog';
-import { FolderPicker } from './FolderPicker';
 import { IconPicker } from './IconPicker';
 import { LooseRow, stepCount } from './LooseRow';
 import { MoveDialog } from './MoveDialog';
@@ -18,10 +15,8 @@ import { ProjectFilter } from './ProjectFilter';
 import { ProjectRow } from './ProjectRow';
 import { RowMenu } from './RowMenu';
 import type { SceneTransfer } from './SceneList';
-import { WorkspaceMenu } from './WorkspaceMenu';
 
 type Props = {
-  api: ApiClient;
   store: ProjectsStore;
   state: StoreState;
   currentId: string | null;
@@ -32,8 +27,6 @@ type Props = {
   onCreated: (id: string) => Promise<void>;
   /** After a project is deleted: the app decides where to go. */
   onDeleted: (id: string) => void;
-  /** Opens another workspace. The app saves the open step first. */
-  onSwitchWorkspace: (open: () => Promise<void>) => Promise<void>;
   /** A project's scenes, shown under its row while it is expanded. `transfer` lets each be moved elsewhere. */
   sceneList?: (row: Extract<Row, { kind: 'ok' }>, transfer: SceneTransfer) => ReactNode;
   /** The open step's save state, said in the footer. */
@@ -73,10 +66,10 @@ type Drop = { id: string; index?: number; sceneId?: string; place?: 'before' | '
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Try again.';
 
 /**
- * The sidebar, laid out like tldraw's: the mark, the workspace switcher, the project filter, search and “New project”,
- * then the projects grouped by when they last changed. Each workspace is a folder on this computer.
+ * The sidebar, laid out like tldraw's: the mark, the project filter, search and “New project”, then the projects grouped
+ * by when they last changed, in the open workspace (chosen in the activity bar), a folder on this computer.
  */
-export function ProjectsPanel({ api, store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, onSwitchWorkspace, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
+export function ProjectsPanel({ store, state, currentId, creating, onCreatingChange, onOpen, onCreated, onDeleted, sceneList, notices, looseCurrentId, onOpenLoose, onCreateLoose, onMoveScene, onReorderScene, onDeleteLoose }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [picker, setPicker] = useState<{ id: string; anchor: HTMLElement } | null>(null);
@@ -86,9 +79,6 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   const [notice, setNotice] = useState<string | null>(null);
   /** Null while the search row is a button; a string, even empty, while it is a field. */
   const [query, setQuery] = useState<string | null>(null);
-  const [workspaceMenu, setWorkspaceMenu] = useState(false);
-  const [choosingFolder, setChoosingFolder] = useState(false);
-  const [switching, setSwitching] = useState(false);
   const [creatingLoose, setCreatingLoose] = useState(false);
   const [looseMenu, setLooseMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [renamingLooseId, setRenamingLooseId] = useState<string | null>(null);
@@ -105,7 +95,6 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
     return next;
   });
   useEffect(() => { if (currentId && !isLooseProject(currentId)) setExpandedTo(currentId, true); }, [currentId]);
-  const workspaceButton = useRef<HTMLButtonElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
   const rowById = (id: string) => state.rows.find((row) => row.id === id);
   const named = (id: string) => { const row = rowById(id); return row?.kind === 'ok' ? row.project.name : id; };
@@ -132,21 +121,8 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   };
   const closeDelete = () => { if (!deleteBusy) { setDeleting(null); setDeleteError(null); } };
 
-  const workspaceAction = async (action: () => Promise<void>, failure: string) => {
-    setSwitching(true); setNotice(null);
-    try { await onSwitchWorkspace(action); setQuery(null); }
-    catch (error) { setNotice(`${failure} ${workspaceErrorText(error)}`); }
-    finally { setSwitching(false); }
-  };
-  /** “New workspace…”: the system's folder dialog in the desktop app, the in-app explorer in a browser. */
-  const addWorkspace = async () => {
-    const choose = nativeFolderChooser();
-    if (!choose) { setChoosingFolder(true); return; }
-    setNotice(null);
-    const path = await choose(activeWorkspace && !activeWorkspace.default ? activeWorkspace.path : undefined).catch(() => undefined);
-    if (path === undefined) { setNotice("Couldn't open the folder chooser."); return; }
-    if (path) await workspaceAction(() => store.addWorkspace(path), "Couldn't add the folder.");
-  };
+  // Another workspace: its list starts without a search.
+  useEffect(() => setQuery(null), [listing?.activeId]);
 
   const offline = !state.connected && state.phase === 'ready';
   const looseAll = state.loose?.diagrams ?? [];
@@ -312,28 +288,13 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
   );
 
   return (
-    <aside id="projects-panel" className="projects" aria-label="Projects and diagrams" aria-busy={switching || undefined} data-dragging={drag ? 'true' : undefined}>
-      <div className="projects__head">
-        {/* The window's buttons (in the desktop app) and the sidebar's toggle sit before the mark, over the head. */}
-        <Brand />
-      </div>
+    <aside id="projects-panel" className="projects" aria-label="Projects and diagrams" data-dragging={drag ? 'true' : undefined}>
+      {/* The app's icon and name, right after the window's buttons in the desktop app, which sit on the bar beside it. */}
+      <div className="panel-brand"><Brand /></div>
 
       <div className="projects__nav">
-        <button
-          ref={workspaceButton} type="button" className="workspace-switch" aria-haspopup="menu" aria-expanded={workspaceMenu}
-          aria-label={`Workspace: ${activeWorkspace?.name ?? 'loading'}`} title={activeWorkspace?.path}
-          disabled={!listing || switching} onClick={() => setWorkspaceMenu(!workspaceMenu)}
-        >
-          <span className="workspace-switch__name">{activeWorkspace?.name ?? ' '}</span>
-          <ChevronsUpDown className="i" aria-hidden="true" />
-        </button>
-        {/* As in T3 Code: what the list shows, “All projects” or one of them, with the loose diagrams as one more choice. */}
-        <ProjectFilter
-          projects={filterProjects} value={filter} disabled={!listing || switching || state.phase !== 'ready'}
-          onChange={(next) => { if (listing) void store.setFilter(listing.activeId, next); }}
-        />
-        <hr />
-        {/* As in T3 Code: “Search” on the left of one row, and the two ways to make something new as icons on its right. */}
+        {/* As in T3 Code, one row: “Search” on the left, then the project filter and the two ways to make something new,
+            as icons. While searching, the field takes the place of “Search”. */}
         <div className="nav-actions">
           {query === null ? (
             <button ref={searchButton} type="button" className="nav-row nav-actions__search" onClick={() => setQuery('')}>
@@ -350,6 +311,10 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
               />
             </label>
           )}
+          <ProjectFilter
+            projects={filterProjects} value={filter} disabled={!listing || state.phase !== 'ready'}
+            onChange={(next) => { if (listing) void store.setFilter(listing.activeId, next); }}
+          />
           <button type="button" className="icon-btn nav-actions__new" aria-label="New project" title="New project" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); setCreatingLoose(false); onCreatingChange(true); }}>
             <FolderPlus className="i" aria-hidden="true" />
           </button>
@@ -488,30 +453,6 @@ export function ProjectsPanel({ api, store, state, currentId, creating, onCreati
         </div>
       )}
 
-      {workspaceMenu && listing && workspaceButton.current && (
-        <WorkspaceMenu
-          anchor={workspaceButton.current}
-          workspaces={listing.workspaces}
-          activeId={listing.activeId}
-          onClose={() => setWorkspaceMenu(false)}
-          onSwitch={(id) => void workspaceAction(() => store.switchWorkspace(id), "Couldn't open the workspace.")}
-          onAdd={() => void addWorkspace()}
-          onReveal={() => { setNotice(null); void store.revealWorkspace(listing.activeId).catch(() => setNotice("Couldn't open the workspace's folder.")); }}
-          onRemove={() => void workspaceAction(() => store.removeWorkspace(listing.activeId), "Couldn't remove the workspace.")}
-        />
-      )}
-      {choosingFolder && (
-        <FolderPicker
-          api={api}
-          near={activeWorkspace && !activeWorkspace.default ? activeWorkspace.path : undefined}
-          onClose={() => setChoosingFolder(false)}
-          onChoose={async (path) => {
-            // Errors stay in the explorer, where the person can pick another folder.
-            await onSwitchWorkspace(() => store.addWorkspace(path));
-            setChoosingFolder(false); setQuery(null);
-          }}
-        />
-      )}
       {menu && rowById(menu.id)?.kind === 'ok' && (
         <RowMenu
           anchor={menu.anchor}

@@ -2,7 +2,7 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -104,8 +104,25 @@ function editsStepOne(text = 'Step 1 updated.') {
   };
 }
 
+/** The chat's button in the activity bar. */
+const chatButton = () => within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Agent chat' });
+/** Opens the app in the Studio with the chat in the left spot: from the bar, unless it is remembered open. */
 async function openPanel() {
   render(<App config={config} />);
+  const button = await waitFor(chatButton, patience);
+  if (button.getAttribute('aria-expanded') !== 'true') fireEvent.click(button);
+  return screen.findByRole('complementary', { name: 'Agent' }, patience);
+}
+/**
+ * Picks a scene in the projects panel, which takes the left spot from the chat, then brings the chat back: one panel at
+ * a time. Returns the chat's panel.
+ */
+async function pickScene(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Projects' }));
+  expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+  await user.click(within(await screen.findByRole('list', { name: 'Scenes of Búsqueda binaria' }, patience)).getByRole('button', { name }));
+  await user.click(chatButton());
+  expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
   return screen.findByRole('complementary', { name: 'Agent' }, patience);
 }
 async function send(panel: HTMLElement, user: ReturnType<typeof userEvent.setup>, text: string) {
@@ -127,6 +144,7 @@ beforeEach(async () => {
   await installHarness('claude', '2.1.40 (Claude Code)');
 
   window.history.replaceState(null, '', '#/p/storyboard');
+  window.localStorage.removeItem('paso.side-panel');
   window.matchMedia = ((query: string) => ({
     matches: false, media: query, addEventListener() {}, removeEventListener() {},
   })) as unknown as typeof window.matchMedia;
@@ -159,10 +177,12 @@ describe('agent message drafts', () => {
     let panel = await openPanel();
     const input = () => within(panel).getByRole('textbox', { name: 'Message to the agent' });
     await user.type(input(), 'Borrador uno');
-    await user.click(within(await screen.findByRole('list', { name: 'Scenes of Búsqueda binaria' }, patience)).getByRole('button', { name: 'Scene 2: Partir en dos' }));
+    panel = await pickScene(user, 'Scene 2: Partir en dos');
     expect(input()).toHaveValue('Borrador uno');
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    // The Studio's button again goes back to the Canvas, where the chat is not; once more, and the chat is back.
+    await user.click(screen.getByRole('button', { name: 'Studio' }));
     expect(await screen.findByRole('main', { name: 'Canvas' }, patience)).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Studio' }, patience));
     panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(input()).toHaveValue('Borrador uno');
@@ -312,13 +332,15 @@ describe('a turn as it happens', () => {
       yield { type: 'finished', reason: 'completed' };
     };
     const user = userEvent.setup();
-    const panel = await openPanel();
+    let panel = await openPanel();
 
+    // The panel starts with the app's icon and name, as the projects do.
+    expect(panel.querySelector('.panel-brand')).toHaveTextContent('Paso');
     // The target is the scene selected in the sidebar; the panel's head names it, and there is nothing to pick there.
     // The log starts empty.
     expect(within(panel).getByRole('log', { name: 'Conversation with the agent' })).toBeEmptyDOMElement();
     await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('01El problema'), patience);
-    await user.click(within(screen.getByRole('list', { name: 'Scenes of Búsqueda binaria' })).getByRole('button', { name: 'Scene 2: Partir en dos' }));
+    panel = await pickScene(user, 'Scene 2: Partir en dos');
     await waitFor(() => expect(within(panel).getByRole('heading', { level: 2 })).toHaveTextContent('02Partir en dos'), patience);
     expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();   // selecting keeps the Studio
     const scene2 = await screen.findByRole('region', { name: 'Scene 2: Partir en dos' }, patience);   // which shows that scene
@@ -395,25 +417,23 @@ describe('a turn as it happens', () => {
     // With the panel in view, the top bar says nothing.
     expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument();
 
-    // Folded, the panel leaves it to a small floating status.
-    // One toggle, outside the panel, which stays at the same spot when the panel folds away and leaves nothing else.
-    const toggle = screen.getByRole('button', { name: 'Hide agent' });
-    expect(within(panel).queryByRole('button', { name: 'Hide agent' })).not.toBeInTheDocument();
-    expect(toggle.querySelector('svg')).toHaveClass('lucide-panel-right');
-    // After the panel in the document, so the head's drag area in the desktop app never takes its clicks.
-    expect(panel.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Folded, the panel leaves it to a small floating status, and a pink dot on the chat's button in the activity bar.
+    const toggle = chatButton();
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls', 'agent-panel');
+    expect(toggle.querySelector('.activity-bar__badge')).toBeNull();
     await user.click(toggle);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show agent' })).toBe(toggle);
-    expect(document.querySelector('.app')).toHaveClass('app--agent-folded');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('.app')).not.toHaveClass('app--agent');
+    expect(toggle.querySelector('.activity-bar__badge')).not.toBeNull();
     const status = await screen.findByRole('status', { name: 'Agent working' }, patience);
     expect(status).toHaveTextContent('Claude Code is changing a step');
     expect(within(status).getByRole('button', { name: 'Go to step 1 of scene 1' })).toHaveTextContent('1');
     await user.click(within(status).getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument(), patience);
 
-    await user.click(screen.getByRole('button', { name: 'Show agent' }));
+    await user.click(chatButton());
     const after = await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(await within(after).findByText(/^Stopped · /, {}, patience)).toBeInTheDocument();
     expect(within(after).getByRole('button', { name: 'Send' })).toBeInTheDocument();
@@ -453,7 +473,7 @@ describe('undoing a run', () => {
       expect(within(scene1).getByRole('button', { name: 'Step 1: Inicio' })).toBeInTheDocument();
     }, patience);
     // The other scene keeps the person's edit.
-    await user.click(within(screen.getByRole('list', { name: 'Scenes of Búsqueda binaria' })).getByRole('button', { name: 'Scene 2: Partir en dos' }));
+    await pickScene(user, 'Scene 2: Partir en dos');
     const scene2 = await screen.findByRole('region', { name: 'Scene 2: Partir en dos' }, patience);
     await within(scene2).findByRole('button', { name: 'Step 1: Trabajo de la persona' }, patience);
     expect(humanStep).toBeDefined();
@@ -667,8 +687,11 @@ describe('the history of conversations', () => {
 });
 
 describe('narrow windows', () => {
-  it('opens the panel as a drawer from the tab on its edge, and shows the agent status while it is closed', async () => {
+  it('opens the panel as a drawer from the activity bar, and shows the agent status while it is closed', async () => {
     window.innerWidth = 900;
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(max-width: 1063px)', media: query, addEventListener() {}, removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
     await call('POST', '/harnesses', { id: 'claude' });
     adapterImpl = async function* (_request, signal) {
       yield { type: 'tool_use', id: 'slow', tool: 'update_elements', readOnly: false, target: { projectId: 'p', sceneId: 's1', stepId: 'step1' } };
@@ -677,15 +700,18 @@ describe('narrow windows', () => {
     };
     const user = userEvent.setup();
     render(<App config={config} />);
-    const toggle = await screen.findByRole('button', { name: 'Show agent' }, patience);
-    const panel = screen.getByRole('complementary', { name: 'Agent', hidden: true });
+    const toggle = await waitFor(chatButton, patience);
+    const panel = await screen.findByRole('complementary', { name: 'Agent', hidden: true }, patience);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(panel).not.toHaveAttribute('data-open');
-    // A drawer does not dock: there is no edge to drag, only the tab.
+    // A drawer does not dock: there is no edge to drag, only the bar's button.
     expect(screen.queryByRole('separator', { name: 'Chat width' })).not.toBeInTheDocument();
 
     await user.click(toggle);
     expect(panel).toHaveAttribute('data-open', 'true');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // A drawer is for the moment: the panel to bring back with room to dock stays the one chosen there.
+    expect(window.localStorage.getItem('paso.side-panel')).toBeNull();
     expect(within(panel).getByRole('textbox', { name: 'Message to the agent' })).toHaveFocus();
     await send(panel, user, 'Cambio lento');
     await within(panel).findByText('Changing the step', {}, patience);

@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // The session token, and the event stream's address: the page is at paso://app, the service on a loopback port.
 const session = ipcRenderer.sendSync('paso-session') ?? {};
 contextBridge.exposeInMainWorld('pasoDesktop', {
-  // macOS draws the window's buttons over the page, in the sidebar's head: the page leaves them room.
+  // macOS draws the window's buttons over the page, at the top of the activity bar: the page leaves them room.
   windowControls: process.platform === 'darwin' ? 'mac' : undefined,
   token: session.token,
   events: session.events,

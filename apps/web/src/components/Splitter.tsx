@@ -9,6 +9,11 @@ export const AGENT_WIDTH = { initial: 360, min: 320, max: 720 } as const;
 export const FOLDED = 16;
 /** What the overview keeps beside the chat: the room for its cards. The chat is only in the overview. */
 export const BOARD_MIN = { storyboard: 440 } as const;
+/** What the activity bar takes from the window's width: --bar-w in tokens.css, wider in the desktop app on macOS. */
+export function barWidth() {
+  const value = typeof document === 'undefined' ? NaN : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-w'));
+  return Number.isFinite(value) && value > 0 ? value : 52;
+}
 const STEP = 16;
 /** A drag this far past the narrowest width folds the side; dragging a folded side out by `OPEN_AT` unfolds it. */
 const FOLD_AT = 80;
@@ -21,9 +26,9 @@ function stored(key: string, initial: number): number {
   } catch { return initial; }
 }
 
-/** The room the window leaves for a docked chat: what is left once the left column and the board have theirs. */
-export function chatRoom(width: number, left: number, boardMin: number) {
-  return width - left - boardMin;
+/** The room the window leaves for the panel in the left spot: what is left once the frame and the board have theirs. */
+export function panelRoom(width: number, boardMin: number) {
+  return width - barWidth() - boardMin;
 }
 
 export type PanelWidth = { width: number; min: number; max: number; initial: number; choose: (width: number) => void };
@@ -51,22 +56,22 @@ function useStoredWidth(key: string, range: { initial: number; min: number }, wi
   return { width, min: range.min, max, initial: range.initial, choose };
 }
 
-/** The sidebar's width. It always leaves the board its minimum and a docked chat its narrowest. */
+/** The projects panel's width. It always leaves the board its minimum. */
 export function useProjectsWidth(boardMin: number = BOARD_MIN.storyboard) {
-  const widest = () => Math.max(PROJECTS_WIDTH.min, Math.min(PROJECTS_WIDTH.max, window.innerWidth - boardMin - AGENT_WIDTH.min));
+  const widest = () => Math.max(PROJECTS_WIDTH.min, Math.min(PROJECTS_WIDTH.max, panelRoom(window.innerWidth, boardMin)));
   return useStoredWidth('paso.projects-width', PROJECTS_WIDTH, widest, [boardMin]);
 }
 
 /**
- * The chat's width. It never takes the board's room beside the left column (`left`, the sidebar or its strip), and as a
- * drawer it leaves a strip of the board in view.
+ * The chat's width, in the same left spot. It never takes the board's room, and as a drawer it leaves a strip of the
+ * board in view.
  */
-export function useAgentWidth(left: number, drawer: boolean, boardMin: number = BOARD_MIN.storyboard) {
+export function useAgentWidth(drawer: boolean, boardMin: number = BOARD_MIN.storyboard) {
   const widest = () => {
-    const room = drawer ? window.innerWidth - 48 : chatRoom(window.innerWidth, left, boardMin);
+    const room = drawer ? window.innerWidth - barWidth() - 48 : panelRoom(window.innerWidth, boardMin);
     return Math.max(AGENT_WIDTH.min, Math.min(AGENT_WIDTH.max, room));
   };
-  return useStoredWidth('paso.agent-width', AGENT_WIDTH, widest, [left, drawer, boardMin]);
+  return useStoredWidth('paso.agent-width', AGENT_WIDTH, widest, [drawer, boardMin]);
 }
 
 type Props = {
@@ -82,7 +87,7 @@ type Props = {
   /** The edge's name, “… width”, and the width it moves. Without it there is only the tab: the panel is a drawer. */
   label?: string;
   resize?: PanelWidth;
-  /** False when the side has its own toggle elsewhere (PanelToggle): only the edge to drag is left. */
+  /** False when the side has its own toggle elsewhere (the activity bar): only the edge to drag is left. */
   tab?: boolean;
 };
 

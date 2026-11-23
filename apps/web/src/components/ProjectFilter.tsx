@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { LOOSE_PROJECT_ID } from '@paso/shared';
-import { Check, ChevronDown, Folders, ListFilter, Search, Shapes } from 'lucide-react';
+import { Check, Folders, ListFilter, Search, Shapes } from 'lucide-react';
 import { ProjectIcon } from '../lib/icons';
 import { matchChoices, type ProjectFilter as Filter } from '../lib/project-filter';
 import { Popover } from './Popover';
@@ -16,8 +16,9 @@ type Props = {
 };
 
 /**
- * The sidebar's project filter, after T3 Code's: a row naming what the list shows, “All projects”, one project or
- * “Loose diagrams”, that opens a searchable list of those choices. As in T3 Code the focus stays in the search field
+ * The sidebar's project filter, after T3 Code's: an icon button in the row of “Search”, named after what the list shows,
+ * “All projects”, one project or “Loose diagrams”, that opens a searchable list of those choices. With a choice other
+ * than “All projects” it shows that choice's icon on the selected grey, so a filtered list is never mistaken for all. As in T3 Code the focus stays in the search field
  * while the arrow keys move through the list, Enter chooses, and Escape closes it.
  */
 export function ProjectFilter({ projects, value, disabled = false, onChange }: Props) {
@@ -32,12 +33,11 @@ export function ProjectFilter({ projects, value, disabled = false, onChange }: P
   return (
     <>
       <button
-        ref={trigger} type="button" className="nav-row project-filter" aria-haspopup="dialog" aria-expanded={open}
-        aria-label={`Filter by project: ${chosen.label}`} title={chosen.label} disabled={disabled} onClick={() => setOpen(!open)}
+        ref={trigger} type="button" className="icon-btn project-filter" aria-haspopup="dialog" aria-expanded={open}
+        aria-label={`Filter by project: ${chosen.label}`} title={`Filter by project: ${chosen.label}`} disabled={disabled}
+        data-filtered={value === null ? undefined : 'true'} onClick={() => setOpen(!open)}
       >
         {value === null ? <ListFilter className="i" aria-hidden="true" /> : chosen.icon}
-        <span className="project-filter__label">{chosen.label}</span>
-        <ChevronDown className="i project-filter__chevron" aria-hidden="true" />
       </button>
       {open && trigger.current && (
         <FilterList

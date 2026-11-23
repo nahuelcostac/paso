@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Excalidraw, MainMenu, restore } from '@excalidraw/excalidraw';
+import { CaptureUpdateAction, Excalidraw, MainMenu, restore } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import type { AppState, ExcalidrawImperativeAPI, ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
-import { Check, Monitor, Moon, Sun, Library } from 'lucide-react';
-import { chooseTheme, useThemeChoice, type ThemeChoice } from '../lib/theme';
+import { chooseTheme } from '../lib/theme';
 import { canvasElements, canvasFiles, loadDrawingFonts } from './excalidraw-runtime';
 import { loadFiles } from './assets';
 import type { ApiClient } from '../lib/api';
@@ -15,40 +14,14 @@ import { sceneFrame } from './scene-content';
 import { clearHistory, finishTyping, swapStep } from './step-swap';
 import { Loading } from './Loading';
 import { canvasStepKey } from './step-keys';
+import type { CanvasMenu, CanvasModes } from './canvas-menu';
 import '../styles/editor.css';
 
 /** Zen and view mode are how the person is looking, not part of a step: they carry over from one step to the next.
  * The grid is saved with each step, as Excalidraw saves it with a drawing. */
 const looking = { zen: false, view: false };
-type Modes = { grid: boolean; zen: boolean; view: boolean };
-const modesOf = (appState: Pick<AppState, 'gridModeEnabled' | 'zenModeEnabled' | 'viewModeEnabled'>): Modes =>
+const modesOf = (appState: Pick<AppState, 'gridModeEnabled' | 'zenModeEnabled' | 'viewModeEnabled'>): CanvasModes =>
   ({ grid: Boolean(appState.gridModeEnabled), zen: Boolean(appState.zenModeEnabled), view: Boolean(appState.viewModeEnabled) });
-const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-
-/** A menu row that turns something on or off: a check when it is on, with Excalidraw's own shortcut. */
-function Toggle({ on, shortcut, onToggle, children }: { on: boolean; shortcut: string; onToggle: () => void; children: string }) {
-  return <MainMenu.Item role="menuitemcheckbox" aria-checked={on} icon={on ? <Check aria-hidden="true" /> : <span aria-hidden="true" />}
-    shortcut={shortcut} onSelect={onToggle}>{children}</MainMenu.Item>;
-}
-
-const THEMES: Array<{ value: ThemeChoice; label: string; icon: typeof Sun }> = [
-  { value: 'light', label: 'Light', icon: Sun }, { value: 'dark', label: 'Dark', icon: Moon }, { value: 'system', label: 'System', icon: Monitor },
-];
-/** “Theme” with Light, Dark and System, in Excalidraw's own radio row markup so it looks like its menu. Its built-in row
- * has no System choice, which leaves the theme to the OS. */
-function ThemeRow({ choice }: { choice: ThemeChoice }) {
-  return <div className="dropdown-menu-item-base dropdown-menu-item-bare">
-    <label className="dropdown-menu-item__text" htmlFor="paso-theme">Theme</label>
-    <div className="RadioGroup" role="radiogroup" aria-label="Theme">
-      {THEMES.map(({ value, label, icon: Icon }) => (
-        <div key={value} className={`RadioGroup__choice${value === choice ? ' active' : ''}`} title={label}>
-          <input id={value === 'light' ? 'paso-theme' : undefined} name="paso-theme" type="radio" checked={value === choice} aria-label={label} onChange={() => chooseTheme(value)} />
-          <Icon className="i" aria-hidden="true" />
-        </div>
-      ))}
-    </div>
-  </div>;
-}
 
 const failure = "Couldn't prepare the save. Keep this window open.";
 
@@ -58,7 +31,7 @@ const failure = "Couldn't prepare the save. Keep this window open.";
  * on screen stays until the next one is ready. Only the first step opened, a canvas that failed, or a canvas that is
  * still starting are mounted afresh.
  */
-export default function StepCanvas({ api, store, session, theme, keepFocus, camera, onStepKey, view, onShow }: {
+export default function StepCanvas({ api, store, session, theme, keepFocus, camera, onStepKey, view, onShow, menu }: {
   api: ApiClient; store: StepStore;
   /** The step the Canvas asks for. Undefined while the store is still reading it: the canvas keeps what it shows. */
   session: Session | undefined;
@@ -69,6 +42,8 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
   view?: ViewStore;
   /** Told which step is on screen, once it is: the Canvas's camera controls and notices belong to that one. */
   onShow?: (session: Session | undefined) => void;
+  /** The activity bar's gear menu, which holds what Excalidraw's main menu held: it acts on this canvas while it is shown. */
+  menu?: CanvasMenu;
 }) {
   const mounted = useRef(false);
   const focusCanvas = useRef(true);
@@ -89,14 +64,26 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
   const swapped = useRef(false);
   const frame = useRef<readonly ExcalidrawElement[]>(undefined);
   const openOnce = useRef(openingFit(true));
-  const [modes, setModes] = useState<Modes>({ grid: Boolean(session?.document.appState.gridModeEnabled), ...looking });
-  const themeChoice = useThemeChoice();
+  const [modes, setModes] = useState<CanvasModes>({ grid: Boolean(session?.document.appState.gridModeEnabled), ...looking });
+  const [background, setBackground] = useState(session?.document.appState.viewBackgroundColor ?? '#ffffff');
   const excalidrawTheme = useRef(theme);
   const onShowRef = useRef(onShow); onShowRef.current = onShow;
-  const toggle = (key: keyof Modes) => {
-    const next = { ...modes, [key]: !modes[key] };
-    excalidraw?.updateScene({ appState: { gridModeEnabled: next.grid, zenModeEnabled: next.zen, viewModeEnabled: next.view } });
-  };
+  // The gear menu in the activity bar acts on this canvas while Excalidraw is up, and loses it when the canvas goes.
+  useEffect(() => {
+    if (!menu || !excalidraw) return;
+    menu.set({
+      modes, background,
+      toggle: (key) => {
+        const next = { ...modes, [key]: !modes[key] };
+        excalidraw.updateScene({ appState: { gridModeEnabled: next.grid, zenModeEnabled: next.zen, viewModeEnabled: next.view } });
+      },
+      exportImage: () => excalidraw.updateScene({ appState: { openDialog: { name: 'imageExport' } } }),
+      toggleLibrary: () => excalidraw.toggleSidebar({ name: 'default', tab: 'library' }),
+      // As Excalidraw's own picker does: one step back with undo, saved with the step.
+      setBackground: (color) => excalidraw.updateScene({ appState: { viewBackgroundColor: color }, captureUpdate: CaptureUpdateAction.IMMEDIATELY }),
+    });
+  }, [menu, excalidraw, modes, background]);
+  useEffect(() => () => menu?.set(undefined), [menu, excalidraw]);
   const show = (next: Session | undefined) => { shownRef.current = next; setShown(next); onShowRef.current?.(next); };
   /** Hands the store what the canvas holds now, so the step being left keeps its last edit even if Excalidraw has not reported it yet. */
   const capture = (app: ExcalidrawImperativeAPI, owner: Session) => {
@@ -148,6 +135,7 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
       ready.current = false;
       session.baseline = undefined;
       setModes({ grid: Boolean(restored.appState.gridModeEnabled), ...looking });
+      setBackground(restored.appState.viewBackgroundColor);
       setData({ key: ++mounts.current, initial: { ...restored, appState: { ...restored.appState, ...opening, zenModeEnabled: looking.zen, viewModeEnabled: looking.view }, scrollToContent: !opening } });
       show(session);
     })().catch(() => {
@@ -155,7 +143,7 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
       // The canvas gives way to the message. What it held is the store's first.
       const app = excalidrawRef.current, previous = shownRef.current;
       if (app && previous && ready.current) capture(app, previous);
-      ready.current = false; excalidrawRef.current = null;
+      ready.current = false; excalidrawRef.current = null; setExcalidraw(undefined);
       setData(undefined); show(undefined);
       setError("Couldn't load the drawing or one of its images.");
     });
@@ -202,6 +190,7 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
           looking.zen = next.zen; looking.view = next.view;
           setModes(next);
         }
+        if (appState.viewBackgroundColor !== background) setBackground(appState.viewBackgroundColor);
         // Alt+Shift+D switches Excalidraw's theme by itself: make it the window's theme too. Only a change Excalidraw
         // made counts: while a new theme prop is on its way in, its appState still holds the old one for a moment.
         if (appState.theme !== excalidrawTheme.current) {
@@ -211,20 +200,9 @@ export default function StepCanvas({ api, store, session, theme, keepFocus, came
         try { store.change(owner, elements, appState, files); setError(undefined); }
         catch { store.fail(owner, failure); }
       }}>
-      <MainMenu>
-        <MainMenu.DefaultItems.SaveAsImage />
-        <MainMenu.Separator />
-        <MainMenu.Group title="Preferences">
-          <Toggle on={modes.grid} shortcut={mac ? "Cmd+'" : "Ctrl+'"} onToggle={() => toggle('grid')}>Show grid</Toggle>
-          <Toggle on={modes.zen} shortcut="Alt+Z" onToggle={() => toggle('zen')}>Zen mode</Toggle>
-          <Toggle on={modes.view} shortcut="Alt+R" onToggle={() => toggle('view')}>View mode</Toggle>
-          <ThemeRow choice={themeChoice} />
-        </MainMenu.Group>
-        <MainMenu.Separator />
-        {/* The library's own button gave its corner to Present: the library opens from here. */}
-        <MainMenu.Item icon={<Library aria-hidden="true" />} onSelect={() => excalidrawRef.current?.toggleSidebar({ name: 'default', tab: 'library' })}>Library</MainMenu.Item>
-        <MainMenu.DefaultItems.ChangeCanvasBackground />
-      </MainMenu>
+      {/* Excalidraw's main menu moved to the gear in the activity bar. An empty one keeps Excalidraw's default (with its
+          links) out, and its button is hidden (app.css). */}
+      <MainMenu />
     </Excalidraw>
   </div>;
 }
