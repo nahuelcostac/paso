@@ -105,6 +105,9 @@
   /* The panels in the left spot (the projects, the chat) are black too, in both themes: they take the dark theme's
      tokens (color-scheme: dark on them, app.css) with the bar's black as their surface. */
   --panel-bg: var(--bar);
+  /* The straight edge between the black and the main view: a line only the dark theme needs, where the main view is
+     nearly black itself; in the light theme the black meets the white. */
+  --bar-line: light-dark(#000000, #2e2e33);
 
   /* ---------------------------------------------------------------- typography
      Inter everywhere, numbers in tabular figures. Sizes follow T3 Code's scale (its root is 16px): text-sm (14px) for
@@ -148,7 +151,6 @@
   --bar-w: 52px; /* the activity bar; barWidth() in Splitter.tsx reads it */
   --bar-top: 40px; /* the top of the bar and of the panel beside it: the window's buttons on macOS, the app's icon */
   --bar-button: 40px; /* its round buttons, 20px icons */
-  --frame-radius: 12px; /* the main view's left corners, against the black, and the drawers' right ones */
   --carousel-h: 108px;
   --carousel-over-bar-h: 100px; /* the strip above its bar */
   --step-bar-h: 36px; /* the bar under the strip, which stays when it is hidden */

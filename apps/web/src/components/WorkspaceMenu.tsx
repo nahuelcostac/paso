@@ -5,6 +5,8 @@ import { Popover, useMenuKeys } from './Popover';
 
 type Props = {
   anchor: HTMLElement;
+  /** Where it opens: beside the activity bar's button, on its right. */
+  side?: 'below' | 'right';
   workspaces: WorkspaceInfo[];
   activeId: string;
   onSwitch: (id: string) => void;
@@ -15,16 +17,16 @@ type Props = {
 };
 
 /**
- * The sidebar's workspace switcher: every workspace, the open one checked, then the actions. A folder that is gone is
+ * The activity bar's workspace switcher: every workspace, the open one checked, then the actions. A folder that is gone is
  * listed but cannot be opened. The default workspace, Paso's own folder, cannot be taken off the list.
  */
-export function WorkspaceMenu({ anchor, workspaces, activeId, onSwitch, onAdd, onReveal, onRemove, onClose }: Props) {
+export function WorkspaceMenu({ anchor, side, workspaces, activeId, onSwitch, onAdd, onReveal, onRemove, onClose }: Props) {
   const list = useRef<HTMLDivElement>(null);
   const keys = useMenuKeys(list);
   const active = workspaces.find((workspace) => workspace.id === activeId);
   const run = (action: () => void) => () => { onClose(); action(); };
   return (
-    <Popover anchor={anchor} onClose={onClose} role="menu" label="Workspaces" className="menu menu--workspaces" onKeyDown={keys}>
+    <Popover anchor={anchor} side={side} onClose={onClose} role="menu" label="Workspaces" className="menu menu--workspaces" onKeyDown={keys}>
       <div ref={list}>
         {workspaces.map((workspace) => {
           const checked = workspace.id === activeId;

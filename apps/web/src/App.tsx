@@ -16,6 +16,7 @@ import { SceneList } from './components/SceneList';
 import { AgentWorking } from './components/AgentWorking';
 import { BOARD_MIN, Splitter, useAgentWidth, useProjectsWidth } from './components/Splitter';
 import { ActivityBar, type SidePanel } from './components/ActivityBar';
+import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
 import { createCanvasMenu } from './editor/canvas-menu';
 import { PresentButton } from './present/PresentButton';
 import { useScenes } from './state/scenes';
@@ -141,6 +142,8 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const sceneId = scenes?.find((item) => item.document.id === route.sceneId)?.document.id;
   const [creatingScene, setCreatingScene] = useState(false);
   const [sceneError, setSceneError] = useState<string>();
+  /** A workspace that couldn't be opened, added or removed, from the activity bar's switcher. */
+  const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null);
   /** The project the sidebar acts on: the open one, or another expanded there. */
   const isOpen = (projectId: string) => openProject?.id === projectId;
   const scenesOf = async (projectId: string) => {
@@ -342,10 +345,14 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   })() : undefined;
 
   // Failures with no place of their own. They sit in the sidebar, or above the step strip while it is folded.
-  const notices = failedStep || sceneError ? <>
+  const notices = failedStep || sceneError || workspaceNotice ? <>
     {failedStep && <div className="notice notice--error" role="alert">
       <span>A step in another scene couldn't be saved.</span>
       <button type="button" className="notice__action" onClick={() => navigate({ ...failedStep.target, view: 'canvas' })}>Review unsaved step</button>
+    </div>}
+    {workspaceNotice && <div className="notice notice--error" role="alert">
+      <span>{workspaceNotice}</span>
+      <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setWorkspaceNotice(null)}>×</button>
     </div>}
     {sceneError && <div className="notice notice--error" role="alert">
       <span>{sceneError}</span>
@@ -382,6 +389,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         studio={openProject && !plainLoose ? overview : undefined}
         onStudio={() => navigate({ ...routeRef.current, view: overview ? 'canvas' : 'storyboard' })}
         canvasMenu={canvasMenu}
+        workspace={(stop) => <WorkspaceSwitcher api={api} store={store} state={state} onSwitchWorkspace={switchWorkspace} onNotice={setWorkspaceNotice} {...stop} />}
       />
       <div className="shell">
         {/* The docked panel's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
@@ -407,9 +415,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         )}
         {shown === 'projects' && (
           <ProjectsPanel
-            api={api}
             store={store}
-            onSwitchWorkspace={switchWorkspace}
             notices={notices}
             // Under each expanded project: its scenes. The open one shows them as the board reads them, the others as listed.
             sceneList={(projectRow, transfer) => {
@@ -456,7 +462,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           />
         )}
         {row?.kind === 'ok' ? <>
-          {/* The main view, flush with the window's edges, its left corners rounded against the black. */}
+          {/* The main view, flush with the window's edges, meeting the black in a straight edge. */}
           <div className="main">{route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
             <Canvas
               key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}

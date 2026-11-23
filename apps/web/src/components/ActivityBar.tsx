@@ -20,21 +20,23 @@ type Props = {
   studio?: boolean;
   onStudio: () => void;
   canvasMenu: CanvasMenu;
+  /** The workspace switcher, above the gear, given the toolbar's tab stop for it. */
+  workspace: (stop: { tabIndex: number; onFocus: () => void }) => ReactNode;
 };
 
 /**
  * The black bar down the window's left edge, as in VS Code: at the top, the two panels that share the left spot and the
- * Studio; at the foot, the gear with what Excalidraw's main menu held. It is one toolbar: Tab reaches it once, and the
+ * Studio; at the foot, the workspace switcher, then the gear with what Excalidraw's main menu held. It is one toolbar: Tab reaches it once, and the
  * arrow keys, Home and End move between its buttons.
  */
-export function ActivityBar({ panel, onPanel, chat, working = false, studio, onStudio, canvasMenu }: Props) {
+export function ActivityBar({ panel, onPanel, chat, working = false, studio, onStudio, canvasMenu, workspace }: Props) {
   const bar = useRef<HTMLDivElement>(null);
   const gear = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const canvas = useCanvasMenu(canvasMenu);
   // The button that keeps the toolbar's one tab stop: the last one used.
   const [current, setCurrent] = useState('projects');
-  const shown = ['projects', ...(chat === 'none' ? [] : ['agent']), ...(studio === undefined ? [] : ['studio']), 'settings'];
+  const shown = ['projects', ...(chat === 'none' ? [] : ['agent']), ...(studio === undefined ? [] : ['studio']), 'workspace', 'settings'];
   const stop = shown.includes(current) ? current : 'projects';
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -74,6 +76,7 @@ export function ActivityBar({ panel, onPanel, chat, working = false, studio, onS
           { 'aria-pressed': studio }, onStudio, undefined, studio ? 'Studio: back to the Canvas' : "Studio: the scene's steps")}
       </div>
       <div className="activity-bar__group">
+        {workspace({ tabIndex: stop === 'workspace' ? 0 : -1, onFocus: () => setCurrent('workspace') })}
         <button
           ref={gear} type="button" className="activity-bar__button" data-id="settings" aria-label="Settings" title="Settings"
           aria-haspopup="menu" aria-expanded={menuOpen} tabIndex={stop === 'settings' ? 0 : -1}
