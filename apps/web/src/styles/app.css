@@ -204,8 +204,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 button.nav-row:hover:not(:disabled) { background: var(--surface-sunken); color: var(--ink); }
 /* “Search” and, on its right, “New project” and “New diagram” as icons, in one row, as in T3 Code. */
 .nav-actions { display: flex; align-items: center; gap: 2px; }
-/* The project filter takes the row's room, left of the two icons; its name is cut short before it meets them. */
-.nav-actions .project-filter { flex: 1; min-width: 0; }
+.nav-actions__search { flex: 1; min-width: 0; }
 .nav-actions__new { color: var(--ink-3); }
 .nav-row--field { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line-strong); cursor: text; }
 .nav-row--field:focus-within { box-shadow: inset 0 0 0 1px var(--accent-line), var(--focus-ring); }
@@ -216,9 +215,9 @@ button.nav-row:hover:not(:disabled) { background: var(--surface-sunken); color: 
 /* The project filter, after T3 Code's: what the list shows, under the workspace, and its searchable list. The list's
    field is the popovers' field (.picker__search) and its options are .menu's items: 28px, 8px in, 4px corners. */
 .project-filter[aria-expanded='true'] { background: var(--surface-sunken); color: var(--ink); }
+/* A list narrowed to one project or to the loose diagrams: the filter shows that choice's icon on the selected grey. */
+.project-filter[data-filtered] { background: var(--accent-soft); color: var(--accent-ink); }
 .project-filter:disabled { opacity: 1; cursor: default; }
-.project-filter__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-filter svg.project-filter__chevron { width: 14px; height: 14px; }
 .popover.project-filter-menu { width: 256px; max-width: calc(100vw - 16px); }
 .project-filter-menu .picker__search { margin: 0 0 var(--space-1); }
 .project-filter-menu__list { max-height: min(320px, 50vh); overflow-y: auto; scrollbar-width: thin; }

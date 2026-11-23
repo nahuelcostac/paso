@@ -293,26 +293,24 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
       <div className="panel-brand"><Brand /></div>
 
       <div className="projects__nav">
-        {/* “Search” on its own row: it turns into a field that filters the list in place. */}
-        {query === null ? (
-          <button ref={searchButton} type="button" className="nav-row" onClick={() => setQuery('')}>
-            <Search className="i" aria-hidden="true" />Search
-          </button>
-        ) : (
-          <label className="nav-row nav-row--field">
-            <Search className="i" aria-hidden="true" />
-            <input
-              type="search" autoFocus value={query} placeholder="Search" aria-label="Search projects and diagrams" spellCheck={false}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setQuery(null); requestAnimationFrame(() => searchButton.current?.focus()); } }}
-              onBlur={(event) => { if (!event.currentTarget.value.trim()) setQuery(null); }}
-            />
-          </label>
-        )}
-        <hr />
-        {/* What the list shows (“All projects”, one project or the loose diagrams), then the two ways to make something
-            new as icons on its right. */}
+        {/* As in T3 Code, one row: “Search” on the left, then the project filter and the two ways to make something new,
+            as icons. While searching, the field takes the place of “Search”. */}
         <div className="nav-actions">
+          {query === null ? (
+            <button ref={searchButton} type="button" className="nav-row nav-actions__search" onClick={() => setQuery('')}>
+              <Search className="i" aria-hidden="true" />Search
+            </button>
+          ) : (
+            <label className="nav-row nav-row--field nav-actions__search">
+              <Search className="i" aria-hidden="true" />
+              <input
+                type="search" autoFocus value={query} placeholder="Search" aria-label="Search projects and diagrams" spellCheck={false}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setQuery(null); requestAnimationFrame(() => searchButton.current?.focus()); } }}
+                onBlur={(event) => { if (!event.currentTarget.value.trim()) setQuery(null); }}
+              />
+            </label>
+          )}
           <ProjectFilter
             projects={filterProjects} value={filter} disabled={!listing || state.phase !== 'ready'}
             onChange={(next) => { if (listing) void store.setFilter(listing.activeId, next); }}

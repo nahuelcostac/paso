@@ -522,11 +522,16 @@ describe('the board and its overview', () => {
     expect(projects).toHaveAttribute('aria-controls', 'projects-panel');
     expect(sidebar).toHaveAttribute('id', 'projects-panel');
     expect(screen.getByRole('separator', { name: 'Sidebar width' })).toHaveAttribute('aria-valuenow', '240');
-    // The project filter, then the two ways to make something new as icons, in one row; “Search” in the row above.
-    const row = sidebar.querySelector('.nav-actions')!;
-    expect([...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['Filter by project: All projects', 'New project', 'New diagram']);
-    const search = within(sidebar).getByRole('button', { name: 'Search' });
-    expect(search.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // As in T3 Code, one row: “Search”, then the project filter and the two ways to make something new, as icons.
+    const row = sidebar.querySelector<HTMLElement>('.nav-actions')!;
+    expect([...row.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['Search', 'Filter by project: All projects', 'New project', 'New diagram']);
+    for (const name of ['Filter by project: All projects', 'New project', 'New diagram']) expect(within(row).getByRole('button', { name })).toHaveTextContent(/^$/);
+    // While searching, the field takes the place of “Search”; the icons stay.
+    await user.click(within(sidebar).getByRole('button', { name: 'Search' }));
+    expect(row).toContainElement(within(sidebar).getByRole('searchbox', { name: 'Search projects and diagrams' }));
+    expect(within(row).getByRole('button', { name: 'Filter by project: All projects' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(within(row).getByRole('button', { name: 'Search' })).toBeInTheDocument();
     expect(within(sidebar).getByRole('button', { name: 'New project' })).toHaveTextContent(/^$/);
     // Its button folds it: nothing is left of it, not even the edge to drag.
     await user.click(projects);
