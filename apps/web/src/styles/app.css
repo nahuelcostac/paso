@@ -133,6 +133,13 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .settings-menu__swatch[aria-disabled='true'] > span { opacity: var(--disabled-opacity); }
 /* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
 .canvas--editor .excalidraw .main-menu-trigger { display: none; }
+/* Use the same row that centres the native buttons and the open panel's mark. */
+:root[data-window-controls='mac'] .app--folded { grid-template-rows: var(--bar-top) minmax(0, 1fr); }
+:root[data-window-controls='mac'] .app--folded::before {
+  content: ''; grid-column: 2; grid-row: 1; -webkit-app-region: drag;
+}
+:root[data-window-controls='mac'] .app--folded .activity-bar { grid-row: 1 / -1; }
+:root[data-window-controls='mac'] .app--folded .shell { grid-row: 2; }
 /* The black around the open panel's mark and the native buttons also moves the window. */
 :root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand { -webkit-app-region: drag; }
 :root[data-window-controls='mac'] .activity-bar__button { -webkit-app-region: no-drag; }

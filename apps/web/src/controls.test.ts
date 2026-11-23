@@ -44,15 +44,17 @@ describe('controls measured from T3 Code', () => {
 });
 
 describe('folded activity bar', () => {
-  it('keeps the rail and workspace in the same full-height row on macOS', async () => {
+  it('centres the macOS window buttons on a black strip when folded', async () => {
     const app = await css('app.css');
-    expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr)');
+    const tokens = await css('tokens.css');
+    const mac = ":root[data-window-controls='mac']";
+    const macFolded = `${mac} .app--folded`;
+    expect(rule(tokens, mac)).toContain('--bar-top: 42px');
+    expect(rule(app, '.app')).toContain('background: var(--bar)');
     expect(rule(app, '.app--folded')).toContain('--bar-w: 44px');
-    expect(rule(app, '.activity-bar')).toContain('grid-column: 1; grid-row: 1');
-    expect(rule(app, '.shell')).toContain('grid-column: 2; grid-row: 1');
-    const macFoldedRules = [...app.matchAll(/[^{}]*\[data-window-controls='mac'\][^{}]*\.app--folded[^{}]*\{[^{}]*\}/g)];
-    for (const [layout] of macFoldedRules) {
-      expect(layout).not.toMatch(/grid-template|grid-row|grid-area|::before/);
-    }
+    expect(rule(app, macFolded)).toContain('grid-template-rows: var(--bar-top) minmax(0, 1fr)');
+    expect(rule(app, `${macFolded}::before`)).toContain('grid-column: 2; grid-row: 1; -webkit-app-region: drag');
+    expect(rule(app, `${macFolded} .activity-bar`)).toContain('grid-row: 1 / -1');
+    expect(rule(app, `${macFolded} .shell`)).toContain('grid-row: 2');
   });
 });
