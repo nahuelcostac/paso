@@ -458,13 +458,14 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           />
         )}
         {row?.kind === 'ok' ? <>
-          {route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
+          {/* The main view: the content inside the black frame, with its rounded corners. */}
+          <div className="main">{route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
             <Canvas
               key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
               notices={shown === 'projects' ? undefined : notices}
               corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen} menu={canvasMenu}
             />
-          </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}
+          </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}</div>
           {/* The agent sits in the left spot beside the overview, where its changes show across the scenes. As a drawer it
               stays mounted, closed. */}
           {chatHere && (narrow || shown === 'agent') && <AgentPanel
@@ -479,7 +480,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
             scenesReady={scenes !== undefined}
             onOpenScene={(id) => navigate({ projectId: row.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
           />}
-        </> : <MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} />}
+        </> : <div className="main"><MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} /></div>}
       </div>
     </div>
   );

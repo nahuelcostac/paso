@@ -102,6 +102,9 @@
   --bar-hover: light-dark(#1f1f23, #1f1f23); /* the round highlight under the pointer */
   --bar-active: light-dark(#2e2e33, #2e2e33); /* the round highlight of the open panel or the view on screen */
   --bar-focus: light-dark(#d4d4d8, #d4d4d8); /* the focus ring on the bar: 14:1 on black */
+  /* The panels in the left spot (the projects, the chat) are black too, in both themes: they take the dark theme's
+     tokens (color-scheme: dark on them, app.css) with the bar's black as their surface. */
+  --panel-bg: var(--bar);
 
   /* ---------------------------------------------------------------- typography
      Inter everywhere, numbers in tabular figures. Sizes follow T3 Code's scale (its root is 16px): text-sm (14px) for

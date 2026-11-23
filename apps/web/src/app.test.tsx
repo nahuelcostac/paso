@@ -506,6 +506,10 @@ describe('the board and its overview', () => {
     for (const button of within(bar).getAllByRole('button')) expect(button).toHaveAttribute('title');
     // The projects are open at first, in the left spot, with the edge to drag.
     const sidebar = screen.getByRole('complementary', { name: 'Projects and diagrams' });
+    // The main view sits apart from the panel, in its own rounded box inside the black frame; the panel is not in it.
+    const main = document.querySelector('.main')!;
+    expect(main).toContainElement(screen.getByRole('main', { name: 'Canvas' }));
+    expect(main).not.toContainElement(sidebar);
     expect(sidebar).toHaveTextContent(/^Paso(?!\.)/);
     const projects = within(bar).getByRole('button', { name: 'Projects' });
     expect(projects).toHaveAttribute('aria-expanded', 'true');

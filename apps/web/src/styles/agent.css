@@ -29,8 +29,7 @@
   height: 12px;
 }
 
-/* Agent panel beside the Studio: in the left spot, where the projects are, on the chrome's grey and edged with a thin
-   line on its right. No rule under its head: space separates. As a drawer it opens over the content (app.css). */
+/* Agent panel beside the Studio: in the left spot, where the projects are, black like them and the bar (app.css). No rule under its head: space separates. As a drawer it opens over the content (app.css). */
 .agent {
   grid-column: 1;
   grid-row: 1;
@@ -39,7 +38,6 @@
   min-height: 0;
   position: relative;
   background: var(--surface);
-  border-right: var(--border);
 }
 :root[data-resizing] { cursor: col-resize; user-select: none; -webkit-user-select: none; }
 :root[data-resizing] iframe, :root[data-resizing] canvas { pointer-events: none; }
