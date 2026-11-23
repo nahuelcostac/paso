@@ -117,7 +117,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   // A loose diagram opens like a project with one scene: the reserved project, limited to that scene, under its name.
   const looseOpen = isLooseProject(route.projectId);
   const looseDiagram = looseOpen ? state.loose?.diagrams.find((diagram) => diagram.id === route.sceneId) : undefined;
-  // A loose diagram with one step is a plain whiteboard: no Studio, no Present. Its agent sits beside the Canvas.
+  // A loose diagram with one step is a plain whiteboard: no step overview, no Present. Its agent sits beside the Canvas.
   const plainLoose = Boolean(looseDiagram && looseDiagram.steps <= 1);
   const looseRow = useMemo((): ProjectRow | undefined => state.loose && looseDiagram ? {
     kind: 'ok', id: LOOSE_PROJECT_ID, project: { ...state.loose.project, name: looseDiagram.scene.name },
@@ -334,7 +334,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const sceneDocuments = useMemo(() => scenes?.map((item) => item.document) ?? [], [scenes]);
   const marks = useMemo(() => stepMarks(agentState.turns, agentState.runs[openProject?.id ?? ''], openProject?.id), [agentState.turns, agentState.runs, openProject?.id]);
   const working = useMemo(() => activeTurn(agentState.turns, openProject?.id), [agentState.turns, openProject?.id]);
-  // Without the panel in view, a pill says who is changing which step, and the chat's button in the bar has a dot.
+  // Without the panel in view, a pill says who is changing which step, and the Studio button has a dot.
   const statusShown = Boolean(openProject && chatHere && working && shown !== 'agent');
   const workingAt = working?.step && sceneDocuments.length ? (() => {
     for (const [index, scene] of sceneDocuments.entries()) {
@@ -362,13 +362,19 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const hideAgent = () => {
     chooseSide(null);
     // Focus goes back to the button that opened it.
-    document.querySelector<HTMLElement>('.activity-bar__button[data-id="agent"]')?.focus();
+    document.querySelector<HTMLElement>('.activity-bar__button[data-id="studio"]')?.focus();
   };
-  // The bar's buttons: each panel's opens it in the left spot and closes the other, and closes it when it is the one in
-  // view. On a project's Canvas the chat is in the Studio, so its button opens the Studio with the chat.
-  const togglePanel = (panel: SidePanel) => {
-    if (panel === 'agent' && openProject && !chatHere) { chooseSide('agent'); navigate({ ...routeRef.current, view: 'storyboard' }); return; }
-    chooseSide(shown === panel ? null : panel);
+  const toggleStudio = () => {
+    if (plainLoose) {
+      chooseSide(shown === 'agent' ? null : 'agent');
+      return;
+    }
+    if (overview && shown === 'agent') {
+      navigate({ ...routeRef.current, view: 'canvas' });
+      return;
+    }
+    chooseSide('agent');
+    if (!overview) navigate({ ...routeRef.current, view: 'storyboard' });
   };
 
   // Present, in the top right corner of both views. Leaving it keeps the view.
@@ -384,10 +390,10 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       style={{ '--left': `${left}px`, '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
       <ActivityBar
-        panel={shown} onPanel={togglePanel} chat={openProject ? (chatHere ? 'here' : 'studio') : 'none'}
+        panel={shown} onProjects={() => chooseSide(shown === 'projects' ? null : 'projects')}
         working={Boolean(openProject && working && shown !== 'agent')}
-        studio={openProject && !plainLoose ? overview : undefined}
-        onStudio={() => navigate({ ...routeRef.current, view: overview ? 'canvas' : 'storyboard' })}
+        studio={openProject ? (plainLoose ? 'whiteboard' : overview ? 'overview' : 'canvas') : undefined}
+        onStudio={toggleStudio}
         canvasMenu={canvasMenu}
         workspace={(stop) => <WorkspaceSwitcher api={api} store={store} state={state} onSwitchWorkspace={switchWorkspace} onNotice={setWorkspaceNotice} {...stop} />}
       />

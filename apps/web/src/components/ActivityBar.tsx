@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Folders, LayoutGrid, MessageCircle, Settings } from 'lucide-react';
+import { Clapperboard, Folders, Settings } from 'lucide-react';
 import { SettingsMenu } from './SettingsMenu';
 import { useCanvasMenu, type CanvasMenu } from '../editor/canvas-menu';
 
@@ -8,16 +8,11 @@ export type SidePanel = 'projects' | 'agent';
 type Props = {
   /** The panel in view in the left spot, if any. */
   panel: SidePanel | null;
-  onPanel: (panel: SidePanel) => void;
-  /**
-   * Where the chat is: beside this view (`here`), in the Studio of this project, which the button opens (`studio`), or
-   * nowhere, with no project open (`none`, no button).
-   */
-  chat: 'here' | 'studio' | 'none';
-  /** The agent works while its panel is out of view: a pink dot on its button. */
+  onProjects: () => void;
+  /** The agent works while its panel is out of view: a pink dot on Studio. */
   working?: boolean;
-  /** Whether the Studio is the view on screen; undefined when there is no Studio (a plain whiteboard, no project). */
-  studio?: boolean;
+  /** The current view, or undefined when no diagram is open. */
+  studio?: 'canvas' | 'overview' | 'whiteboard';
   onStudio: () => void;
   canvasMenu: CanvasMenu;
   /** The workspace switcher, above the gear, given the toolbar's tab stop for it. */
@@ -25,19 +20,22 @@ type Props = {
 };
 
 /**
- * The black bar down the window's left edge, as in VS Code: at the top, the two panels that share the left spot and the
- * Studio; at the foot, the workspace switcher, then the gear with what Excalidraw's main menu held. It is one toolbar: Tab reaches it once, and the
- * arrow keys, Home and End move between its buttons.
+ * Projects and Studio sit above the workspace switcher and settings. Tab reaches the toolbar once.
+ * The arrow keys, Home and End move between its buttons.
  */
-export function ActivityBar({ panel, onPanel, chat, working = false, studio, onStudio, canvasMenu, workspace }: Props) {
+export function ActivityBar({ panel, onProjects, working = false, studio, onStudio, canvasMenu, workspace }: Props) {
   const bar = useRef<HTMLDivElement>(null);
   const gear = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const canvas = useCanvasMenu(canvasMenu);
   // The button that keeps the toolbar's one tab stop: the last one used.
   const [current, setCurrent] = useState('projects');
-  const shown = ['projects', ...(chat === 'none' ? [] : ['agent']), ...(studio === undefined ? [] : ['studio']), 'workspace', 'settings'];
+  const shown = ['projects', ...(studio === undefined ? [] : ['studio']), 'workspace', 'settings'];
   const stop = shown.includes(current) ? current : 'projects';
+  const chatOpen = panel === 'agent';
+  const studioTitle = studio === 'canvas' ? 'Open Studio with agent chat'
+    : !chatOpen ? 'Open agent chat'
+    : studio === 'whiteboard' ? 'Hide agent chat' : 'Back to the Canvas';
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const keys: Record<string, number | 'first' | 'last'> = { ArrowDown: 1, ArrowUp: -1, Home: 'first', End: 'last' };
@@ -66,14 +64,15 @@ export function ActivityBar({ panel, onPanel, chat, working = false, studio, onS
       <div className="activity-bar__group">
         {button('projects', 'Projects', <Folders className="i" aria-hidden="true" />,
           { 'aria-expanded': panel === 'projects', 'aria-controls': panel === 'projects' ? 'projects-panel' : undefined },
-          () => onPanel('projects'))}
-        {chat !== 'none' && button('agent', 'Agent chat', <MessageCircle className="i" aria-hidden="true" />,
-          { 'aria-expanded': panel === 'agent', 'aria-controls': panel === 'agent' ? 'agent-panel' : undefined },
-          () => onPanel('agent'),
-          working && panel !== 'agent' ? <span className="activity-bar__badge" aria-hidden="true" /> : undefined,
-          chat === 'studio' ? 'Agent chat, in the Studio' : 'Agent chat')}
-        {studio !== undefined && button('studio', 'Studio', <LayoutGrid className="i" aria-hidden="true" />,
-          { 'aria-pressed': studio }, onStudio, undefined, studio ? 'Studio: back to the Canvas' : "Studio: the scene's steps")}
+          onProjects)}
+        {studio !== undefined && button('studio', 'Studio', <Clapperboard className="i" aria-hidden="true" />,
+          {
+            'aria-pressed': studio === 'whiteboard' ? undefined : studio === 'overview',
+            'aria-expanded': chatOpen,
+            'aria-controls': chatOpen ? 'agent-panel' : undefined,
+          }, onStudio,
+          working ? <span className="activity-bar__badge" aria-hidden="true" /> : undefined,
+          studioTitle)}
       </div>
       <div className="activity-bar__group">
         {workspace({ tabIndex: stop === 'workspace' ? 0 : -1, onFocus: () => setCurrent('workspace') })}

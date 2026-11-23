@@ -556,19 +556,26 @@ describe('the step strip of a loose diagram', () => {
     expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();
   });
 
-  it('is a plain whiteboard with one step: no Present, no Studio, the agent beside the Canvas', async () => {
+  it('uses Studio to open and close chat beside the Canvas of a one-step diagram', async () => {
     await seedLoose('d', 'Pizarra');
     window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     const { unmount } = render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
     expect(document.querySelector('.canvas__corner')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Present/ })).not.toBeInTheDocument();
-    // The activity bar has no Studio for it, and its chat opens in the left spot, beside the Canvas.
+    const user = userEvent.setup();
     const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
-    expect(within(bar).queryByRole('button', { name: 'Studio' })).not.toBeInTheDocument();
-    await userEvent.setup().click(within(bar).getByRole('button', { name: 'Agent chat' }));
+    const studio = within(bar).getByRole('button', { name: 'Studio' });
+    expect(studio).toHaveAttribute('aria-expanded', 'false');
+    expect(studio).not.toHaveAttribute('aria-pressed');
+    await user.click(studio);
     expect(await screen.findByRole('textbox', { name: /agent/i }, patience)).toBeInTheDocument();
+    expect(studio).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('canvas')).toBeInTheDocument();
+    await user.click(studio);
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+    expect(studio).toHaveAttribute('aria-expanded', 'false');
+    expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0');
     unmount();
     // The Studio has nothing to show for it: an old address lands on the Canvas.
     window.history.replaceState(null, '', '#/_loose/storyboard/d/d-step-0');

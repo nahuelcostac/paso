@@ -445,6 +445,7 @@ describe('the board and its overview', () => {
     const again = await screen.findByRole('main', { name: 'Studio' }, patience);
     // It shows the selected scene only; another one is chosen in the sidebar.
     expect(within(again).queryByRole('region', { name: 'Scene 1: Primera' })).not.toBeInTheDocument();
+    await user.click(within(bar).getByRole('button', { name: 'Projects' }));
     await user.click(screen.getByRole('button', { name: 'Scene 1: Primera' }));
     const first = await within(again).findByRole('region', { name: 'Scene 1: Primera' }, patience);
     await user.click(within(first).getByRole('button', { name: 'Step 1' }));
@@ -504,7 +505,7 @@ describe('the board and its overview', () => {
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
     expect(bar).toHaveAttribute('aria-orientation', 'vertical');
-    expect(within(bar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Projects', 'Agent chat', 'Studio', 'Workspace: My projects', 'Settings']);
+    expect(within(bar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Projects', 'Studio', 'Workspace: My projects', 'Settings']);
     // The workspace switcher is no longer in the projects panel.
     expect(within(screen.getByRole('complementary', { name: 'Projects and diagrams' })).queryByRole('button', { name: /^Workspace/ })).not.toBeInTheDocument();
     for (const button of within(bar).getAllByRole('button')) expect(button).toHaveAttribute('title');
@@ -544,30 +545,35 @@ describe('the board and its overview', () => {
     await user.click(projects);
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
 
-    // The chat has no place on a project's Canvas: its button opens the Studio with the chat, which takes the left spot.
-    const chat = within(bar).getByRole('button', { name: 'Agent chat' });
-    expect(chat).toHaveAttribute('aria-expanded', 'false');
-    expect(chat).toHaveAttribute('title', 'Agent chat, in the Studio');
-    await user.click(chat);
+    const studio = within(bar).getByRole('button', { name: 'Studio' });
+    expect(studio.querySelector('.lucide-clapperboard')).toBeInTheDocument();
+    expect(studio).toHaveAttribute('aria-expanded', 'false');
+    expect(studio).toHaveAttribute('title', 'Open Studio with agent chat');
+    await user.click(studio);
     await screen.findByRole('main', { name: 'Studio' }, patience);
     const panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(panel).toHaveAttribute('id', 'agent-panel');
-    expect(chat).toHaveAttribute('aria-expanded', 'true');
+    expect(studio).toHaveAttribute('aria-expanded', 'true');
+    expect(studio).toHaveAttribute('aria-controls', 'agent-panel');
     expect(projects).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
     expect(screen.getByRole('separator', { name: 'Chat width' })).toHaveAttribute('aria-valuenow', '360');
     expect(document.querySelector('.app')).toHaveClass('app--agent');
-    // One at a time: the projects take the spot back, and the chat's own button folds it.
+    // Projects take the left spot. Studio brings the chat back while the overview stays open.
     await user.click(projects);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
-    await user.click(chat);
+    expect(studio).toHaveAttribute('title', 'Open agent chat');
+    await user.click(studio);
+    expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Agent' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
     expect(window.localStorage.getItem('paso.side-panel')).toBe('agent');
     // Back on the Canvas the chat is not there, and the spot is empty; the Studio brings it back.
-    await user.click(within(bar).getByRole('button', { name: 'Studio' }));
+    expect(studio).toHaveAttribute('title', 'Back to the Canvas');
+    await user.click(studio);
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
-    expect(chat).toHaveAttribute('aria-expanded', 'false');
+    expect(studio).toHaveAttribute('aria-expanded', 'false');
 
     // Remembered across a relaunch.
     unmount();
@@ -585,14 +591,14 @@ describe('the board and its overview', () => {
     render(<App config={config} />);
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
-    const [projects, chat, studio, workspace, settings] = within(bar).getAllByRole('button');
-    expect([projects, chat, studio, workspace, settings].map((button) => button.tabIndex)).toEqual([0, -1, -1, -1, -1]);
+    const [projects, studio, workspace, settings] = within(bar).getAllByRole('button');
+    expect([projects, studio, workspace, settings].map((button) => button.tabIndex)).toEqual([0, -1, -1, -1]);
     projects.focus();
     await user.keyboard('{ArrowDown}');
-    expect(chat).toHaveFocus();
+    expect(studio).toHaveFocus();
     await user.keyboard('{End}');
     expect(settings).toHaveFocus();
-    expect([projects, chat, studio, workspace, settings].map((button) => button.tabIndex)).toEqual([-1, -1, -1, -1, 0]);
+    expect([projects, studio, workspace, settings].map((button) => button.tabIndex)).toEqual([-1, -1, -1, 0]);
     await user.keyboard('{ArrowDown}');
     expect(settings).toHaveFocus();   // it stops at the ends
     await user.keyboard('{ArrowUp}');
