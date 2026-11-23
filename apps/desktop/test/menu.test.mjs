@@ -94,13 +94,13 @@ describe('one instance', () => {
 });
 
 describe('permissions', () => {
-  const origin = 'http://127.0.0.1:52000';
   it('lets only the app’s own page go full screen', () => {
-    expect(allowsPermission('fullscreen', `${origin}/`, origin)).toBe(true);
-    expect(allowsPermission('fullscreen', 'http://127.0.0.1:52001/', origin)).toBe(false);
-    expect(allowsPermission('fullscreen', 'https://example.com/', origin)).toBe(false);
-    expect(allowsPermission('fullscreen', undefined, origin)).toBe(false);
-    expect(allowsPermission('fullscreen', 'not a url', origin)).toBe(false);
-    for (const permission of ['media', 'notifications', 'geolocation', 'clipboard-read', 'openExternal']) expect(allowsPermission(permission, `${origin}/`, origin)).toBe(false);
+    expect(allowsPermission('fullscreen', 'paso://app/#/p/canvas')).toBe(true);
+    expect(allowsPermission('fullscreen', 'http://127.0.0.1:52001/')).toBe(false);
+    expect(allowsPermission('fullscreen', 'paso://other/')).toBe(false);
+    expect(allowsPermission('fullscreen', 'https://example.com/')).toBe(false);
+    expect(allowsPermission('fullscreen', undefined)).toBe(false);
+    expect(allowsPermission('fullscreen', 'not a url')).toBe(false);
+    for (const permission of ['media', 'notifications', 'geolocation', 'clipboard-read', 'openExternal']) expect(allowsPermission(permission, 'paso://app/')).toBe(false);
   });
 });

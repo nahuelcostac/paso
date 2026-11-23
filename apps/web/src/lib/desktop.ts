@@ -1,6 +1,8 @@
 /** What the desktop app's preload exposes to the page. The browser version has none of it. */
 export type DesktopBridge = {
   token?: string;
+  /** The service's event stream. The desktop page is at `paso://app`, which cannot carry a WebSocket itself. */
+  events?: string;
   /** The system's folder dialog. Resolves to the folder the person picked, or null when they cancelled. */
   chooseFolder?: (near?: string) => Promise<string | null>;
   /** “mac” when macOS draws the window's close, minimise and zoom buttons over the page, in the sidebar's head. */

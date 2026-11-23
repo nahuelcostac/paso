@@ -1,3 +1,5 @@
+import { isAppUrl } from './app-origin.mjs';
+
 /**
  * Small pieces of desktop behaviour kept out of main.mjs: one instance at a time, and the only permission the page
  * gets. This module does not import Electron so it can be tested in Node.
@@ -24,12 +26,11 @@ export function claimSingleInstance(app, current) {
 }
 
 /**
- * The page may only go full screen, which Present asks for, and only from the app's own origin. Every other
- * permission, such as the camera or notifications, is denied.
+ * The page may only go full screen, which Present asks for, and only from the app's own origin, `paso://app`. Every
+ * other permission, such as the camera or notifications, is denied.
  */
-export function allowsPermission(permission, requestingUrl, origin) {
-  if (permission !== 'fullscreen' || typeof requestingUrl !== 'string') return false;
-  try { return new URL(requestingUrl).origin === origin; } catch { return false; }
+export function allowsPermission(permission, requestingUrl) {
+  return permission === 'fullscreen' && isAppUrl(requestingUrl);
 }
 
 /** Where macOS draws the window's close, minimise and zoom buttons: in the sidebar's head, its centre 30px down. */

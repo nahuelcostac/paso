@@ -2,7 +2,8 @@ import type { Project, Scene, Step } from '@paso/shared';
 import type { Target, Binaries } from '../editor/step-store';
 import type { DesktopBridge } from './desktop';
 
-export type ClientConfig = { baseUrl: string; token: string };
+/** `eventsUrl` is the event stream's address when it is not at `baseUrl`, as in the desktop app. */
+export type ClientConfig = { baseUrl: string; token: string; eventsUrl?: string };
 
 /** The service cannot be reached, or rejected this session. The UI offers a retry. */
 export class UnavailableError extends Error {
@@ -121,8 +122,9 @@ export type RunSummary = {
 };
 
 export function configFromPage(): ClientConfig {
-  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? (window as Window & { pasoDesktop?: DesktopBridge }).pasoDesktop?.token ?? '';
-  return { baseUrl: window.location.origin, token };
+  const desktop = (window as Window & { pasoDesktop?: DesktopBridge }).pasoDesktop;
+  const token = document.querySelector<HTMLMetaElement>('meta[name="paso-session-token"]')?.content ?? desktop?.token ?? '';
+  return { baseUrl: window.location.origin, token, ...(desktop?.events ? { eventsUrl: desktop.events } : {}) };
 }
 
 export class ApiClient {
@@ -312,6 +314,6 @@ export class ApiClient {
 
   /** WebSocket URL and subprotocols. The token never goes in the URL. */
   eventsTarget() {
-    return { url: `${this.config.baseUrl.replace(/^http/, 'ws')}/api/events`, protocols: ['paso', `paso-token.${this.config.token}`] };
+    return { url: this.config.eventsUrl ?? `${this.config.baseUrl.replace(/^http/, 'ws')}/api/events`, protocols: ['paso', `paso-token.${this.config.token}`] };
   }
 }

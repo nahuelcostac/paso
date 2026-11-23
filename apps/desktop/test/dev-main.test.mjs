@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ handlers: new Map(), windows: [], showOpenDialog: vi.fn(), listen: vi.fn() }));
+const mocks = vi.hoisted(() => ({ handlers: new Map(), ipc: new Map(), windows: [], showOpenDialog: vi.fn(), listen: vi.fn(), schemes: [], protocolHandlers: new Map(), beforeRequest: undefined }));
 
 vi.mock('electron', () => ({
   app: { setPath: vi.fn(), whenReady: () => Promise.resolve(), on: vi.fn(), quit: vi.fn() },
@@ -12,8 +12,14 @@ vi.mock('electron', () => ({
     async loadURL(url) { this.webContents.mainFrame.url = url; }
   },
   dialog: { showOpenDialog: mocks.showOpenDialog },
-  ipcMain: { on: vi.fn(), handle: (channel, handler) => mocks.handlers.set(channel, handler) },
-  session: { defaultSession: { setPermissionRequestHandler: vi.fn(), webRequest: { onBeforeRequest: vi.fn() } } },
+  ipcMain: { on: (channel, handler) => mocks.ipc.set(channel, handler), handle: (channel, handler) => mocks.handlers.set(channel, handler) },
+  net: { fetch: vi.fn() },
+  protocol: { registerSchemesAsPrivileged: (schemes) => mocks.schemes.push(...schemes) },
+  session: { defaultSession: {
+    setPermissionRequestHandler: vi.fn(),
+    protocol: { handle: (scheme, handler) => mocks.protocolHandlers.set(scheme, handler) },
+    webRequest: { onBeforeRequest: (listener) => { mocks.beforeRequest = listener; } },
+  } },
   shell: { openPath: vi.fn(), openExternal: vi.fn() },
 }));
 vi.mock('@paso/server', () => ({ startServer: async () => ({ url: 'http://127.0.0.1:50124', port: 50124, sessionToken: 'test' }) }));
@@ -31,7 +37,7 @@ describe('desktop development folder picker', () => {
     originalListeners = signals.map((signal) => process.listeners(signal));
     originalEnv = { ...process.env };
     await import('../dev-main.mjs');
-    await vi.waitFor(() => expect(mocks.windows[0]?.webContents.mainFrame.url).toBe('http://127.0.0.1:50123'));
+    await vi.waitFor(() => expect(mocks.windows[0]?.webContents.mainFrame.url).toBe('paso://app/'));
   });
 
   afterAll(() => {
@@ -62,5 +68,29 @@ describe('desktop development folder picker', () => {
       await expect(choose({ sender: webContents, senderFrame: webContents.mainFrame })).rejects.toThrow('Not allowed.');
     } finally { webContents.mainFrame.url = url; }
     expect(mocks.showOpenDialog).not.toHaveBeenCalled();
+  });
+
+  it('opens the page at paso://app on every launch, served from Vite through the scheme', () => {
+    expect(mocks.schemes).toEqual([expect.objectContaining({ scheme: 'paso', privileges: expect.objectContaining({ standard: true, secure: true }) })]);
+    expect(mocks.protocolHandlers.has('paso')).toBe(true);
+    expect(mocks.windows[0].webContents.mainFrame.url).toBe('paso://app/');
+  });
+
+  it('gives the session token and the event socket only to the app’s own page', () => {
+    const { webContents } = mocks.windows[0];
+    const session = mocks.ipc.get('paso-session');
+    const answer = (event) => { session(event); return event.returnValue; };
+    expect(answer({ sender: webContents, senderFrame: webContents.mainFrame })).toEqual({ token: 'test', events: 'ws://127.0.0.1:50124/api/events' });
+    expect(answer({ sender: {}, senderFrame: webContents.mainFrame })).toBeUndefined();
+    expect(answer({ sender: webContents, senderFrame: { url: 'paso://app/' } })).toBeUndefined();
+  });
+
+  it('lets the renderer reach only the page, Vite and its service', () => {
+    const cancelled = (url) => { let result; mocks.beforeRequest({ url }, (answer) => { result = answer.cancel; }); return result; };
+    expect(cancelled('paso://app/src/main.tsx')).toBe(false);
+    expect(cancelled('ws://127.0.0.1:50123/?token=x')).toBe(false);
+    expect(cancelled('ws://127.0.0.1:50124/api/events')).toBe(false);
+    expect(cancelled('https://example.com/')).toBe(true);
+    expect(cancelled('http://127.0.0.1:3001/')).toBe(true);
   });
 });
