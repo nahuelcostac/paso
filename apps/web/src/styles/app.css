@@ -157,7 +157,9 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .brand__name { font-size: 21px; font-weight: var(--weight-bold); letter-spacing: -0.04em; line-height: 1; }
 /* The app's icon and name at the top of the panel in the left spot, as tall as the bar's top, right after the window's
    buttons in the desktop app. Small, as T3 Code's name: an 18px tile and the name at 15px. Not a control. */
-.panel-brand { flex: none; display: flex; align-items: center; justify-content: center; height: var(--bar-top); padding: 0 var(--space-3); cursor: default; }
+/* Its tile lines up with the icons of the rows below (the filter, Search): the nav's 8px, the row's 10px, less 1px for
+   the 18px tile over their 16px icons. */
+.panel-brand { flex: none; display: flex; align-items: center; height: var(--bar-top); padding: 0 var(--space-3) 0 calc(var(--space-2) + 10px - 1px); cursor: default; }
 .panel-brand .brand { gap: var(--space-2); }
 .panel-brand .brand__mark { width: 18px; height: 18px; }
 .panel-brand .brand__name { font-size: var(--text-15); letter-spacing: -0.02em; }

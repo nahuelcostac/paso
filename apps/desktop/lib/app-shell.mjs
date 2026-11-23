@@ -33,8 +33,8 @@ export function allowsPermission(permission, requestingUrl) {
   return permission === 'fullscreen' && isAppUrl(requestingUrl);
 }
 
-/** Where macOS draws the window's close, minimise and zoom buttons: at the top of the 72px activity bar, 10px in, its
- * centre 20px down, with the app's icon right after them at the top of the open panel. */
+/** Where macOS draws the window's close, minimise and zoom buttons: at the top of the 80px activity bar, 10px in, so
+ * their 60px leave 10px on each side, and centred 20px down. The app's icon follows at the top of the open panel. */
 export const TRAFFIC_LIGHTS = { x: 10, y: 14 };
 
 /**
