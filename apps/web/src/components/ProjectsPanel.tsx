@@ -293,29 +293,30 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
       <div className="panel-brand"><Brand /></div>
 
       <div className="projects__nav">
-        {/* As in T3 Code: what the list shows, “All projects” or one of them, with the loose diagrams as one more choice. */}
-        <ProjectFilter
-          projects={filterProjects} value={filter} disabled={!listing || state.phase !== 'ready'}
-          onChange={(next) => { if (listing) void store.setFilter(listing.activeId, next); }}
-        />
+        {/* “Search” on its own row: it turns into a field that filters the list in place. */}
+        {query === null ? (
+          <button ref={searchButton} type="button" className="nav-row" onClick={() => setQuery('')}>
+            <Search className="i" aria-hidden="true" />Search
+          </button>
+        ) : (
+          <label className="nav-row nav-row--field">
+            <Search className="i" aria-hidden="true" />
+            <input
+              type="search" autoFocus value={query} placeholder="Search" aria-label="Search projects and diagrams" spellCheck={false}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setQuery(null); requestAnimationFrame(() => searchButton.current?.focus()); } }}
+              onBlur={(event) => { if (!event.currentTarget.value.trim()) setQuery(null); }}
+            />
+          </label>
+        )}
         <hr />
-        {/* As in T3 Code: “Search” on the left of one row, and the two ways to make something new as icons on its right. */}
+        {/* What the list shows (“All projects”, one project or the loose diagrams), then the two ways to make something
+            new as icons on its right. */}
         <div className="nav-actions">
-          {query === null ? (
-            <button ref={searchButton} type="button" className="nav-row nav-actions__search" onClick={() => setQuery('')}>
-              <Search className="i" aria-hidden="true" />Search
-            </button>
-          ) : (
-            <label className="nav-row nav-row--field nav-actions__search">
-              <Search className="i" aria-hidden="true" />
-              <input
-                type="search" autoFocus value={query} placeholder="Search" aria-label="Search projects and diagrams" spellCheck={false}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setQuery(null); requestAnimationFrame(() => searchButton.current?.focus()); } }}
-                onBlur={(event) => { if (!event.currentTarget.value.trim()) setQuery(null); }}
-              />
-            </label>
-          )}
+          <ProjectFilter
+            projects={filterProjects} value={filter} disabled={!listing || state.phase !== 'ready'}
+            onChange={(next) => { if (listing) void store.setFilter(listing.activeId, next); }}
+          />
           <button type="button" className="icon-btn nav-actions__new" aria-label="New project" title="New project" disabled={state.phase !== 'ready'} onClick={() => { setRenamingId(null); setRenamingLooseId(null); setQuery(null); setCreatingLoose(false); onCreatingChange(true); }}>
             <FolderPlus className="i" aria-hidden="true" />
           </button>
