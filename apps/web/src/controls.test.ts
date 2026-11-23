@@ -42,3 +42,17 @@ describe('controls measured from T3 Code', () => {
     expect(app).toContain('.btn:active:not(:disabled):not([aria-haspopup]), .icon-btn:active:not(:disabled):not([aria-haspopup]) { scale: 0.97; }');
   });
 });
+
+describe('folded activity bar', () => {
+  it('keeps the rail and workspace in the same full-height row on macOS', async () => {
+    const app = await css('app.css');
+    expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr)');
+    expect(rule(app, '.app--folded')).toContain('--bar-w: 44px');
+    expect(rule(app, '.activity-bar')).toContain('grid-column: 1; grid-row: 1');
+    expect(rule(app, '.shell')).toContain('grid-column: 2; grid-row: 1');
+    const macFoldedRules = [...app.matchAll(/[^{}]*\[data-window-controls='mac'\][^{}]*\.app--folded[^{}]*\{[^{}]*\}/g)];
+    for (const [layout] of macFoldedRules) {
+      expect(layout).not.toMatch(/grid-template|grid-row|grid-area|::before/);
+    }
+  });
+});
