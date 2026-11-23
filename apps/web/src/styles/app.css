@@ -133,13 +133,16 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .settings-menu__swatch[aria-disabled='true'] > span { opacity: var(--disabled-opacity); }
 /* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
 .canvas--editor .excalidraw .main-menu-trigger { display: none; }
-/* Use the same row that centres the native buttons and the open panel's mark. */
-:root[data-window-controls='mac'] .app--folded { grid-template-rows: var(--bar-top) minmax(0, 1fr); }
-:root[data-window-controls='mac'] .app--folded::before {
-  content: ''; grid-column: 2; grid-row: 1; -webkit-app-region: drag;
+/* Extend the black rail just far enough to cover the native buttons. */
+:root[data-window-controls='mac'] .app--folded {
+  --window-controls-overhang: calc(var(--window-controls-w) - var(--bar-w));
 }
-:root[data-window-controls='mac'] .app--folded .activity-bar { grid-row: 1 / -1; }
-:root[data-window-controls='mac'] .app--folded .shell { grid-row: 2; }
+:root[data-window-controls='mac'] .app--folded::before {
+  content: ''; position: fixed; z-index: 8; top: 0; left: 0;
+  width: var(--window-controls-w); height: var(--bar-top); background: var(--bar); -webkit-app-region: drag;
+}
+/* The shape properties sit just below the native controls. */
+:root[data-window-controls='mac'] .app--folded .canvas--editor .excalidraw .selected-shape-actions { margin-top: var(--space-2); }
 /* The black around the open panel's mark and the native buttons also moves the window. */
 :root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand { -webkit-app-region: drag; }
 :root[data-window-controls='mac'] .activity-bar__button { -webkit-app-region: no-drag; }
@@ -454,6 +457,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* The Canvas fills everything right of the sidebar, edge to edge: the canvas, then its step strip. No card, no gutter. */
 .canvas-page { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
 .editor-notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--danger-soft); color: var(--ink); border-bottom: var(--border); }
+:root[data-window-controls='mac'] .app--folded .editor-notice { padding-left: calc(var(--window-controls-overhang) + var(--space-4)); }
 .editor-notice .btn { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-sm); }
 .canvas--editor > .canvas__placeholder { height: 100%; justify-content: center; padding: var(--space-5); }
 .canvas--editor { display: block; padding: 0; flex: 1; min-height: 320px; overflow: auto; }
@@ -472,6 +476,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* A narrower window: the board's padding shrinks before anything else does. */
 @media (max-width: 1099px) {
   .board { padding: var(--space-6) var(--space-5) var(--space-7); }
+  :root[data-window-controls='mac'] .app--folded .board { padding-left: calc(var(--window-controls-overhang) + var(--space-2)); }
 }
 
 

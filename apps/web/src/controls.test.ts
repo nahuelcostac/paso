@@ -44,17 +44,18 @@ describe('controls measured from T3 Code', () => {
 });
 
 describe('folded activity bar', () => {
-  it('centres the macOS window buttons on a black strip when folded', async () => {
+  it('keeps the black space behind the macOS window buttons within the top-left corner', async () => {
     const app = await css('app.css');
     const tokens = await css('tokens.css');
     const mac = ":root[data-window-controls='mac']";
     const macFolded = `${mac} .app--folded`;
     expect(rule(tokens, mac)).toContain('--bar-top: 42px');
-    expect(rule(app, '.app')).toContain('background: var(--bar)');
+    expect(rule(tokens, mac)).toContain('--window-controls-w: 80px');
+    expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr)');
     expect(rule(app, '.app--folded')).toContain('--bar-w: 44px');
-    expect(rule(app, macFolded)).toContain('grid-template-rows: var(--bar-top) minmax(0, 1fr)');
-    expect(rule(app, `${macFolded}::before`)).toContain('grid-column: 2; grid-row: 1; -webkit-app-region: drag');
-    expect(rule(app, `${macFolded} .activity-bar`)).toContain('grid-row: 1 / -1');
-    expect(rule(app, `${macFolded} .shell`)).toContain('grid-row: 2');
+    expect(rule(app, macFolded)).not.toContain('grid-template');
+    const corner = rule(app, `${macFolded}::before`);
+    expect(corner).toContain('position: fixed; z-index: 8; top: 0; left: 0');
+    expect(corner).toContain('width: var(--window-controls-w); height: var(--bar-top); background: var(--bar); -webkit-app-region: drag');
   });
 });
