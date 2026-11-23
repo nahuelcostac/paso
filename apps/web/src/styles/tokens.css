@@ -27,8 +27,7 @@
 }
 
 :root {
-  --theme-scheme: light dark;
-  color-scheme: var(--theme-scheme);
+  color-scheme: light dark;
 
   /* ------------------------------------------------------------------ colour
      Each pair is light-dark(light, dark). Use the names, never raw values. */
@@ -94,21 +93,15 @@
   --danger-soft: light-dark(#fdecea, #3b2323);
   --focus: light-dark(#71717a, #a1a1aa); /* a grey that reaches 3:1 on every layer */
 
-  /* The activity bar and the frame it makes around the window's content: black in both themes, as in VS Code's dark
-     bar, so the app's left side reads as one black object. Its icons are light greys; the open panel's icon is
-     white on a soft round highlight. The same values in both themes, on purpose. */
-  --bar: light-dark(#000000, #000000);
-  --bar-ink: light-dark(#a1a1aa, #a1a1aa); /* an icon at rest: 8:1 on the bar */
-  --bar-ink-active: light-dark(#fafafa, #fafafa); /* the open panel, the view on screen, a hovered icon */
-  --bar-hover: light-dark(#1f1f23, #1f1f23); /* the round highlight under the pointer */
-  --bar-active: light-dark(#2e2e33, #2e2e33); /* the round highlight of the open panel or the view on screen */
-  --bar-focus: light-dark(#d4d4d8, #d4d4d8); /* the focus ring on the bar: 14:1 on black */
-  /* The panels in the left spot (the projects, the chat) are black too, in both themes: they take the dark theme's
-     tokens (color-scheme: dark on them, app.css) with the bar's black as their surface. */
-  --panel-bg: var(--bar);
-  /* The straight edge between the black and the main view: a line only the dark theme needs, where the main view is
-     nearly black itself; in the light theme the black meets the white. */
-  --bar-line: light-dark(#000000, #2e2e33);
+  /* The sidebar follows the theme. Its activity buttons share an outline and use solid ink when selected. */
+  --bar: var(--surface);
+  --bar-ink: var(--ink);
+  --bar-ink-active: light-dark(#ffffff, #f4f4f5);
+  --bar-hover: var(--surface-hover);
+  --bar-active: light-dark(#18181b, #36363b);
+  --bar-focus: var(--focus);
+  --panel-bg: var(--work-surface);
+  --bar-line: var(--line);
 
   /* ---------------------------------------------------------------- typography
      Inter everywhere, numbers in tabular figures. Sizes follow T3 Code's scale (its root is 16px): text-sm (14px) for
@@ -203,10 +196,10 @@
 /* Non-colour theme values cannot use light-dark(). This filter is Excalidraw's own
    dark-mode filter, so a thumbnail always matches the canvas it came from. */
 :root[data-theme='light'] {
-  --theme-scheme: light;
+  color-scheme: light;
 }
 :root[data-theme='dark'] {
-  --theme-scheme: dark;
+  color-scheme: dark;
   --thumb-filter: invert(93%) hue-rotate(180deg);
 }
 @media (prefers-color-scheme: dark) {

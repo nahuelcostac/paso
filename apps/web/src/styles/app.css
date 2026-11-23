@@ -24,8 +24,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 /* The small spaced uppercase label above a title: “SCENE 1 OF 3”, “STEP 01”. */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
-/* The window: the activity bar down its left edge and the panel in the left spot (the projects or the agent's chat),
-   black, then the main view. App sets --left to the docked panel's width. */
+/* The activity bar, the sidebar and the main view. App sets --left to the docked panel's width. */
 .app {
   --window-header-bg: var(--page);
   display: grid; height: 100%;
@@ -41,10 +40,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
   grid-column: 2; grid-row: 1; position: relative; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   min-width: 0; min-height: 0; border-left: 1px solid var(--bar-line); background: var(--page); overflow: hidden;
 }
-/* The panels in the left spot: black in both themes, as the bar. They take the dark theme's values of every token
-   (light-dark() resolves by the element's colour scheme), on the bar's black instead of the chrome's grey. */
 .projects, .agent {
-  color-scheme: dark;
   --surface: var(--panel-bg);
   --border: 1px solid var(--line);
   --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 5px var(--focus);
@@ -63,7 +59,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .splitter__edge:hover::after, .splitter[data-dragging] .splitter__edge::after { opacity: 1; }
 .splitter__edge:focus-visible { box-shadow: none !important; }
 .splitter__edge:focus-visible::after { opacity: 1; background: var(--focus); }
-/* Beside a black panel, the line sits on the black, in the bar's light grey. */
+/* The resize line sits inside the panel. */
 .splitter--left .splitter__edge::after { left: 2px; background: var(--bar-focus); }
 .splitter__tab {
   position: absolute; top: 50%; left: -8px; translate: 0 -50%;
@@ -90,25 +86,28 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
 .main > * { grid-column: 1; grid-row: 1; }
 
-/* The activity bar, as in VS Code: black in both themes, the panels and the Studio at the top, the gear at the foot.
-   Round buttons with 20px icons in light grey. The open panel and the view on screen are white on a soft round
-   highlight. The focus ring is light, so it shows on the black. */
+/* A single outline groups the activity buttons, with Projects and Studio at the top. */
 .activity-bar {
-  --focus-ring: 0 0 0 2px var(--bar), 0 0 0 4px var(--bar-focus);
-  grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+  --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--bar-focus);
+  grid-column: 1; grid-row: 1; display: flex; flex-direction: column; align-items: center;
   min-height: 0; padding: calc(var(--bar-top) + var(--bar-top-gap)) 0 var(--space-3); overflow: hidden auto; scrollbar-width: none;
+}
+.activity-bar__buttons {
+  display: flex; flex: 1; flex-direction: column; justify-content: space-between; gap: var(--space-3);
+  width: calc(var(--bar-button) + 2 * var(--space-1)); padding: var(--space-1) 0;
+  background: var(--panel-bg); border: 1px solid var(--bar-line); border-radius: var(--radius-card);
 }
 .activity-bar__group { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
 .activity-bar__button {
   position: relative; display: grid; place-items: center; width: var(--bar-button); height: var(--bar-button);
-  border-radius: var(--radius-pill); color: var(--bar-ink);
+  border-radius: var(--radius-md); color: var(--bar-ink);
 }
 .activity-bar__button svg.i { width: 20px; height: 20px; }
-.activity-bar__button:hover { background: var(--bar-hover); color: var(--bar-ink-active); }
+.activity-bar__button:hover { background: var(--bar-hover); }
 .activity-bar__button[aria-expanded='true'], .activity-bar__button[aria-pressed='true'] { background: var(--bar-active); color: var(--bar-ink-active); }
 .activity-bar__button:active:not([aria-haspopup]) { scale: 0.95; }
 /* The agent works while its chat is out of view: a pink dot, the agent's mark, on its button. */
-.activity-bar__badge { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--bar); }
+.activity-bar__badge { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--panel-bg); }
 /* The gear's menu: what Excalidraw's main menu held, beside the gear. */
 .popover.settings-menu { width: 264px; max-width: calc(100vw - 16px); }
 .settings-menu hr { margin: var(--space-1) var(--space-2); border: 0; border-top: var(--border); }
@@ -131,12 +130,16 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .settings-menu__swatch[aria-disabled='true'] > span { opacity: var(--disabled-opacity); }
 /* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
 .canvas--editor .excalidraw .main-menu-trigger { display: none; }
-/* The native buttons and the panel header share the workspace colour. The first row also moves the window. */
+/* The native buttons and the panel header share the workspace colour. */
 :root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand {
   background: linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top));
+}
+:root[data-window-controls='mac'] .activity-bar { -webkit-app-region: drag; }
+/* Start the panel's drag region after the toggle. Electron treats overlapping drag regions as native title-bar input. */
+:root[data-window-controls='mac'] .panel-brand .brand {
+  align-self: stretch; flex: 1;
   -webkit-app-region: drag;
 }
-:root[data-window-controls='mac'] .panel-brand { color-scheme: var(--theme-scheme); color: var(--ink); }
 :root[data-window-controls='mac'] .main {
   border-image: linear-gradient(var(--window-header-bg) var(--bar-top), var(--bar-line) var(--bar-top)) 1;
 }
@@ -202,11 +205,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
   width: var(--control-h-sm); height: var(--control-h-sm); background: var(--surface); color: var(--ink-2);
 }
 :root[data-window-controls='mac'] .sidebar-toggle { --surface: var(--window-header-bg); }
-:root:not([data-window-controls='mac']) .sidebar-toggle[aria-expanded='true'] {
-  --focus-ring: 0 0 0 2px var(--bar), 0 0 0 4px var(--bar-focus);
-  background: transparent; color: var(--bar-ink);
-}
-:root:not([data-window-controls='mac']) .sidebar-toggle[aria-expanded='true']:hover { background: var(--bar-hover); color: var(--bar-ink-active); }
+:root:not([data-window-controls='mac']) .sidebar-toggle[aria-expanded='true'] { --surface: var(--panel-bg); }
 
 /* Sidebar: the projects, laid out like tldraw's. A paper column docked to the left, the full height of the window, with
    the mark at its head; the header runs beside it. On a narrow window it opens over the content instead. */

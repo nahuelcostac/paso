@@ -58,4 +58,18 @@ describe('fixed activity bar', () => {
     expect(rule(app, ".app[data-view='canvas']")).toContain('--window-header-bg: var(--paper)');
     expect(rule(app, `${mac} .activity-bar, ${mac} .panel-brand`)).toContain('linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top))');
   });
+
+  it('keeps the macOS panel drag region to the right of the sidebar toggle', async () => {
+    const app = await css('app.css');
+    const mac = ":root[data-window-controls='mac']";
+    expect(rule(app, `${mac} .activity-bar, ${mac} .panel-brand`)).not.toContain('-webkit-app-region: drag');
+    expect(rule(app, `${mac} .panel-brand .brand`)).toContain('-webkit-app-region: drag');
+    expect(rule(app, '.panel-brand')).toContain('padding: 0 var(--space-3) var(--bar-top-gap) var(--sidebar-toggle-inset)');
+  });
+
+  it('uses theme colours and one outline around the activity buttons', async () => {
+    const app = await css('app.css');
+    expect(rule(app, '.projects, .agent')).not.toContain('color-scheme: dark');
+    expect(rule(app, '.activity-bar__buttons')).toContain('border: 1px solid var(--bar-line)');
+  });
 });

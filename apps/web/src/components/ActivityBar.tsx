@@ -61,28 +61,30 @@ export function ActivityBar({ panel, onProjects, working = false, studio, onStud
 
   return (
     <div ref={bar} className="activity-bar" role="toolbar" aria-orientation="vertical" aria-label="Activity bar" onKeyDown={onKeyDown}>
-      <div className="activity-bar__group">
-        {button('projects', 'Projects', <Folders className="i" aria-hidden="true" />,
-          { 'aria-expanded': panel === 'projects', 'aria-controls': panel === 'projects' ? 'projects-panel' : undefined },
-          onProjects)}
-        {studio !== undefined && button('studio', 'Studio', <Clapperboard className="i" aria-hidden="true" />,
-          {
-            'aria-pressed': studio === 'whiteboard' ? undefined : studio === 'overview',
-            'aria-expanded': chatOpen,
-            'aria-controls': chatOpen ? 'agent-panel' : undefined,
-          }, onStudio,
-          working ? <span className="activity-bar__badge" aria-hidden="true" /> : undefined,
-          studioTitle)}
-      </div>
-      <div className="activity-bar__group">
-        {workspace({ tabIndex: stop === 'workspace' ? 0 : -1, onFocus: () => setCurrent('workspace') })}
-        <button
-          ref={gear} type="button" className="activity-bar__button" data-id="settings" aria-label="Settings" title="Settings"
-          aria-haspopup="menu" aria-expanded={menuOpen} tabIndex={stop === 'settings' ? 0 : -1}
-          onFocus={() => setCurrent('settings')} onClick={() => setMenuOpen(!menuOpen)}
-        >
-          <Settings className="i" aria-hidden="true" />
-        </button>
+      <div className="activity-bar__buttons">
+        <div className="activity-bar__group">
+          {button('projects', 'Projects', <Folders className="i" aria-hidden="true" />,
+            { 'aria-expanded': panel === 'projects', 'aria-controls': panel === 'projects' ? 'projects-panel' : undefined },
+            onProjects)}
+          {studio !== undefined && button('studio', 'Studio', <Clapperboard className="i" aria-hidden="true" />,
+            {
+              'aria-pressed': studio === 'whiteboard' ? undefined : studio === 'overview',
+              'aria-expanded': chatOpen,
+              'aria-controls': chatOpen ? 'agent-panel' : undefined,
+            }, onStudio,
+            working ? <span className="activity-bar__badge" aria-hidden="true" /> : undefined,
+            studioTitle)}
+        </div>
+        <div className="activity-bar__group">
+          {workspace({ tabIndex: stop === 'workspace' ? 0 : -1, onFocus: () => setCurrent('workspace') })}
+          <button
+            ref={gear} type="button" className="activity-bar__button" data-id="settings" aria-label="Settings" title="Settings"
+            aria-haspopup="menu" aria-expanded={menuOpen} tabIndex={stop === 'settings' ? 0 : -1}
+            onFocus={() => setCurrent('settings')} onClick={() => setMenuOpen(!menuOpen)}
+          >
+            <Settings className="i" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       {menuOpen && gear.current && <SettingsMenu anchor={gear.current} canvas={canvas} onClose={() => setMenuOpen(false)} />}
     </div>
