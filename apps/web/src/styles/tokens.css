@@ -149,7 +149,9 @@
   --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
   --window-controls-w: 0px; /* the window's own buttons, at the top of the activity bar: none in a browser */
   --bar-w: 52px; /* the activity bar; barWidth() in Splitter.tsx reads it */
-  --bar-top: 40px; /* the top of the bar and of the panel beside it: the window's buttons on macOS, the app's icon */
+  --bar-top: 40px; /* the row for the app mark and, on macOS, the window controls */
+  --bar-top-gap: 0px;
+  --panel-mark-size: 18px;
   --bar-button: 40px; /* its round buttons, 20px icons */
   --carousel-h: 108px;
   --carousel-over-bar-h: 100px; /* the strip above its bar */
@@ -187,10 +189,14 @@
   --thumb-filter: none;
 }
 
-/* The desktop app on macOS: close, minimise and zoom (three 14px circles 9px apart, 60px in all) sit at the top of the
-   activity bar, centred 20px down, with 10px on each side: the bar is 80px wide to hold them, and its icons stay
-   centred under them. */
-:root[data-window-controls='mac'] { --window-controls-w: 80px; --bar-w: 80px; }
+/* The native buttons are 14px high and start 14px from the top. Keep the app mark at their size and centre. */
+:root[data-window-controls='mac'] {
+  --window-controls-w: 80px;
+  --bar-w: 80px;
+  --bar-top: 42px;
+  --bar-top-gap: var(--space-2);
+  --panel-mark-size: 14px;
+}
 
 /* Non-colour theme values cannot use light-dark(). This filter is Excalidraw's own
    dark-mode filter, so a thumbnail always matches the canvas it came from. */

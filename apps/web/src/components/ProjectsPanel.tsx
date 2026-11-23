@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isLooseProject, LOOSE_PROJECT_ID, type Scene } from '@paso/shared';
-import { CloudOff, Folder, FolderPlus, Layers, Search, ServerOff, Shapes, SquarePen, TriangleAlert, X } from 'lucide-react';
+import { CloudOff, Folder, FolderPlus, Layers, Search, ServerOff, SquarePen, TriangleAlert, X } from 'lucide-react';
 import { describeContents, fold } from '../lib/format';
 import { shownFilter, showsUnder } from '../lib/project-filter';
 import { ActionError, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
@@ -393,7 +393,6 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
                   {creatingLoose && (
                     <li>
                       <div className="project project--loose" data-draft="true">
-                        <span className="project__tile"><Shapes className="i" aria-hidden="true" /></span>
                         <div className="project__text">
                           <NameField
                             initial=""
@@ -413,7 +412,7 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
                   )}
                   {looseVisible.map(renderLoose)}
                   {sceneOut && looseVisible.length === 0 && !creatingLoose && (
-                    <li className="loose-drop" aria-hidden="true"><Shapes className="i" />Drop here</li>
+                    <li className="loose-drop" aria-hidden="true">Drop here</li>
                   )}
                 </ul>
               </section>
@@ -499,7 +498,7 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
       )}
       {drag && createPortal(
         <div className="drag-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
-          {isLooseProject(drag.source) ? <Shapes className="i" /> : <Layers className="i" />}{drag.name}
+          {!isLooseProject(drag.source) && <Layers className="i" />}{drag.name}
         </div>,
         document.body,
       )}

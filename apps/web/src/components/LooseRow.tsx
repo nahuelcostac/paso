@@ -1,5 +1,5 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { EllipsisVertical, Shapes } from 'lucide-react';
+import { EllipsisVertical } from 'lucide-react';
 import type { LooseDiagram } from '../state/projects-store';
 import { NameField } from './NameField';
 
@@ -29,8 +29,7 @@ type Props = {
 };
 
 /**
- * A loose diagram: one scene that belongs to no project. It reads like a project row, with a fixed icon, and can be
- * dragged onto a project to move it in.
+ * A loose diagram belongs to no project. Drag its row onto a project to move it there.
  */
 export function LooseRow({ diagram, current, renaming, dragging, onOpen, onMenu, onRename, onRenameCancel, onRenameAbandon, drag }: Props) {
   const more = useRef<HTMLButtonElement>(null);
@@ -39,7 +38,6 @@ export function LooseRow({ diagram, current, renaming, dragging, onOpen, onMenu,
   return (
     <li>
       <div className="project project--loose" data-current={current} data-dragging={dragging || undefined}>
-        <span className="project__tile" aria-hidden="true"><Shapes className="i" /></span>
         {renaming ? (
           <div className="project__text">
             <NameField initial={name} label={`Name of ${name}`} onSave={onRename} onCancel={onRenameCancel} onAbandon={onRenameAbandon} />

@@ -90,7 +90,9 @@ describe('loose diagrams in the sidebar', () => {
     expect([...sidebar().querySelectorAll('.project__name')].map((name) => name.textContent)).toEqual([
       'Álgebra', 'Biología', 'Ábaco', 'Zeta',
     ]);
-    expect(within(section).getByRole('list', { name: 'Loose diagrams' })).toHaveTextContent('Ábaco');
+    const diagrams = within(section).getByRole('list', { name: 'Loose diagrams' });
+    expect(diagrams).toHaveTextContent('Ábaco');
+    expect(diagrams.querySelector('.project__tile')).toBeNull();
   });
 
   it('creates one with “New diagram”, opens it, renames and deletes it', async () => {
@@ -103,7 +105,9 @@ describe('loose diagrams in the sidebar', () => {
     expect(navButtons.indexOf('New diagram')).toBe(navButtons.indexOf('New project') + 1);
 
     await user.click(within(sidebar()).getByRole('button', { name: 'New diagram' }));
-    await user.type(screen.getByLabelText('Name of the new diagram'), 'Pizarra rápida{Enter}');
+    const draft = screen.getByLabelText('Name of the new diagram');
+    expect(draft.closest('.project')?.querySelector('.project__tile')).toBeNull();
+    await user.type(draft, 'Pizarra rápida{Enter}');
     const row = await screen.findByRole('button', { name: /^Pizarra rápida ?, loose diagram/ }, patience);
     expect(row).toHaveAttribute('aria-current', 'true');
     await waitFor(() => expect(row).toHaveTextContent('Pizarra rápida'), patience);
