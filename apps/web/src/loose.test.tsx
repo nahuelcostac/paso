@@ -556,28 +556,32 @@ describe('the step strip of a loose diagram', () => {
     expect(screen.getByRole('button', { name: 'Show steps' })).toBeInTheDocument();
   });
 
-  it('opens Studio and the Canvas separately for a one-step diagram', async () => {
+  it('opens Studio and the Canvas separately for a one-step diagram, and the chat beside either', async () => {
     await seedLoose('d', 'Pizarra');
     window.history.replaceState(null, '', '#/_loose/canvas/d/d-step-0');
     const { unmount } = render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
-    expect(document.querySelector('.canvas__corner')).not.toBeInTheDocument();
+    // A plain whiteboard has nothing to present or frame: its corner keeps only the view switch.
+    const corner = document.querySelector('.canvas__corner')!;
+    const views = within(corner as HTMLElement).getByRole('group', { name: 'View' });
     expect(screen.queryByRole('button', { name: /^Present/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Frame' })).not.toBeInTheDocument();
     const user = userEvent.setup();
-    const bar = screen.getByRole('toolbar', { name: 'View controls' });
-    const studio = within(bar).getByRole('button', { name: 'Studio' });
-    const diagram = within(bar).getByRole('button', { name: 'Diagram' });
-    expect(studio).toHaveAttribute('aria-expanded', 'false');
+    const studio = within(views).getByRole('button', { name: 'Studio' });
     expect(studio).toHaveAttribute('aria-pressed', 'false');
+    const agent = within(screen.getByRole('toolbar', { name: 'Sidebar panels' })).getByRole('button', { name: 'Agent' });
+    await waitFor(() => expect(agent).not.toHaveAttribute('aria-disabled'), patience);
     await user.click(studio);
     const overview = await screen.findByRole('main', { name: 'Studio' }, patience);
-    expect(await screen.findByRole('textbox', { name: /agent/i }, patience)).toBeInTheDocument();
-    expect(studio).toHaveAttribute('aria-expanded', 'true');
-    expect(studio).toHaveAttribute('aria-pressed', 'true');
+    // The view changed, not the panel.
+    expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
     expect(await within(overview).findByRole('button', { name: /^Step 1/ }, patience)).toBeInTheDocument();
-    await user.click(diagram);
+    await user.click(agent);
+    expect(await screen.findByRole('textbox', { name: /agent/i }, patience)).toBeInTheDocument();
+    expect(agent).toHaveAttribute('aria-expanded', 'true');
+    await user.click(within(screen.getByRole('group', { name: 'View' })).getByRole('button', { name: 'Diagram' }));
     expect(await screen.findByTestId('canvas', {}, patience)).toBeInTheDocument();
-    expect(diagram).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByRole('group', { name: 'View' })).getByRole('button', { name: 'Diagram' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('complementary', { name: 'Agent' })).toBeInTheDocument();
     expect(window.location.hash).toBe('#/_loose/canvas/d/d-step-0');
     unmount();
@@ -668,7 +672,7 @@ describe('the gear in the activity bar', () => {
     await user.keyboard('{Escape}');
 
     // In the Studio there is no canvas: its options stay in place, greyed, with a note; the theme still works.
-    await user.click(within(screen.getByRole('toolbar', { name: 'View controls' })).getByRole('button', { name: 'Studio' }));
+    await user.click(within(screen.getByRole('group', { name: 'View' })).getByRole('button', { name: 'Studio' }));
     await screen.findByRole('main', { name: 'Studio' }, patience);
     await user.click(settings);
     menu = await screen.findByRole('menu', { name: 'Settings' });

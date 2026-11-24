@@ -39,13 +39,15 @@ function keyboardInCarousel() {
   try { return active.matches(':focus-visible'); } catch { return true; }
 }
 
-export default function Canvas({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, corner, subscribeEvents, loose = false, menu }: {
+export default function Canvas({ api, store, actions, projectId, projectName, scenes, structureRevision, refreshScenes, route, navigate, stepAgentStates, notices, views, corner, subscribeEvents, loose = false, menu }: {
   api: ApiClient; store: StepStore; actions: StepActions; projectId: string; projectName: string;
   scenes: SceneEnvelope[] | undefined; structureRevision: string; refreshScenes: () => Promise<SceneEnvelope[]>;
   route: Route; navigate: (route: Route, options?: { replace?: boolean }) => void;
   stepAgentStates?: Record<string, 'working' | 'changed'>;
   /** The app's failures with no place of their own while the sidebar is folded. */
   notices?: React.ReactNode;
+  /** The view switch, in the canvas's top right corner, left of Present. */
+  views?: React.ReactNode;
   /** Over the canvas's top right corner, where Excalidraw's library button was: Present. */
   corner?: React.ReactNode;
   /** The service's changes, so a camera this step keeps from an earlier one follows it when that one changes. */
@@ -130,6 +132,8 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
 
   // The step strip: a project's scene shows it, a loose diagram shows it with several steps, or as the person chose.
   // Hidden, the steps stay, and the keys on the canvas still move through them.
+  // A loose diagram with one step (or none) is a plain whiteboard.
+  const plain = loose && stepIds.length <= 1;
   const strip = useStepStrip(scene ? stripKey(projectId, scene.id, loose) : undefined, stepIds.length, loose);
 
   // ← → on the canvas move through the scene's steps, as in Present. They stop at both ends.
@@ -155,11 +159,12 @@ export default function Canvas({ api, store, actions, projectId, projectName, sc
       }}>Download copy and load the service's version</button>}
     </div>}
     <div className="canvas canvas--editor">
-      {/* A loose diagram with one step is a plain whiteboard: nothing to present or frame. A second step brings the
-          corner back. */}
-      {!(loose && stepIds.length <= 1) && <div className="canvas__corner">
-        {corner}
-        {session && <CameraControl
+      {/* A loose diagram with one step is a plain whiteboard: nothing to present or frame, so the corner keeps only the
+          view switch. A second step brings Present and Frame back. */}
+      {(views || !plain) && <div className="canvas__corner">
+        {views}
+        {!plain && corner}
+        {!plain && session && <CameraControl
           camera={session.document.camera} first={shownIds?.[0] === shownStepId} kept={kept} drawing={framing} onDraw={() => setFraming((on) => !on)}
           onClear={() => { setFraming(false); store.setCamera(session, undefined); }}
           onKeep={(keep) => { setFraming(false); store.setCamera(session, keep ? PREVIOUS_CAMERA : undefined); }}
