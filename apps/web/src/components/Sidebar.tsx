@@ -6,7 +6,6 @@ import { useCanvasMenu, type CanvasMenu } from '../editor/canvas-menu';
 import type { View } from '../lib/route';
 
 type Props = {
-  expanded: boolean;
   chatOpen: boolean;
   /** The agent works while its panel is out of view: a pink dot on Studio. */
   working?: boolean;
@@ -20,14 +19,12 @@ type Props = {
   children: ReactNode;
 };
 
-/** The full sidebar when open and a compact column of controls when folded. */
-export function Sidebar({ expanded, chatOpen, working = false, view, onDiagram, onStudio, canvasMenu, workspace, children }: Props) {
+export function Sidebar({ chatOpen, working = false, view, onDiagram, onStudio, canvasMenu, workspace, children }: Props) {
   const gear = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const canvas = useCanvasMenu(canvasMenu);
   const [viewStop, setViewStop] = useState('diagram');
   const [toolStop, setToolStop] = useState('workspace');
-  const orientation = expanded ? 'horizontal' : 'vertical';
   const studioTitle = view === 'canvas' ? 'Open Studio with agent chat' : chatOpen ? 'Studio' : 'Open agent chat';
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -54,9 +51,9 @@ export function Sidebar({ expanded, chatOpen, working = false, view, onDiagram, 
 
   return (
     <div className="sidebar">
-      {expanded && <div className="panel-brand"><Brand /></div>}
+      <div className="panel-brand"><Brand /></div>
       <div className="sidebar__body">
-        {view && <div className="sidebar__views" role="toolbar" aria-orientation={orientation} aria-label="View controls" onKeyDown={onKeyDown}>
+        {view && <div className="sidebar__views" role="toolbar" aria-orientation="horizontal" aria-label="View controls" onKeyDown={onKeyDown}>
           {button('diagram', 'Diagram', <Presentation className="i" aria-hidden="true" />,
             { 'aria-pressed': view === 'canvas' }, onDiagram)}
           {button('studio', 'Studio', <Clapperboard className="i" aria-hidden="true" />,
@@ -69,7 +66,7 @@ export function Sidebar({ expanded, chatOpen, working = false, view, onDiagram, 
             studioTitle)}
         </div>}
         {children}
-        <div className="sidebar__tools" role="toolbar" aria-orientation={orientation} aria-label="Workspace controls" onKeyDown={onKeyDown}>
+        <div className="sidebar__tools" role="toolbar" aria-orientation="horizontal" aria-label="Workspace controls" onKeyDown={onKeyDown}>
           {workspace({ tabIndex: toolStop === 'workspace' ? 0 : -1, onFocus: () => setToolStop('workspace') })}
           <button
             ref={gear} type="button" className="sidebar__button" data-id="settings" aria-label="Settings" title="Settings"

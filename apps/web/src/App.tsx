@@ -321,13 +321,14 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   };
 
   // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram. Both
-  // take the left spot, one at a time; on a project's Canvas the chat is not there, and the spot shows nothing for it.
+  // take the left spot, one at a time. Projects take its place when the current view cannot show chat.
   const chatHere = overview || plainLoose;
   const canShowAgent = Boolean(openProject && chatHere);
-  const shown = side === 'agent' && !canShowAgent ? null : side;
+  const shown = side === 'agent' && !canShowAgent ? 'projects' : side;
   const sidebarLabel = shown ? 'Hide sidebar' : 'Show sidebar';
+  const sidebarToggle = useRef<HTMLButtonElement>(null);
   const docked = narrow ? null : shown;
-  const left = docked ? `${(docked === 'projects' ? projectsWidth : agentWidth).width}px` : 'var(--bar-w)';
+  const left = docked ? `${(docked === 'projects' ? projectsWidth : agentWidth).width}px` : '0px';
   /** A drawer steps aside once something is chosen in it. Docked, the panel stays. */
   const closeDrawer = () => { if (window.matchMedia(NARROW).matches) chooseSide(null); };
   // The agent's marks on steps and its notice in the top bar follow the open project in both views.
@@ -362,8 +363,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   </> : undefined;
   const hideAgent = () => {
     chooseSide(null);
-    // Focus goes back to the button that opened it.
-    document.querySelector<HTMLButtonElement>('.sidebar__button[data-id="studio"]')?.focus();
+    sidebarToggle.current?.focus();
   };
   const openStudio = () => {
     chooseSide('agent');
@@ -384,14 +384,13 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       style={{ '--left': left, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
       <button
-        type="button" className="icon-btn sidebar-toggle" aria-label={sidebarLabel} title={sidebarLabel}
+        ref={sidebarToggle} type="button" className="icon-btn sidebar-toggle" aria-label={sidebarLabel} title={sidebarLabel}
         aria-expanded={shown !== null} aria-controls={shown ? `${shown}-panel` : undefined}
         onClick={() => chooseSide(shown ? null : 'projects')}
       >
         <PanelLeft className="i" aria-hidden="true" />
       </button>
-      <Sidebar
-        expanded={shown !== null}
+      {shown && <Sidebar
         chatOpen={shown === 'agent'}
         working={Boolean(openProject && working && shown !== 'agent')}
         view={openProject ? route.view : undefined}
@@ -448,21 +447,19 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
             }}
           />
         )}
-        {/* The agent sits in the left spot beside the overview, where its changes show across the scenes. As a drawer it
-            stays mounted, closed. */}
-        {openProject && chatHere && (narrow || shown === 'agent') && <AgentPanel
+        {shown === 'agent' && openProject && <AgentPanel
           store={agentStore} projectId={openProject.id} projectName={openProject.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
           input={agentDrafts[JSON.stringify([openProject.id, onlySceneId ?? null])] ?? ''}
           setInput={(value) => {
             const key = JSON.stringify([openProject.id, onlySceneId ?? null]);
             setAgentDrafts((drafts) => ({ ...drafts, [key]: typeof value === 'function' ? value(drafts[key] ?? '') : value }));
           }}
-          narrow={narrow} open={shown === 'agent'} onClose={hideAgent}
+          narrow={narrow} onClose={hideAgent}
           onOpenStep={(id, stepId) => navigate({ projectId: openProject.id, view: 'canvas', sceneId: id, stepId })}
           scenesReady={scenes !== undefined}
           onOpenScene={(id) => navigate({ projectId: openProject.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
         />}
-      </Sidebar>
+      </Sidebar>}
       {/* The docked panel's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
       {docked && <Splitter
         key={docked} side="left" open onToggle={() => chooseSide(null)}

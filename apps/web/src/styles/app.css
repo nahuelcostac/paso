@@ -27,7 +27,6 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 /* The sidebar and the main view share the window. */
 .app {
   --window-header-bg: var(--page);
-  --folded-main-inset: calc(var(--sidebar-toggle-inset) - var(--bar-w));
   position: relative; display: grid; height: 100%;
   grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr);
   background: var(--bar);
@@ -37,6 +36,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
   grid-column: 2; grid-row: 1; position: relative; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   min-width: 0; min-height: 0; border-left: 1px solid var(--bar-line); background: var(--page); overflow: hidden;
 }
+.app--folded .main, .app--narrow .main { border-left: 0; }
 .sidebar {
   --surface: var(--panel-bg);
   --border: 1px solid var(--line);
@@ -85,18 +85,11 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
 .main > * { grid-column: 1; grid-row: 1; }
 
-/* The expanded sidebar has two rows of controls. When folded, they share a narrow outline. */
+/* The sidebar has two rows of controls. */
 .sidebar__body { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .sidebar__views, .sidebar__tools { display: flex; flex: none; gap: var(--space-1); }
 .sidebar__views { padding: 0 var(--space-2) var(--space-2); }
 .sidebar__tools { margin-top: auto; padding: var(--space-2); }
-.app--folded .sidebar { align-items: center; padding: var(--bar-top) 0 var(--space-1); overflow: hidden auto; scrollbar-width: none; }
-.app--folded .sidebar__body {
-  min-height: min-content; gap: var(--space-3);
-  width: calc(var(--bar-button) + 2 * var(--space-1)); padding: calc(var(--space-1) + var(--bar-top-gap)) 0 var(--space-3);
-  background: var(--panel-bg); border: 1px solid var(--bar-line); border-radius: var(--radius-card);
-}
-.app--folded .sidebar__views, .app--folded .sidebar__tools { flex-direction: column; align-items: center; padding: 0; }
 .sidebar__button {
   --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--bar-focus);
   position: relative; display: grid; place-items: center; width: var(--bar-button); height: var(--bar-button);
@@ -134,12 +127,13 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 :root[data-window-controls='mac'] .sidebar {
   background: linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top)) var(--surface);
 }
-:root[data-window-controls='mac'] .app--folded .sidebar { -webkit-app-region: drag; }
 /* Leave the sidebar toggle between the two native drag regions. */
+:root[data-window-controls='mac'] .app--folded::before,
 :root[data-window-controls='mac'] .panel-brand::before {
   content: ''; position: absolute; top: 0; left: 0; width: var(--window-controls-w); height: var(--bar-top);
   -webkit-app-region: drag;
 }
+:root[data-window-controls='mac'] .app--folded::before { z-index: 15; }
 :root[data-window-controls='mac'] .panel-brand .brand {
   align-self: stretch; flex: 1;
   -webkit-app-region: drag;
@@ -441,8 +435,11 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
   scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
 }
 .board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: 180px; }
-/* Keep notices and the title clear of the toggle when it sits over the board. */
-.app--folded .board { padding-left: max(var(--board-inline-padding), var(--folded-main-inset)); }
+/* Leave room above the board title and beside its notices when the toggle floats over the main view. */
+.app--folded .board, .app--narrow .board { padding-top: max(44px, var(--bar-top)); }
+.app--folded .board__top, .app--narrow .board__top {
+  padding-left: max(0px, calc(var(--sidebar-toggle-inset) - var(--board-inline-padding)));
+}
 /* In the Studio the corner scrolls with the page, and the title keeps clear of it. */
 .board__corner { z-index: 2; }
 .board__head { display: flex; padding-right: 180px; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
@@ -467,15 +464,18 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* The Canvas fills everything right of the sidebar, edge to edge: the canvas, then its step strip. No card, no gutter. */
 .canvas-page { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
 .editor-notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--danger-soft); color: var(--ink); border-bottom: var(--border); }
-.app--folded .editor-notice { padding-left: max(var(--space-4), var(--folded-main-inset)); }
+.app--folded .editor-notice, .app--narrow .editor-notice { padding-left: var(--sidebar-toggle-inset); }
 .editor-notice .btn { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-sm); }
 .canvas--editor > .canvas__placeholder { height: 100%; justify-content: center; padding: var(--space-5); }
 .canvas--editor { display: block; padding: 0; flex: 1; min-height: 320px; overflow: auto; }
+/* Keep the selected shape's controls below the window controls and sidebar toggle. */
+.app--folded .canvas--editor .excalidraw .App-menu__left,
+.app--narrow .canvas--editor .excalidraw .App-menu__left { margin-top: var(--bar-top); }
 .editor-message { display: grid; place-content: center; gap: var(--space-2); height: 100%; color: var(--ink-2); }
 
 /* Under 1160px the save state keeps its place for screen readers but gives its room to the agent status. */
 /* On narrow windows, the expanded sidebar opens over the board from the left edge. */
-.app--narrow:not(.app--folded) .sidebar {
+.app--narrow .sidebar {
   position: fixed; z-index: 15; top: 0; bottom: 0; left: 0;
   border-right: 1px solid var(--bar-line); box-shadow: var(--shadow-lg); overflow: hidden;
 }

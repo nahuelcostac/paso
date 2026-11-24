@@ -23,9 +23,8 @@ type Props = {
   scenes: Scene[];
   /** The scene in the address. The agent receives it until the person picks another target. */
   routeSceneId?: string;
-  /** Under 1100px the panel is a drawer over the Storyboard. */
+  /** The panel is a drawer over the main view on narrow windows. */
   narrow: boolean;
-  open: boolean;
   onClose: () => void;
   onOpenStep: (sceneId: string, stepId: string) => void;
   /** Selects a scene, so the chat follows it: the scene the agent works on is the one selected in the sidebar. */
@@ -172,7 +171,7 @@ function UndoDialog({ state, scenes, onCancel, onConfirm }: {
 }
 
 /** The agent panel: a conversation with the person's own harness about this project, and what the agent does in it. */
-export function AgentPanel({ store, input, setInput, projectId, projectName, scenes, routeSceneId, narrow, open, onClose, onOpenStep, onOpenScene, scenesReady }: Props) {
+export function AgentPanel({ store, input, setInput, projectId, projectName, scenes, routeSceneId, narrow, onClose, onOpenStep, onOpenScene, scenesReady }: Props) {
   const state = useAgent(store);
   const [menu, setMenu] = useState<{ kind: 'history'; anchor: HTMLButtonElement } | null>(null);
   const [deleting, setDeleting] = useState<{ session: AgentSessionInfo; busy: boolean; error?: string } | null>(null);
@@ -185,7 +184,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   useEffect(() => { void store.loadHarnesses(); }, [store]);
   useEffect(() => { void store.openProject(projectId); }, [store, projectId]);
   // Opening the drawer puts the person in the composer.
-  useEffect(() => { if (narrow && open) textarea.current?.focus(); }, [narrow, open]);
+  useEffect(() => { if (narrow) textarea.current?.focus(); }, [narrow]);
   // The composer grows with its text, as in T3 Code, up to the cap in agent.css; past it, it scrolls.
   useLayoutEffect(() => {
     const field = textarea.current;
@@ -223,11 +222,11 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   const info = state.harnesses.list.find((candidate) => candidate.id === harness);
   const usable = Boolean(scenesReady && info?.supported && info.found && info.added && info.session !== 'signed_out');
 
-  // The latest turn stays in view. A closed drawer cannot scroll, so it scrolls again when it opens.
+  // The latest turn stays in view.
   useEffect(() => {
     const element = log.current;
     if (element) element.scrollTop = element.scrollHeight;
-  }, [turns, open]);
+  }, [turns]);
 
   const send = async () => {
     if (!usable || running || !input.trim()) return;
@@ -305,7 +304,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
 
   return (
     <aside
-      id="agent-panel" className="agent" aria-label="Agent" data-narrow={narrow || undefined} data-open={narrow && open ? 'true' : undefined}
+      id="agent-panel" className="agent" aria-label="Agent"
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
     >
       <div className="agent__head">

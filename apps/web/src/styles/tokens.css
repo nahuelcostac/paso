@@ -142,7 +142,6 @@
   --panel-agent: 360px; /* the chat's starting width. The person drags it; App sets the chosen width on .app (PanelResizer.tsx) */
   --fold-w: 16px; /* a folded side with a tab on its edge (Splitter): a thin strip that holds the tab */
   --window-controls-w: 0px; /* the window's own buttons, at the top of the activity bar: none in a browser */
-  --bar-w: 44px; /* the sidebar when folded */
   --bar-top: 40px; /* the row for the sidebar toggle, app mark and macOS window controls */
   --bar-top-gap: 0px;
   --sidebar-toggle-start: calc(var(--window-controls-w) + var(--space-2));

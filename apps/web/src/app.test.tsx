@@ -547,7 +547,7 @@ describe('the board and its overview', () => {
     await user.keyboard('{Escape}');
     expect(within(row).getByRole('button', { name: 'Search' })).toBeInTheDocument();
     expect(within(sidebar).getByRole('button', { name: 'New project' })).toHaveTextContent(/^$/);
-    // Its button folds it: nothing is left of it, not even the edge to drag.
+    // Hide removes the sidebar and its resize edge.
     await user.click(toggle);
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -556,13 +556,15 @@ describe('the board and its overview', () => {
     expect(screen.queryByRole('separator', { name: 'Sidebar width' })).not.toBeInTheDocument();
     expect(window.localStorage.getItem('paso.side-panel')).toBe('none');
     expect(app).toHaveClass('app--folded');
-    expect(bar).toHaveAttribute('aria-orientation', 'vertical');
-    expect(tools()).toHaveAttribute('aria-orientation', 'vertical');
+    expect(app).toHaveStyle({ '--left': '0px' });
+    expect(document.querySelector('.sidebar')).not.toBeInTheDocument();
+    expect(bar).not.toBeInTheDocument();
+    expect(screen.queryByRole('toolbar', { name: 'Workspace controls' })).not.toBeInTheDocument();
     await user.click(toggle);
     expect(app).not.toHaveClass('app--folded');
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
 
-    const studio = within(bar).getByRole('button', { name: 'Studio' });
+    let studio = screen.getByRole('button', { name: 'Studio' });
     expect(studio.querySelector('.lucide-clapperboard')).toBeInTheDocument();
     expect(studio).toHaveAttribute('aria-expanded', 'false');
     expect(studio).toHaveAttribute('title', 'Open Studio with agent chat');
@@ -579,6 +581,7 @@ describe('the board and its overview', () => {
     // Projects take the left spot. Studio brings the chat back while the overview stays open.
     await user.click(toggle);
     await user.click(toggle);
+    studio = screen.getByRole('button', { name: 'Studio' });
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
     expect(studio).toHaveAttribute('title', 'Open agent chat');
@@ -587,12 +590,13 @@ describe('the board and its overview', () => {
     expect(screen.getByRole('complementary', { name: 'Agent' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
     expect(window.localStorage.getItem('paso.side-panel')).toBe('agent');
-    // Back on the Canvas the chat is not there, and the spot is empty; the Studio brings it back.
-    await user.click(within(bar).getByRole('button', { name: 'Diagram' }));
+    // On the Canvas, Projects take the left spot so the view controls stay available.
+    await user.click(screen.getByRole('button', { name: 'Diagram' }));
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     expect(studio).toHaveAttribute('aria-expanded', 'false');
-    expect(app).toHaveClass('app--folded');
+    expect(app).toHaveClass('app--projects');
+    expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
 
     // Remembered across a relaunch.
     unmount();
@@ -628,6 +632,8 @@ describe('the board and its overview', () => {
     await user.click(toggle);
     expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+    expect(document.querySelector('.sidebar')).not.toBeInTheDocument();
+    expect(document.querySelector('.app')).toHaveStyle({ '--left': '0px' });
 
     unmount();
     window.localStorage.setItem('paso.last-side-panel', 'agent');

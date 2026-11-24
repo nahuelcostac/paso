@@ -704,15 +704,15 @@ describe('narrow windows', () => {
     };
     const user = userEvent.setup();
     render(<App config={config} />);
-    const toggle = await waitFor(studioButton, patience);
-    const panel = await screen.findByRole('complementary', { name: 'Agent', hidden: true }, patience);
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(panel).not.toHaveAttribute('data-open');
+    const sidebarToggle = screen.getByRole('button', { name: 'Show sidebar' });
+    expect(document.querySelector('.sidebar')).not.toBeInTheDocument();
     // A drawer does not dock and has no edge to drag.
     expect(screen.queryByRole('separator', { name: 'Chat width' })).not.toBeInTheDocument();
 
+    await user.click(sidebarToggle);
+    const toggle = await waitFor(studioButton, patience);
     await user.click(toggle);
-    expect(panel).toHaveAttribute('data-open', 'true');
+    const panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     // A drawer is for the moment: the panel to bring back with room to dock stays the one chosen there.
     expect(window.localStorage.getItem('paso.side-panel')).toBeNull();
@@ -721,17 +721,18 @@ describe('narrow windows', () => {
     await within(panel).findByText('Changing the step', {}, patience);
 
     await user.keyboard('{Escape}');
-    expect(panel).not.toHaveAttribute('data-open');
-    expect(toggle).toHaveFocus();
+    expect(panel).not.toBeInTheDocument();
+    expect(document.querySelector('.sidebar')).not.toBeInTheDocument();
+    expect(sidebarToggle).toHaveAccessibleName('Show sidebar');
+    expect(sidebarToggle).toHaveFocus();
     expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
     const status = await screen.findByRole('status', { name: 'Agent working' }, patience);
     await user.click(within(status).getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument(), patience);
 
-    const sidebarToggle = screen.getByRole('button', { name: 'Show sidebar' });
     await user.click(sidebarToggle);
     const projects = screen.getByRole('complementary', { name: 'Projects and diagrams' });
-    expect(panel).not.toHaveAttribute('data-open');
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     await user.click(sidebarToggle);
     expect(projects).not.toBeInTheDocument();
     expect(sidebarToggle).toHaveFocus();

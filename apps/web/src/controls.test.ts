@@ -50,11 +50,8 @@ describe('sidebar layout', () => {
     const mac = ":root[data-window-controls='mac']";
     expect(rule(tokens, mac)).toContain('--bar-top: 42px');
     expect(rule(tokens, mac)).toContain('--window-controls-w: 80px');
-    expect(rule(tokens, ':root')).toContain('--bar-w: 44px');
     expect(rule(tokens, ':root')).toContain('--bar: var(--panel-bg)');
-    expect(rule(tokens, mac)).not.toContain('--bar-w:');
     expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr)');
-    expect(app).not.toContain('--bar-w:');
     expect(rule(app, '.sidebar-toggle')).toContain('top: calc((var(--bar-top) - var(--control-h-sm)) / 2)');
     expect(rule(app, '.sidebar-toggle')).toContain('left: var(--sidebar-toggle-start)');
     expect(rule(app, '.app')).toContain('--window-header-bg: var(--page)');
@@ -71,11 +68,9 @@ describe('sidebar layout', () => {
     expect(rule(app, '.panel-brand')).toContain('padding: 0 var(--space-3) var(--bar-top-gap) var(--sidebar-toggle-inset)');
   });
 
-  it('uses theme colours and an outline around the folded sidebar controls', async () => {
+  it('uses the sidebar theme colour and places the workspace controls at the bottom', async () => {
     const app = await css('app.css');
     expect(rule(app, '.sidebar')).toContain('--surface: var(--panel-bg)');
-    expect(rule(app, '.app--folded .sidebar')).toContain('padding: var(--bar-top) 0 var(--space-1)');
-    expect(rule(app, '.app--folded .sidebar__body')).toContain('border: 1px solid var(--bar-line)');
     expect(rule(app, '.sidebar__tools')).toContain('margin-top: auto');
   });
 
