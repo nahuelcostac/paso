@@ -138,9 +138,6 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
   align-self: stretch; flex: 1;
   -webkit-app-region: drag;
 }
-:root[data-window-controls='mac'] .main {
-  border-image: linear-gradient(var(--window-header-bg) var(--bar-top), var(--bar-line) var(--bar-top)) 1;
-}
 :root[data-window-controls='mac'] .sidebar__button, :root[data-window-controls='mac'] .sidebar-toggle { -webkit-app-region: no-drag; }
 
 /* The agent at work with its panel folded: a floating pill at the foot of the Studio, by the chat's tab, with a pink
