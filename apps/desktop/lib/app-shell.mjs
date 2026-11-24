@@ -1,8 +1,7 @@
 import { isAppUrl } from './app-origin.mjs';
 
 /**
- * Small pieces of desktop behaviour kept out of main.mjs: one instance at a time, and the only permission the page
- * gets. This module does not import Electron so it can be tested in Node.
+ * Small pieces of desktop behaviour kept out of main.mjs. This module does not import Electron so it can be tested in Node.
  */
 
 /** Brings a window to the front, out of the Dock if it was minimized. */
@@ -26,11 +25,18 @@ export function claimSingleInstance(app, current) {
 }
 
 /**
- * The page may only go full screen, which Present asks for, and only from the app's own origin, `paso://app`. Every
- * other permission, such as the camera or notifications, is denied.
+ * Only the app's main frame may go full screen or write sanitized clipboard data.
  */
-export function allowsPermission(permission, requestingUrl) {
-  return permission === 'fullscreen' && isAppUrl(requestingUrl);
+export function allowsPermission(permission, requestingUrl, isMainFrame) {
+  return (permission === 'fullscreen' || permission === 'clipboard-sanitized-write') && isMainFrame === true && isAppUrl(requestingUrl);
+}
+
+export function registerPermissions(session) {
+  session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    callback(isAppUrl(contents?.mainFrame?.url) && allowsPermission(permission, details.requestingUrl, details.isMainFrame));
+  });
+  session.setPermissionCheckHandler((contents, permission, origin, details) =>
+    isAppUrl(contents?.mainFrame?.url) && isAppUrl(origin) && allowsPermission(permission, details.requestingUrl, details.isMainFrame));
 }
 
 /** The native buttons start at 10px from the left and 14px from the top. The 14px buttons centre at y=21px. */

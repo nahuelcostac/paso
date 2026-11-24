@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { menuTemplate } from '../lib/menu.mjs';
-import { allowsPermission, claimSingleInstance, focusWindow } from '../lib/app-shell.mjs';
+import { allowsPermission, claimSingleInstance, focusWindow, registerPermissions } from '../lib/app-shell.mjs';
 
 const items = (menu) => menu.submenu.filter((item) => item.type !== 'separator');
 const byRole = (template, role) => template.flatMap((menu) => menu.submenu).find((item) => item.role === role);
@@ -94,13 +94,45 @@ describe('one instance', () => {
 });
 
 describe('permissions', () => {
+  it('checks both Electron permission paths and fails closed', () => {
+    const session = { setPermissionRequestHandler: vi.fn(), setPermissionCheckHandler: vi.fn() };
+    registerPermissions(session);
+    const request = session.setPermissionRequestHandler.mock.calls[0][0];
+    const check = session.setPermissionCheckHandler.mock.calls[0][0];
+    const contents = { mainFrame: { url: 'paso://app/' } };
+    const details = { requestingUrl: 'paso://app/', isMainFrame: true };
+    const result = vi.fn();
+    for (const permission of ['clipboard-sanitized-write', 'fullscreen']) {
+      request(contents, permission, result, details);
+      expect(result).toHaveBeenLastCalledWith(true);
+      expect(check(contents, permission, 'paso://app', details)).toBe(true);
+    }
+    for (const [candidate, origin, frame] of [
+      [{}, 'paso://app', details],
+      [contents, 'https://example.com', details],
+      [contents, 'paso://app', { ...details, isMainFrame: false }],
+      [contents, 'paso://app', { ...details, requestingUrl: 'paso://other/' }],
+      [contents, 'paso://app', { ...details, requestingUrl: undefined }],
+    ]) {
+      expect(check(candidate, 'clipboard-sanitized-write', origin, frame)).toBe(false);
+      if (origin === 'paso://app') {
+        request(candidate, 'clipboard-sanitized-write', result, frame);
+        expect(result).toHaveBeenLastCalledWith(false);
+      }
+    }
+    expect(check(contents, 'clipboard-read', 'paso://app', details)).toBe(false);
+    request(contents, 'clipboard-read', result, details);
+    expect(result).toHaveBeenLastCalledWith(false);
+  });
   it('lets only the app’s own page go full screen', () => {
-    expect(allowsPermission('fullscreen', 'paso://app/#/p/canvas')).toBe(true);
-    expect(allowsPermission('fullscreen', 'http://127.0.0.1:52001/')).toBe(false);
-    expect(allowsPermission('fullscreen', 'paso://other/')).toBe(false);
-    expect(allowsPermission('fullscreen', 'https://example.com/')).toBe(false);
-    expect(allowsPermission('fullscreen', undefined)).toBe(false);
-    expect(allowsPermission('fullscreen', 'not a url')).toBe(false);
-    for (const permission of ['media', 'notifications', 'geolocation', 'clipboard-read', 'openExternal']) expect(allowsPermission(permission, 'paso://app/')).toBe(false);
+    expect(allowsPermission('fullscreen', 'paso://app/#/p/canvas', true)).toBe(true);
+    expect(allowsPermission('clipboard-sanitized-write', 'paso://app/', true)).toBe(true);
+    expect(allowsPermission('clipboard-sanitized-write', 'paso://app/', false)).toBe(false);
+    expect(allowsPermission('clipboard-sanitized-write', 'paso://app/')).toBe(false);
+    for (const url of ['http://127.0.0.1:52001/', 'paso://other/', 'https://example.com/', undefined, 'not a url']) {
+      expect(allowsPermission('fullscreen', url, true)).toBe(false);
+      expect(allowsPermission('clipboard-sanitized-write', url, true)).toBe(false);
+    }
+    for (const permission of ['media', 'notifications', 'geolocation', 'clipboard-read', 'deprecated-sync-clipboard-read', 'openExternal']) expect(allowsPermission(permission, 'paso://app/', true)).toBe(false);
   });
 });

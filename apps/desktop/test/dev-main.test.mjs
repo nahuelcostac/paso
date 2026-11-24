@@ -17,6 +17,7 @@ vi.mock('electron', () => ({
   protocol: { registerSchemesAsPrivileged: (schemes) => mocks.schemes.push(...schemes) },
   session: { defaultSession: {
     setPermissionRequestHandler: vi.fn(),
+    setPermissionCheckHandler: vi.fn(),
     protocol: { handle: (scheme, handler) => mocks.protocolHandlers.set(scheme, handler) },
     webRequest: { onBeforeRequest: (listener) => { mocks.beforeRequest = listener; } },
   } },
