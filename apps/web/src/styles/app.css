@@ -123,10 +123,6 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .settings-menu__swatch[aria-disabled='true'] > span { opacity: var(--disabled-opacity); }
 /* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
 .canvas--editor .excalidraw .main-menu-trigger { display: none; }
-/* The native buttons and the panel header share the workspace colour. */
-:root[data-window-controls='mac'] .sidebar {
-  background: linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top)) var(--surface);
-}
 /* Leave the sidebar toggle between the two native drag regions. */
 :root[data-window-controls='mac'] .app--folded::before,
 :root[data-window-controls='mac'] .panel-brand::before {
@@ -200,7 +196,8 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
   width: var(--control-h-sm); height: var(--control-h-sm); background: var(--surface); color: var(--ink-2);
 }
 :root[data-window-controls='mac'] .sidebar-toggle { --surface: var(--window-header-bg); }
-:root:not([data-window-controls='mac']) .sidebar-toggle[aria-expanded='true'] { --surface: var(--panel-bg); }
+/* Open, the toggle sits on the sidebar, whose head is the panel's colour in every view. */
+:root .sidebar-toggle[aria-expanded='true'] { --surface: var(--panel-bg); }
 
 /* Sidebar: the projects, laid out like tldraw's. A paper column docked to the left, the full height of the window, with
    the mark at its head; the header runs beside it. On a narrow window it opens over the content instead. */

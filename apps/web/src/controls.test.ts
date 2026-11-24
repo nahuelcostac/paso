@@ -56,13 +56,15 @@ describe('sidebar layout', () => {
     expect(rule(app, '.sidebar-toggle')).toContain('left: var(--sidebar-toggle-start)');
     expect(rule(app, '.app')).toContain('--window-header-bg: var(--page)');
     expect(rule(app, ".app[data-view='canvas']")).toContain('--window-header-bg: var(--paper)');
-    expect(rule(app, `${mac} .sidebar`)).toContain('linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top)) var(--surface)');
+    // The sidebar's head is the panel's colour in the Diagram and the Studio alike, not the view's header colour.
+    expect(app).not.toContain(`\n${mac} .sidebar {`);
+    expect(rule(app, ":root .sidebar-toggle[aria-expanded='true']")).toContain('--surface: var(--panel-bg)');
   });
 
   it('keeps the macOS panel drag region to the right of the sidebar toggle', async () => {
     const app = await css('app.css');
     const mac = ":root[data-window-controls='mac']";
-    expect(rule(app, `${mac} .sidebar`)).not.toContain('-webkit-app-region: drag');
+    expect(rule(app, '.sidebar')).not.toContain('-webkit-app-region: drag');
     expect(rule(app, `${mac} .panel-brand::before`)).toContain('width: var(--window-controls-w)');
     expect(rule(app, `${mac} .panel-brand .brand`)).toContain('-webkit-app-region: drag');
     expect(rule(app, '.panel-brand')).toContain('padding: 0 var(--space-3) var(--bar-top-gap) var(--sidebar-toggle-inset)');
