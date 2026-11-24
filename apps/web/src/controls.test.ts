@@ -70,6 +70,13 @@ describe('sidebar layout', () => {
     expect(rule(app, '.canvas__corner > .camera-control')).not.toContain('justify-self');
   });
 
+  it('steps the switch down under 966px on the canvas only, since the Studio has no toolbar to clear', async () => {
+    const app = await css('app.css');
+    const narrow = app.slice(app.indexOf('@container main (max-width: 965px)'));
+    expect(narrow).toContain('.canvas__corner:not(.board__corner):has(> .btn--primary) > .view-switch { grid-row: 2; }');
+    expect(narrow.slice(0, narrow.indexOf('\n}'))).not.toMatch(/(^|[\s,])\.canvas__corner:has/);
+  });
+
   it('keeps the step strip\'s scrollbar slim, so its thumbnails stay under its top', async () => {
     const carousel = await css('carousel.css');
     // Over its bar the strip is 100px and its thumbnails 88px, anchored at its foot: a scrollbar over 9px pushes them up

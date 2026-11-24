@@ -191,6 +191,16 @@ describe('images attached to a message', () => {
     expect((await api(`/api/agent/sessions/${id}/events`)).data.events).toEqual([]);
   });
 
+  it('are refused before sending to Antigravity, whose print mode takes text only', async () => {
+    await writeFile(join(root, 'bin', 'agy'), '#!/bin/sh\necho 1.5.16\n');
+    await chmod(join(root, 'bin', 'agy'), 0o755);
+    const id = await session(await project(), 'agy');
+    const reply = await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'Mira', attachments: [image(png, 'image/png')] });
+    expect([reply.status, reply.data.error.code]).toEqual([422, 'IMAGES_NOT_SUPPORTED']);
+    expect(await stored(id)).toEqual([]);
+    expect((await api(`/api/agent/sessions/${id}/events`)).data.events).toEqual([]);
+  });
+
   it('are not kept when the message is refused because the agent is busy', async () => {
     const id = await session(await project());
     const first = await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'SCENARIO:slow' });

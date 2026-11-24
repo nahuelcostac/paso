@@ -15,8 +15,11 @@ export function createBoardMcp(config: Configuration) {
   const server = new McpServer({ name: 'paso-board', version: '0.1.0' }, {
     instructions: `Paso is a local whiteboard with project > scenes > steps. Each step is a full independent snapshot. List projects first. The reserved project _loose holds loose diagrams, one scene each; it is never listed, so work in it only when Paso names it, and only in the named scene. Create scenes and steps in an existing project, then add elements. Duplicate a step to build up an explanation without changing previous steps. ${conventions} ${stale} Call get_step_image after drawing; if unavailable, inspect read_step layout and overlaps or ask for a visual check in Paso.`,
   });
+  // Antigravity discovers MCP tools on demand unless a tool asks to be always loaded. Paso's agent there has no file
+  // tool to read the schemas it would discover, so every board tool is loaded up front. Other clients ignore it.
+  const _meta = { 'antigravity/alwaysLoad': true };
   function tool<Schema extends z.ZodRawShape>(name: string, description: string, inputSchema: Schema, readOnly: boolean, handler: (input: z.infer<z.ZodObject<Schema>>) => Promise<unknown>, destructive = false) {
-    server.registerTool<z.ZodRawShape, z.ZodObject<Schema>>(name, { description, inputSchema: z.object(inputSchema).strict(), annotations: { readOnlyHint: readOnly, destructiveHint: destructive, idempotentHint: readOnly, openWorldHint: false } }, async (input) => {
+    server.registerTool<z.ZodRawShape, z.ZodObject<Schema>>(name, { description, inputSchema: z.object(inputSchema).strict(), annotations: { readOnlyHint: readOnly, destructiveHint: destructive, idempotentHint: readOnly, openWorldHint: false }, _meta }, async (input) => {
       try { return textResult(await handler(input as z.infer<z.ZodObject<Schema>>)); }
       catch (error) { return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : 'BOARD_ERROR. The board operation failed. Read current state before retrying.' }] }; }
     });
@@ -65,7 +68,7 @@ export function createBoardMcp(config: Configuration) {
   tool('delete_elements', `Delete only elements in this step, leaving tombstones. Deleting a shape also deletes its bound labels and connected arrows. Clean reciprocal bindings. Other steps stay unchanged. ${stale}`, { ...targetShape, revision: revisionSchema, ids: z.array(z.string().min(1).max(256)).min(1).max(200) }, false, ({ revision, ids, ...target }) => edit(target, revision, (step) => deleteElements(step, ids)), true);
   server.registerTool('get_step_image', {
     description: 'Get a PNG of the current step from the real local Excalidraw exporter, at most 2048 pixels on the longest side. No Paso window is needed. Requires the host to configure PASO_MCP_BROWSER_EXECUTABLE with installed Chromium. No browser is downloaded. If unavailable, returns an error plus the read_step layout with positions and potential overlaps. Images and layout refer to the included revision, which may change later.',
-    inputSchema: z.object(targetShape).strict(), annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: z.object(targetShape).strict(), annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, _meta,
   }, async (target) => {
     let current: Envelope<Step> | undefined;
     try {

@@ -19,7 +19,7 @@ export type HarnessId = typeof harnessIds[number];
 export const effortLevels: Record<HarnessId, readonly string[]> = {
   claude: ['low', 'medium', 'high', 'xhigh', 'max'],
   codex: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
-  agy: [],
+  agy: ['low', 'medium', 'high', 'xhigh', 'max'],
 };
 
 /** Which board step a tool call touches, when the call says so. IDs are service IDs. */
@@ -98,6 +98,8 @@ export interface HarnessAdapter {
   readonly id: HarnessId;
   /** Whether the harness can take images as message content. Without it, a message with images is refused before it is sent. */
   readonly acceptsImages?: boolean;
+  /** The text of a failure the service reports itself (not installed, signed out...), in this harness's name. */
+  readonly failureMessage?: (code: FailureCode) => string;
   /**
    * Runs one turn and yields events. Never throws. Aborting `signal` stops the whole process
    * tree and ends the stream with `finished` (reason `cancelled`).

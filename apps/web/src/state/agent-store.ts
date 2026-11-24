@@ -19,7 +19,7 @@ import type { ServiceEvent } from './projects-store';
 
 export const HARNESS_NAMES: Record<HarnessId, string> = { claude: 'Claude Code', codex: 'Codex', agy: 'Antigravity' };
 /** Harnesses the service can run a session on today. The others are shown as detected but not available. */
-export const SUPPORTED_HARNESSES: readonly HarnessId[] = ['claude', 'codex'];
+export const SUPPORTED_HARNESSES: readonly HarnessId[] = ['claude', 'codex', 'agy'];
 
 export type ModelOption = { id: string; label: string };
 /**
@@ -34,7 +34,16 @@ export const HARNESS_MODELS: Record<HarnessId, ModelOption[]> = {
     { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
   ],
   codex: [{ id: '', label: 'Default' }, { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol' }, { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra' }],
-  agy: [{ id: '', label: 'Default' }],
+  // agy 1.5.16 lists each model once per level (`gemini-4-neon-high`); Paso picks the model and passes the level as
+  // `--effort`, as agy itself allows.
+  agy: [
+    { id: '', label: 'Default' },
+    { id: 'gemini-4-neon', label: 'Gemini 4 Neon' },
+    { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon' },
+    { id: 'gemini-4-argon', label: 'Gemini 4 Argon' },
+    { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen' },
+    { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' },
+  ],
 };
 
 /**
@@ -50,8 +59,13 @@ export const HARNESS_EFFORTS: Record<HarnessId, ModelOption[]> = {
     { id: '', label: 'Automatic' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' },
     { id: 'high', label: 'High' }, { id: 'xhigh', label: 'Very high' }, { id: 'max', label: 'Maximum' }, { id: 'ultra', label: 'Ultra' },
   ],
-  agy: [],
+  agy: [
+    { id: '', label: 'Automatic' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' },
+    { id: 'high', label: 'High' }, { id: 'xhigh', label: 'Very high' },
+  ],
 };
+/** The agy models that also have a very high level. The others go up to high. */
+const AGY_XHIGH_MODELS = new Set(['gemini-4-neon', 'gemini-4-hydrogen']);
 
 /** Harnesses that take images as message content. A harness without it says so before anything is sent. */
 export const HARNESS_ACCEPTS_IMAGES: Record<HarnessId, boolean> = { claude: true, codex: true, agy: false };
@@ -84,7 +98,9 @@ export function effortOptions(harness: HarnessId, model: string, info?: HarnessI
   const selected = info?.models?.find((item) => item.id === model || (!model && item.isDefault));
   return harness === 'codex' && selected?.efforts.length
     ? HARNESS_EFFORTS.codex.filter((option) => !option.id || selected.efforts.includes(option.id))
-    : harness === 'codex' ? HARNESS_EFFORTS.codex.filter((option) => !['max', 'ultra'].includes(option.id)) : HARNESS_EFFORTS[harness];
+    : harness === 'codex' ? HARNESS_EFFORTS.codex.filter((option) => !['max', 'ultra'].includes(option.id))
+      : harness === 'agy' ? HARNESS_EFFORTS.agy.filter((option) => option.id !== 'xhigh' || AGY_XHIGH_MODELS.has(model))
+        : HARNESS_EFFORTS[harness];
 }
 
 export type ToolItem = {

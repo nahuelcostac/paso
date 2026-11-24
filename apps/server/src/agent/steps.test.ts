@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { startServer, type AgentOptions } from '../server.js';
+import { agyAdapter, agyInput } from './agy.js';
 import { claudeArguments } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { maxSteps, parseStepAttachments } from './steps.js';
@@ -13,6 +14,7 @@ import type { AgentEvent, AgentRunRequest, HarnessAdapter } from './types.js';
 const token = 'steps-to-chat-test-token-with-at-least-32-characters';
 const fakeClaude = join(import.meta.dirname, 'testing', 'fake-claude.mjs');
 const fakeCodex = join(import.meta.dirname, 'testing', 'fake-codex.mjs');
+const fakeAgy = join(import.meta.dirname, 'testing', 'fake-agy.mjs');
 type Service = Awaited<ReturnType<typeof startServer>>;
 let root: string;
 let service: Service;
@@ -222,5 +224,30 @@ describe('steps in the instructions', () => {
     expect(events.at(-1)).toEqual({ type: 'finished', reason: 'completed' });
     const thread = readFileSync(record, 'utf8').trim().split('\n').map((line) => JSON.parse(line)).find((r) => r.method === 'thread/start');
     expect(thread.params.developerInstructions).toContain('The person attached a step to this message: step "p-b" in scene "p-intro".');
+  });
+  it('reach Antigravity in its turn prefix, with or without text', async () => {
+    const stepOnly = JSON.parse(agyInput({ text: '', context: { projectId: 'p', sceneId: 'p-intro', steps: [{ sceneId: 'p-intro', stepId: 'p-b' }] } }));
+    expect(stepOnly.message.content).toEqual([{
+      type: 'text',
+      text: '[Paso] You are working in the project "p", scene "p-intro" (service IDs). The person attached a step to this message: step "p-b" in scene "p-intro". Work on that step with the board tools, and leave the other steps as they are unless the message asks for more.',
+    }]);
+    const record = join(root, 'agy-records.jsonl');
+    const executable = join(root, 'agy');
+    await writeFile(executable, `#!/bin/sh\nFAKE_RECORD='${record}' exec '${process.execPath}' '${fakeAgy}' "$@"\n`);
+    await chmod(executable, 0o755);
+    await project();
+    const workDir = join(root, 'agy-work'); await mkdir(workDir);
+    const request: AgentRunRequest = {
+      executable, workDir, text: 'ok', context: { projectId: 'p', sceneId: 'p-intro', steps: [{ sceneId: 'p-intro', stepId: 'p-b' }] },
+      board: { serviceUrl: service.url, sessionToken: token, mcp: { command: process.execPath, args: [join(import.meta.dirname, '../../../mcp/dist/cli.js')] } },
+      limits: { idleTimeoutMs: 5000, maxRunMs: 15000 },
+    };
+    const events: AgentEvent[] = [];
+    for await (const event of agyAdapter.run(request, new AbortController().signal)) events.push(event);
+    expect(events.at(-1)).toEqual({ type: 'finished', reason: 'completed' });
+    const input = readFileSync(record, 'utf8').trim().split('\n').map((line) => JSON.parse(line)).find((r) => r.stdin !== undefined);
+    const text = JSON.parse(input.stdin).message.content[0].text as string;
+    expect(text).toContain('The person attached a step to this message: step "p-b" in scene "p-intro".');
+    expect(text.endsWith('\n\nok')).toBe(true);
   });
 });

@@ -51,6 +51,8 @@ export type ProcessOptions = {
 };
 export type ManagedProcess = {
   write(line: string): void;
+  /** Closes stdin, so a harness that reads its turns from stdin finishes the current one and exits. */
+  endInput(): void;
   /** Ends the process tree. Resolves when nothing of it is left. Safe to call more than once. */
   stop(): Promise<void>;
   done: Promise<ProcessEnd>;
@@ -111,7 +113,7 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
     });
   } catch (error) {
     settle({ reason: 'spawn-error', code: null, signal: null, stderrTail: '', spawnErrorCode: (error as NodeJS.ErrnoException).code });
-    return { write: () => {}, stop: async () => {}, done };
+    return { write: () => {}, endInput: () => {}, stop: async () => {}, done };
   }
   const pid = child.pid;
   if (pid !== undefined) live.add(pid);
@@ -168,5 +170,9 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
       settle({ reason: wanted ?? 'exit', code, signal, stderrTail });
     })();
   });
-  return { write: (line) => { if (!wanted && !child.stdin!.destroyed) child.stdin!.write(line + '\n'); }, stop: () => stop('stopped'), done };
+  return {
+    write: (line) => { if (!wanted && !child.stdin!.destroyed) child.stdin!.write(line + '\n'); },
+    endInput: () => { if (!child.stdin!.destroyed) child.stdin!.end(); },
+    stop: () => stop('stopped'), done,
+  };
 }
