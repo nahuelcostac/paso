@@ -5,7 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { menuTemplate } from './lib/menu.mjs';
 import { placeWindow, readState, trackWindowState } from './lib/window-state.mjs';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
-import { allowsPermission, claimSingleInstance, windowChrome } from './lib/app-shell.mjs';
+import { claimSingleInstance, registerPermissions, windowChrome } from './lib/app-shell.mjs';
 import { APP_ORIGIN, APP_SCHEME_PRIVILEGES, APP_URL, appCsp, eventsUrl, hostOf, isAppUrl, isRequestAllowed } from './lib/app-origin.mjs';
 import { serveApp, staticPage } from './lib/app-protocol.mjs';
 
@@ -25,7 +25,7 @@ async function start() {
     agent: { mcp: { command: process.execPath, entry: join(root, 'mcp', 'cli.mjs'), electronRunAsNode: true } },
     openFolder: async (path) => { const error = await shell.openPath(path); if (error) throw new Error(error); },
   });
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => callback(allowsPermission(permission, details.requestingUrl)));
+  registerPermissions(session.defaultSession);
   // The page and its API at paso://app, the API forwarded to the service. Only this session.
   serveApp({ session: session.defaultSession, net, serviceUrl: service.url, page: staticPage({ webRoot: join(root, 'web'), csp: appCsp(service.port) }) });
   const fromPage = (event) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);

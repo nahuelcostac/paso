@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { createServer as createSocket } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
-import { windowChrome } from './lib/app-shell.mjs';
+import { registerPermissions, windowChrome } from './lib/app-shell.mjs';
 import { APP_ORIGIN, APP_SCHEME_PRIVILEGES, APP_URL, eventsUrl, hostOf, isAppUrl, isRequestAllowed } from './lib/app-origin.mjs';
 import { forward, serveApp } from './lib/app-protocol.mjs';
 import { createServer as createVite } from '../web/node_modules/vite/dist/node/index.js';
@@ -47,7 +47,7 @@ async function start() {
   vite = await createVite({ configFile: join(root, 'apps/web/vite.config.ts'), root: join(root, 'apps/web') });
   await vite.listen();
   const viteUrl = `http://127.0.0.1:${port}`;
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  registerPermissions(session.defaultSession);
   serveApp({ session: session.defaultSession, net, serviceUrl: service.url, page: (request, path) => forward(net, request, `${viteUrl}${path}`) });
   const fromPage = (event) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
   const window = new BrowserWindow({ width: 1400, height: 900, ...windowChrome(process.platform), webPreferences: { preload: join(root, 'apps/desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
