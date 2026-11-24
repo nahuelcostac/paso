@@ -10,6 +10,7 @@ const webPort = Number(process.env.PASO_WEB_PORT ?? 5173);
 const servicePort = Number(process.env.PASO_PORT ?? 3001);
 const desktopDev = process.env.PASO_DESKTOP_DEV === '1';
 const fonts = join(dirname(require.resolve('@excalidraw/excalidraw')), 'fonts');
+let patchedFontFallback = false;
 
 export default defineConfig(({ command }) => ({
   define: { 'process.env.IS_PREACT': JSON.stringify('false') },
@@ -25,6 +26,23 @@ export default defineConfig(({ command }) => ({
     },
   },
   plugins: [react(), {
+    name: 'paso-no-external-excalidraw-fonts',
+    apply: 'build',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.includes('@excalidraw/excalidraw/dist/prod/chunk-K2UTITRG.js')) return;
+      // Chromium checks every FontFace source against CSP, including an unused fallback.
+      // The bundled files are the only sources Paso should use, including during SVG export.
+      const fallback = 'return r.push(new URL(n,jn.ASSETS_FALLBACK_URL)),r';
+      if (!code.includes(fallback)) throw new Error('Excalidraw font fallback changed; review the offline font patch');
+      patchedFontFallback = true;
+      return code.replace(fallback, 'return r');
+    },
+    buildStart() { patchedFontFallback = false; },
+    buildEnd(error) {
+      if (!error && !patchedFontFallback) throw new Error('Excalidraw font fallback patch was not applied');
+    },
+  }, {
     name: 'paso-check-subsetting-worker',
     generateBundle(_options, bundle) {
       const chunks = Object.values(bundle).filter((item) => item.type === 'chunk');
