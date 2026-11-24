@@ -85,10 +85,10 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
 .main > * { grid-column: 1; grid-row: 1; }
 
-/* The sidebar has two rows of controls. */
+/* The sidebar has two rows of controls: the panels at the top, the workspace and the gear at the foot. */
 .sidebar__body { display: flex; flex: 1; flex-direction: column; min-height: 0; }
-.sidebar__views, .sidebar__tools { display: flex; flex: none; gap: var(--space-1); }
-.sidebar__views { padding: 0 var(--space-2) var(--space-2); }
+.sidebar__panels, .sidebar__tools { display: flex; flex: none; gap: var(--space-1); }
+.sidebar__panels { padding: 0 var(--space-2) var(--space-2); }
 .sidebar__tools { margin-top: auto; padding: var(--space-2); }
 .sidebar__button {
   --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--bar-focus);
@@ -98,7 +98,10 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .sidebar__button svg.i { width: 20px; height: 20px; }
 .sidebar__button:hover { background: var(--bar-hover); }
 .sidebar__button[aria-expanded='true'], .sidebar__button[aria-pressed='true'] { background: var(--bar-active); color: var(--bar-ink-active); }
-.sidebar__button:active:not([aria-haspopup]) { scale: 0.95; }
+.sidebar__button:active:not([aria-haspopup]):not([aria-disabled='true']) { scale: 0.95; }
+/* The agent's button with no diagram open: in place, and reachable, so its tooltip says why it does nothing. */
+.sidebar__button[aria-disabled='true'] { opacity: var(--disabled-opacity); cursor: not-allowed; }
+.sidebar__button[aria-disabled='true']:hover { background: none; }
 /* The agent works while its chat is out of view: a pink dot, the agent's mark, on its button. */
 .sidebar__badge { position: absolute; top: var(--space-1); right: var(--space-1); width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--panel-bg); }
 /* The gear's menu: what Excalidraw's main menu held, beside the gear. */
@@ -428,15 +431,17 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
   /* A thin thumb with no track: a grey track would sit as a stripe against the chat's card. */
   scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
 }
-.board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: 180px; }
+.board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: var(--board-corner-w); }
 /* Leave room above the board title and beside its notices when the toggle floats over the main view. */
 .app--folded .board, .app--narrow .board { padding-top: max(44px, var(--bar-top)); }
 .app--folded .board__top, .app--narrow .board__top {
   padding-left: max(0px, calc(var(--sidebar-toggle-inset) - var(--board-inline-padding)));
 }
-/* In the Studio the corner scrolls with the page, and the title keeps clear of it. */
+/* In the Studio the corner scrolls with the page, and the title keeps clear of it: the view switch and Present, with
+   their labels, or their icons only on a narrow Studio. */
 .board__corner { z-index: 2; }
-.board__head { display: flex; padding-right: 180px; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
+.board { --board-corner-w: 320px; }
+.board__head { display: flex; padding-right: var(--board-corner-w); align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
 .board__heading { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .board__title { font-size: var(--text-28); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); overflow-wrap: anywhere; }
 .board__meta { color: var(--ink-3); font-size: var(--text-14); white-space: nowrap; }
@@ -484,7 +489,30 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 
 /* Present sits over the top right corner, where Excalidraw's library button was, at the height of its islands. On the
    Canvas, “Frame” is under it, and Present is as wide. */
-.canvas__corner { position: absolute; z-index: 4; top: var(--space-4); right: var(--space-4); display: grid; grid-template-columns: max-content; gap: var(--space-2); }
+.canvas__corner { position: absolute; z-index: 4; top: var(--space-4); right: var(--space-4); display: grid; grid-template-columns: max-content max-content; gap: var(--space-2); }
+/* Diagram | Studio, then Present, in one row. “Frame” sits under Present, at least as wide, and grows to its left
+   without widening Present's column, so the switch is in the same place in both views. Its note wraps to Present's
+   width. Why Present could not start stays left of them all. A plain whiteboard's corner has only the switch. */
+.canvas__corner:not(:has(> .btn--primary)) { grid-template-columns: max-content; }
+.canvas__corner > .view-switch { grid-column: 1; grid-row: 1; }
+.canvas__corner > .btn--primary { grid-column: 2; grid-row: 1; }
+.canvas__corner > .camera-control { grid-column: 1 / -1; justify-self: end; }
+.canvas__corner > .camera-control__note { grid-column: 2; }
+/* The view switch, a segmented control after T3 Code's: 32px options with 16px icons, 2px inside an island as tall as
+   Present and Excalidraw's, on the paper with a thin line like “Frame” beside it. The open view is the selected grey,
+   so Present stays the one ink button. */
+.view-switch {
+  display: flex; gap: 2px; height: var(--control-h-lg); padding: 2px; border-radius: var(--radius-md);
+  background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm);
+}
+.view-switch__option {
+  --focus-ring: inset 0 0 0 2px var(--focus);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-h); padding: 0 10px;
+  border-radius: calc(var(--radius-md) - 2px); color: var(--ink-2); font-weight: var(--weight-medium); white-space: nowrap;
+}
+.view-switch__option:hover { background: var(--surface-sunken); color: var(--ink); }
+.view-switch__option[aria-pressed='true'] { background: var(--accent-soft); color: var(--ink); cursor: default; }
+.view-switch__option:active:not([aria-pressed='true']) { scale: 0.97; }
 .canvas__corner .btn--primary { height: var(--control-h-lg); justify-content: center; }
 /* “Frame”, under Present, and the cross that removes the step's camera once there is one. */
 .camera-control { display: flex; height: 36px; border-radius: var(--radius-md); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); overflow: hidden; }
@@ -535,18 +563,28 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
    the strip shown, at the same spot inside the strip, which keeps that end free. With several steps it carries the
    pager's “02 / 03”. */
 .camera-control__take[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
-/* Excalidraw's toolbar stays centred: on a narrower board Present and “Frame” keep only their icons, so they never
-   meet. The Studio has no toolbar, so it keeps the label until it is much narrower. */
+/* Excalidraw's toolbar stays centred, and the corner never meets it. The corner follows the main view's width, the
+   same in both views, so the switch stays under the pointer when the view changes: with room, the switch and Present
+   have labels; narrower, the switch keeps its icons; narrower still, Present and “Frame” keep theirs; and on the
+   narrowest boards that still have the toolbar on top, the switch steps down beside “Frame”. */
 .canvas--editor { container: board / inline-size; }
 .board { container: studio / inline-size; }
-@container board (max-width: 860px) {
-  .camera-control__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .canvas__corner .btn--primary { padding: 0; font-size: 0; gap: 0; }
-  .canvas__corner .btn--primary svg.i { margin: 0; }
+.main { container: main / inline-size; }
+@container main (max-width: 1179px) {
+  .view-switch__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .view-switch__option { width: var(--control-h); padding: 0; }
+  .board { --board-corner-w: 216px; }
 }
-@container studio (max-width: 520px) {
-  .canvas__corner .btn--primary { padding: 0; font-size: 0; gap: 0; }
+@container main (max-width: 959px) {
+  .camera-control__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .canvas__corner .btn--primary { width: var(--control-h-lg); padding: 0; font-size: 0; gap: 0; }
   .canvas__corner .btn--primary svg.i { margin: 0; }
+  .board { --board-corner-w: 140px; }
+}
+/* Narrower, Excalidraw's toolbar would reach the switch: it steps down, beside “Frame”. */
+@container main (max-width: 829px) {
+  .canvas__corner:has(> .btn--primary) > .view-switch { grid-row: 2; }
+  .canvas__corner:has(> .btn--primary) > .camera-control { grid-column: 2; }
 }
 /* Why Present could not start: beside it, to its left, so the corner's column keeps its width. */
 .present-error { position: absolute; top: 0; right: calc(100% + var(--space-2)); display: inline-flex; align-items: center; gap: var(--space-1); width: max-content; max-width: 320px; padding: 0 var(--space-1) 0 var(--space-3); height: 36px; border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); font-size: var(--text-12); box-shadow: var(--shadow-sm); }

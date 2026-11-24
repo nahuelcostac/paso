@@ -26,6 +26,8 @@ type Props = {
   stepAgentStates?: Record<string, 'working' | 'changed'>;
   /** The app's own failures that have no other place here, such as a step that could not be saved. */
   notices?: React.ReactNode;
+  /** The view switch, left of Present in the top right corner, as on the board. */
+  views?: React.ReactNode;
   /** Present, over the top right corner: the same corner as on the board. */
   corner?: React.ReactNode;
   /** Saves a step's title, through the steps the Canvas may have open. */
@@ -45,7 +47,7 @@ function insertAt(order: string[], from: number, to: number) {
  * The Studio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
  * Studio opens it from the activity bar. Diagram, a step or Escape goes back to the board.
  */
-export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, corner, renameStep }: Props) {
+export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, views, corner, renameStep }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);
   useEffect(() => { store.start(); return () => store.dispose(); }, [store]);
   const state = useStoryboard(store);
@@ -226,10 +228,10 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
     if (state.phase !== 'ready' || !selectedScene || selectedScene.id === route.sceneId) return;
     navigate({ ...route, sceneId: selectedScene.id, stepId: selectedScene.stepIds[0] }, { replace: true });
   }, [state.phase, selectedScene, route, navigate]);
-  // Opened from the board or from the activity bar: focus lands on the title, so Escape and Tab work from here.
+  // Opened from the board without the switch (a shortcut, the address): focus lands on the title, so Escape and Tab work
+  // from here. Opened with the switch, the focus stays on it.
   useEffect(() => {
-    const active = document.activeElement;
-    if (active === document.body || active?.closest('.sidebar__views')) title.current?.focus({ preventScroll: true });
+    if (document.activeElement === document.body) title.current?.focus({ preventScroll: true });
   }, []);
   return (
     <main
@@ -241,7 +243,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
         back();
       }}
     >
-      <div className="canvas__corner board__corner">{corner}</div>
+      <div className="canvas__corner board__corner">{views}{corner}</div>
       {notices && <div className="board__top">{notices}</div>}
       <div className="board__head">
         <div className="board__heading">

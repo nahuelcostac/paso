@@ -104,12 +104,18 @@ function editsStepOne(text = 'Step 1 updated.') {
   };
 }
 
-/** Studio also opens the chat. */
-const studioButton = () => within(screen.getByRole('toolbar', { name: 'View controls' })).getByRole('button', { name: 'Studio' });
-/** Opens the app in the Studio with the chat in the left spot: from the bar, unless it is remembered open. */
+/** The sidebar's panel buttons, which choose only what the sidebar shows. */
+const agentButton = () => within(screen.getByRole('toolbar', { name: 'Sidebar panels' })).getByRole('button', { name: 'Agent' });
+const projectsButton = () => within(screen.getByRole('toolbar', { name: 'Sidebar panels' })).getByRole('button', { name: 'Projects' });
+/** The view switch in the main view's corner, which chooses only the view. */
+const viewButton = (name: 'Diagram' | 'Studio') => within(screen.getByRole('group', { name: 'View' })).getByRole('button', { name });
+/** Opens the app in the Studio with the chat in the left spot: the view from its switch, then the panel from the bar, unless it is remembered open. */
 async function openPanel() {
   render(<App config={config} />);
-  const button = await waitFor(studioButton, patience);
+  const studio = await waitFor(() => viewButton('Studio'), patience);
+  if (studio.getAttribute('aria-pressed') !== 'true') fireEvent.click(studio);
+  await screen.findByRole('main', { name: 'Studio' }, patience);
+  const button = agentButton();
   if (button.getAttribute('aria-expanded') !== 'true') fireEvent.click(button);
   return screen.findByRole('complementary', { name: 'Agent' }, patience);
 }
@@ -122,7 +128,7 @@ async function pickScene(user: ReturnType<typeof userEvent.setup>, name: string)
   await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
   expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
   await user.click(within(await screen.findByRole('list', { name: 'Scenes of Búsqueda binaria' }, patience)).getByRole('button', { name }));
-  await user.click(studioButton());
+  await user.click(agentButton());
   expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
   return screen.findByRole('complementary', { name: 'Agent' }, patience);
 }
@@ -180,11 +186,18 @@ describe('agent message drafts', () => {
     await user.type(input(), 'Borrador uno');
     panel = await pickScene(user, 'Scene 2: Partir en dos');
     expect(input()).toHaveValue('Borrador uno');
-    // Diagram opens the Canvas. Studio opens the chat again with its draft.
-    await user.click(screen.getByRole('button', { name: 'Diagram' }));
+    // Diagram opens the Canvas and the chat stays beside it with its draft, and so it does back in the Studio.
+    await user.click(viewButton('Diagram'));
     expect(await screen.findByRole('main', { name: 'Canvas' }, patience)).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Agent' })).toBe(panel);
+    expect(input()).toHaveValue('Borrador uno');
+    await user.click(await waitFor(() => viewButton('Studio'), patience));
+    expect(await screen.findByRole('main', { name: 'Studio' }, patience)).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Agent' })).toBe(panel);
+    // Hidden behind Projects and shown again, it keeps the draft too.
+    await user.click(projectsButton());
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
-    await user.click(await screen.findByRole('button', { name: 'Studio' }, patience));
+    await user.click(agentButton());
     panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(input()).toHaveValue('Borrador uno');
 
@@ -403,7 +416,7 @@ describe('a turn as it happens', () => {
     expect(runs.map((run) => run.status)).toEqual(['finished']);
   });
 
-  it('shows the running agent on the Studio button while the chat is out of view', async () => {
+  it('shows the running agent on the Agent button while the chat is out of view', async () => {
     await call('POST', '/harnesses', { id: 'claude' });
     adapterImpl = async function* (_request, signal) {
       yield { type: 'tool_use', id: 'slow', tool: 'update_elements', readOnly: false, target: { projectId: 'p', sceneId: 's1', stepId: 'step1' } };
@@ -417,27 +430,36 @@ describe('a turn as it happens', () => {
     // With the panel in view, the top bar says nothing.
     expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument();
 
-    // Back on the Canvas, the Studio button marks the running agent.
-    const toggle = studioButton();
+    // On the Canvas the chat stays in view, so nothing else marks the agent.
+    const toggle = agentButton();
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveAttribute('aria-controls', 'agent-panel');
     expect(toggle.querySelector('.sidebar__badge')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Diagram' }));
-    await screen.findByRole('main', { name: 'Canvas' }, patience);
+    await user.click(viewButton('Diagram'));
+    await waitFor(() => viewButton('Studio'), patience);
+    expect(screen.getByRole('complementary', { name: 'Agent' })).toBe(panel);
+    expect(toggle.querySelector('.sidebar__badge')).toBeNull();
+    // Projects take the left spot: the Agent button marks the running agent. The Canvas's strip marks its step, so
+    // there is no pill on it.
+    await user.click(projectsButton());
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('.app')).not.toHaveClass('app--agent');
     expect(toggle.querySelector('.sidebar__badge')).not.toBeNull();
-    await user.click(toggle);
+    expect(toggle).toHaveAttribute('title', 'Agent (working)');
+    expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument();
+    // In the Studio, with the sidebar folded, the pill says it.
+    await user.click(await waitFor(() => viewButton('Studio'), patience));
+    await screen.findByRole('main', { name: 'Studio' }, patience);
     await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
-    await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
     const status = await screen.findByRole('status', { name: 'Agent working' }, patience);
+    await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
     expect(status).toHaveTextContent('Claude Code is changing a step');
     expect(within(status).getByRole('button', { name: 'Go to step 1 of scene 1' })).toHaveTextContent('1');
     await user.click(within(status).getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument(), patience);
 
-    await user.click(studioButton());
+    await user.click(agentButton());
     const after = await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(await within(after).findByText(/^Stopped · /, {}, patience)).toBeInTheDocument();
     expect(within(after).getByRole('button', { name: 'Send' })).toBeInTheDocument();
@@ -710,7 +732,9 @@ describe('narrow windows', () => {
     expect(screen.queryByRole('separator', { name: 'Chat width' })).not.toBeInTheDocument();
 
     await user.click(sidebarToggle);
-    const toggle = await waitFor(studioButton, patience);
+    // The chat needs an open diagram: until one opens its button says so and does nothing.
+    const toggle = await waitFor(agentButton, patience);
+    await waitFor(() => expect(toggle).not.toHaveAttribute('aria-disabled'), patience);
     await user.click(toggle);
     const panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -725,6 +749,7 @@ describe('narrow windows', () => {
     expect(document.querySelector('.sidebar')).not.toBeInTheDocument();
     expect(sidebarToggle).toHaveAccessibleName('Show sidebar');
     expect(sidebarToggle).toHaveFocus();
+    // Opening and closing the panel never changed the view: the Studio is still open, and a pill says the agent works.
     expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
     const status = await screen.findByRole('status', { name: 'Agent working' }, patience);
     await user.click(within(status).getByRole('button', { name: 'Stop' }));

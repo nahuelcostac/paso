@@ -7,7 +7,7 @@ import { StepStore, targetKey, type Recovery } from './editor/step-store';
 import { StepActions } from './editor/step-actions';
 import { BrowserRecovery } from './editor/recovery';
 import { bindStepLifecycle } from './editor/lifecycle';
-import { useRoute } from './lib/route';
+import { useRoute, type View } from './lib/route';
 import { MainView } from './components/MainView';
 import { Storyboard } from './components/Storyboard';
 import { AgentPanel } from './components/AgentPanel';
@@ -16,7 +16,8 @@ import { ProjectsPanel } from './components/ProjectsPanel';
 import { SceneList } from './components/SceneList';
 import { AgentWorking } from './components/AgentWorking';
 import { BOARD_MIN, Splitter, useAgentWidth, useProjectsWidth } from './components/Splitter';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, type SidePanel } from './components/Sidebar';
+import { ViewSwitch, viewShortcut } from './components/ViewSwitch';
 import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
 import { createCanvasMenu } from './editor/canvas-menu';
 import { PresentButton } from './present/PresentButton';
@@ -45,7 +46,6 @@ function useMediaQuery(query: string) {
 }
 
 const SIDE_KEY = 'paso.side-panel';
-type SidePanel = 'projects' | 'agent';
 /** The panel left open in the left spot, remembered in this browser (and in the desktop app, whose origin stays). */
 function storedSide(): SidePanel | null {
   try {
@@ -320,10 +320,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     }
   };
 
-  // Where the agent sits: beside the Studio, or beside the Canvas of a plain loose diagram. Both
-  // take the left spot, one at a time. Projects take its place when the current view cannot show chat.
-  const chatHere = overview || plainLoose;
-  const canShowAgent = Boolean(openProject && chatHere);
+  // The sidebar's panel and the view are chosen apart: the chat sits beside either view of an open diagram. Projects
+  // take its place while no diagram is open.
+  const canShowAgent = Boolean(openProject);
   const shown = side === 'agent' && !canShowAgent ? 'projects' : side;
   const sidebarLabel = shown ? 'Hide sidebar' : 'Show sidebar';
   const sidebarToggle = useRef<HTMLButtonElement>(null);
@@ -336,8 +335,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const sceneDocuments = useMemo(() => scenes?.map((item) => item.document) ?? [], [scenes]);
   const marks = useMemo(() => stepMarks(agentState.turns, agentState.runs[openProject?.id ?? ''], openProject?.id), [agentState.turns, agentState.runs, openProject?.id]);
   const working = useMemo(() => activeTurn(agentState.turns, openProject?.id), [agentState.turns, openProject?.id]);
-  // Without the panel in view, a pill says who is changing which step, and the Studio button has a dot.
-  const statusShown = Boolean(openProject && chatHere && working && shown !== 'agent');
+  // Without the panel in view, the Agent button has a dot, and a pill says who is changing which step where nothing else
+  // shows it: in the Studio, and on a plain whiteboard, which hides its step strip. The Canvas's strip marks the step.
+  const statusShown = Boolean(openProject && (overview || plainLoose) && working && shown !== 'agent');
   const workingAt = working?.step && sceneDocuments.length ? (() => {
     for (const [index, scene] of sceneDocuments.entries()) {
       const at = scene.stepIds.indexOf(working.step!.stepId);
@@ -365,10 +365,29 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     chooseSide(null);
     sidebarToggle.current?.focus();
   };
-  const openStudio = () => {
-    chooseSide('agent');
-    if (!overview) navigate({ ...routeRef.current, view: 'storyboard' });
+  /** A panel's button in the sidebar: the other panel opens, the open one folds the sidebar. The view stays. */
+  const choosePanel = (panel: SidePanel) => {
+    if (shown !== panel) { chooseSide(panel); return; }
+    chooseSide(null);
+    sidebarToggle.current?.focus();
   };
+  /** The view, from the switch in the main view's corner or its shortcut. The sidebar stays as it is. */
+  const chooseView = useCallback((view: View) => {
+    if (routeRef.current.view !== view) navigate({ ...routeRef.current, view });
+  }, [navigate]);
+  const viewOpen = openProject !== undefined;
+  useEffect(() => {
+    if (!viewOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const view = viewShortcut(event);
+      if (!view) return;
+      event.preventDefault();
+      chooseView(view);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [viewOpen, chooseView]);
+  const viewSwitch = <ViewSwitch view={route.view} onChange={chooseView} />;
 
   // Present, in the top right corner of both views. Leaving it keeps the view.
   const presentButton = row?.kind === 'ok' ? <PresentButton
@@ -391,11 +410,10 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         <PanelLeft className="i" aria-hidden="true" />
       </button>
       {shown && <Sidebar
-        chatOpen={shown === 'agent'}
+        panel={shown}
+        agentAvailable={canShowAgent}
         working={Boolean(openProject && working && shown !== 'agent')}
-        view={openProject ? route.view : undefined}
-        onDiagram={() => navigate({ ...routeRef.current, view: 'canvas' })}
-        onStudio={openStudio}
+        onPanel={choosePanel}
         canvasMenu={canvasMenu}
         workspace={(stop) => <WorkspaceSwitcher api={api} store={store} state={state} onSwitchWorkspace={switchWorkspace} onNotice={setWorkspaceNotice} {...stop} />}
       >
@@ -457,7 +475,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           narrow={narrow} onClose={hideAgent}
           onOpenStep={(id, stepId) => navigate({ projectId: openProject.id, view: 'canvas', sceneId: id, stepId })}
           scenesReady={scenes !== undefined}
-          onOpenScene={(id) => navigate({ projectId: openProject.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
+          onOpenScene={(id) => navigate({ projectId: openProject.id, view: routeRef.current.view, sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
         />}
       </Sidebar>}
       {/* The docked panel's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
@@ -485,9 +503,9 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
           <Canvas
             key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
             notices={shown === 'projects' ? undefined : notices}
-            corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen} menu={canvasMenu}
+            views={viewSwitch} corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen} menu={canvasMenu}
           />
-        </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}</div>
+        </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} views={viewSwitch} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}</div>
       : <div className="main"><MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} /></div>}
     </div>
   );
