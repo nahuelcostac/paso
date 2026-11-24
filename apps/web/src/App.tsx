@@ -16,7 +16,7 @@ import { ProjectsPanel } from './components/ProjectsPanel';
 import { SceneList } from './components/SceneList';
 import { AgentWorking } from './components/AgentWorking';
 import { BOARD_MIN, Splitter, useAgentWidth, useProjectsWidth } from './components/Splitter';
-import { ActivityBar } from './components/ActivityBar';
+import { Sidebar } from './components/Sidebar';
 import { WorkspaceSwitcher } from './components/WorkspaceSwitcher';
 import { createCanvasMenu } from './editor/canvas-menu';
 import { PresentButton } from './present/PresentButton';
@@ -327,7 +327,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const shown = side === 'agent' && !canShowAgent ? null : side;
   const sidebarLabel = shown ? 'Hide sidebar' : 'Show sidebar';
   const docked = narrow ? null : shown;
-  const left = docked === 'projects' ? projectsWidth.width : docked === 'agent' ? agentWidth.width : 0;
+  const left = docked ? `${(docked === 'projects' ? projectsWidth : agentWidth).width}px` : 'var(--bar-w)';
   /** A drawer steps aside once something is chosen in it. Docked, the panel stays. */
   const closeDrawer = () => { if (window.matchMedia(NARROW).matches) chooseSide(null); };
   // The agent's marks on steps and its notice in the top bar follow the open project in both views.
@@ -363,7 +363,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const hideAgent = () => {
     chooseSide(null);
     // Focus goes back to the button that opened it.
-    document.querySelector<HTMLButtonElement>('.activity-bar__button[data-id="studio"]')?.focus();
+    document.querySelector<HTMLButtonElement>('.sidebar__button[data-id="studio"]')?.focus();
   };
   const openStudio = () => {
     chooseSide('agent');
@@ -381,9 +381,17 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
     <div
       className={`app app--${shown ?? 'folded'}${narrow ? ' app--narrow' : ''}`}
       data-view={openProject ? route.view : undefined}
-      style={{ '--left': `${left}px`, '--panel-projects': `${projectsWidth.width}px`, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
+      style={{ '--left': left, '--panel-agent': `${agentWidth.width}px` } as React.CSSProperties}
     >
-      <ActivityBar
+      <button
+        type="button" className="icon-btn sidebar-toggle" aria-label={sidebarLabel} title={sidebarLabel}
+        aria-expanded={shown !== null} aria-controls={shown ? `${shown}-panel` : undefined}
+        onClick={() => chooseSide(shown ? null : 'projects')}
+      >
+        <PanelLeft className="i" aria-hidden="true" />
+      </button>
+      <Sidebar
+        expanded={shown !== null}
         chatOpen={shown === 'agent'}
         working={Boolean(openProject && working && shown !== 'agent')}
         view={openProject ? route.view : undefined}
@@ -391,36 +399,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
         onStudio={openStudio}
         canvasMenu={canvasMenu}
         workspace={(stop) => <WorkspaceSwitcher api={api} store={store} state={state} onSwitchWorkspace={switchWorkspace} onNotice={setWorkspaceNotice} {...stop} />}
-      />
-      <div className="shell">
-        <button
-          type="button" className="icon-btn sidebar-toggle" aria-label={sidebarLabel} title={sidebarLabel}
-          aria-expanded={shown !== null} aria-controls={shown ? `${shown}-panel` : undefined}
-          onClick={() => chooseSide(shown ? null : 'projects')}
-        >
-          <PanelLeft className="i" aria-hidden="true" />
-        </button>
-        {/* The docked panel's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
-        {docked && <Splitter
-          key={docked} side="left" open onToggle={() => chooseSide(null)}
-          hide={docked === 'projects' ? 'Hide projects' : 'Hide agent'} show={docked === 'projects' ? 'Show projects' : 'Show agent'}
-          controls={docked === 'projects' ? 'projects-panel' : 'agent-panel'} label={docked === 'projects' ? 'Sidebar width' : 'Chat width'}
-          resize={docked === 'projects' ? projectsWidth : agentWidth} tab={false}
-        />}
-        {openProject && statusShown && working && <AgentWorking
-          working={{
-            sentence: `${HARNESS_NAMES[working.turn.harness]} is ${workingAt ? 'changing a step' : 'working'}`,
-            step: workingAt ? {
-              label: `Go to step ${workingAt.stepNumber} of scene ${workingAt.sceneNumber}`, number: workingAt.stepNumber,
-              onOpen: () => navigate({ projectId: openProject.id, view: 'canvas', sceneId: workingAt.sceneId, stepId: working.step!.stepId }),
-            } : undefined,
-            onStop: () => void agentStore.stop(openProject.id),
-          }}
-        />}
-        {shown === 'projects' && (
-          // On a narrow window the projects open over the content, and a press beside them closes them.
-          <div className="projects-scrim" aria-hidden="true" onPointerDown={() => chooseSide(null)} />
-        )}
+      >
         {shown === 'projects' && (
           <ProjectsPanel
             store={store}
@@ -469,31 +448,50 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
             }}
           />
         )}
-        {row?.kind === 'ok' ? <>
-          {/* The main view, flush with the window's edges, meeting the black in a straight edge. */}
-          <div className="main">{route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
-            <Canvas
-              key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
-              notices={shown === 'projects' ? undefined : notices}
-              corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen} menu={canvasMenu}
-            />
-          </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}</div>
-          {/* The agent sits in the left spot beside the overview, where its changes show across the scenes. As a drawer it
-              stays mounted, closed. */}
-          {chatHere && (narrow || shown === 'agent') && <AgentPanel
-            store={agentStore} projectId={row.id} projectName={row.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
-            input={agentDrafts[JSON.stringify([row.id, onlySceneId ?? null])] ?? ''}
-            setInput={(value) => {
-              const key = JSON.stringify([row.id, onlySceneId ?? null]);
-              setAgentDrafts((drafts) => ({ ...drafts, [key]: typeof value === 'function' ? value(drafts[key] ?? '') : value }));
-            }}
-            narrow={narrow} open={shown === 'agent'} onClose={hideAgent}
-            onOpenStep={(id, stepId) => navigate({ projectId: row.id, view: 'canvas', sceneId: id, stepId })}
-            scenesReady={scenes !== undefined}
-            onOpenScene={(id) => navigate({ projectId: row.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
-          />}
-        </> : <div className="main"><MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} /></div>}
-      </div>
+        {/* The agent sits in the left spot beside the overview, where its changes show across the scenes. As a drawer it
+            stays mounted, closed. */}
+        {openProject && chatHere && (narrow || shown === 'agent') && <AgentPanel
+          store={agentStore} projectId={openProject.id} projectName={openProject.project.name} scenes={sceneDocuments} routeSceneId={route.sceneId}
+          input={agentDrafts[JSON.stringify([openProject.id, onlySceneId ?? null])] ?? ''}
+          setInput={(value) => {
+            const key = JSON.stringify([openProject.id, onlySceneId ?? null]);
+            setAgentDrafts((drafts) => ({ ...drafts, [key]: typeof value === 'function' ? value(drafts[key] ?? '') : value }));
+          }}
+          narrow={narrow} open={shown === 'agent'} onClose={hideAgent}
+          onOpenStep={(id, stepId) => navigate({ projectId: openProject.id, view: 'canvas', sceneId: id, stepId })}
+          scenesReady={scenes !== undefined}
+          onOpenScene={(id) => navigate({ projectId: openProject.id, view: 'storyboard', sceneId: id, stepId: scenes?.find((item) => item.document.id === id)?.document.stepIds[0] })}
+        />}
+      </Sidebar>
+      {/* The docked panel's inner edge: a drag changes its width, and dragging it well past the narrowest folds it. */}
+      {docked && <Splitter
+        key={docked} side="left" open onToggle={() => chooseSide(null)}
+        hide={docked === 'projects' ? 'Hide projects' : 'Hide agent'} show={docked === 'projects' ? 'Show projects' : 'Show agent'}
+        controls={docked === 'projects' ? 'projects-panel' : 'agent-panel'} label={docked === 'projects' ? 'Sidebar width' : 'Chat width'}
+        resize={docked === 'projects' ? projectsWidth : agentWidth} tab={false}
+      />}
+      {openProject && statusShown && working && <AgentWorking
+        working={{
+          sentence: `${HARNESS_NAMES[working.turn.harness]} is ${workingAt ? 'changing a step' : 'working'}`,
+          step: workingAt ? {
+            label: `Go to step ${workingAt.stepNumber} of scene ${workingAt.sceneNumber}`, number: workingAt.stepNumber,
+            onOpen: () => navigate({ projectId: openProject.id, view: 'canvas', sceneId: workingAt.sceneId, stepId: working.step!.stepId }),
+          } : undefined,
+          onStop: () => void agentStore.stop(openProject.id),
+        }}
+      />}
+      {shown === 'projects' && (
+        // On a narrow window the projects open over the content, and a press beside them closes them.
+        <div className="projects-scrim" aria-hidden="true" onPointerDown={() => chooseSide(null)} />
+      )}
+      {row?.kind === 'ok' ? <div className="main">{route.view === 'canvas' ? <Suspense fallback={<main className="main-message" aria-label="Canvas">Loading…</main>}>
+          <Canvas
+            key={row.id} api={api} store={steps} actions={actions} projectId={row.id} projectName={row.project.name} scenes={scenes} structureRevision={row.revision} refreshScenes={refreshScenes} route={route} navigate={navigate} stepAgentStates={marks}
+            notices={shown === 'projects' ? undefined : notices}
+            corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen} menu={canvasMenu}
+          />
+        </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}</div>
+      : <div className="main"><MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} /></div>}
     </div>
   );
 }

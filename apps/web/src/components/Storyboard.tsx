@@ -229,7 +229,7 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
   // Opened from the board or from the activity bar: focus lands on the title, so Escape and Tab work from here.
   useEffect(() => {
     const active = document.activeElement;
-    if (active === document.body || active?.closest('.activity-bar')) title.current?.focus({ preventScroll: true });
+    if (active === document.body || active?.closest('.sidebar__views')) title.current?.focus({ preventScroll: true });
   }, []);
   return (
     <main

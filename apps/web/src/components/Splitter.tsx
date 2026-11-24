@@ -9,11 +9,6 @@ export const AGENT_WIDTH = { initial: 360, min: 320, max: 720 } as const;
 export const FOLDED = 16;
 /** What the overview keeps beside the chat: the room for its cards. The chat is only in the overview. */
 export const BOARD_MIN = { storyboard: 440 } as const;
-/** The fixed activity bar width, as set on the root in tokens.css. */
-export function barWidth() {
-  const value = typeof document === 'undefined' ? NaN : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-w'));
-  return Number.isFinite(value) && value > 0 ? value : 44;
-}
 const STEP = 16;
 /** A drag this far past the narrowest width folds the side; dragging a folded side out by `OPEN_AT` unfolds it. */
 const FOLD_AT = 80;
@@ -26,9 +21,9 @@ function stored(key: string, initial: number): number {
   } catch { return initial; }
 }
 
-/** The room the window leaves for the panel in the left spot: what is left once the frame and the board have theirs. */
+/** The room the window leaves for the docked sidebar beside the board. */
 export function panelRoom(width: number, boardMin: number) {
-  return width - barWidth() - boardMin;
+  return width - boardMin;
 }
 
 export type PanelWidth = { width: number; min: number; max: number; initial: number; choose: (width: number) => void };
@@ -68,7 +63,7 @@ export function useProjectsWidth(boardMin: number = BOARD_MIN.storyboard) {
  */
 export function useAgentWidth(drawer: boolean, boardMin: number = BOARD_MIN.storyboard) {
   const widest = () => {
-    const room = drawer ? window.innerWidth - barWidth() - 48 : panelRoom(window.innerWidth, boardMin);
+    const room = drawer ? window.innerWidth - 48 : panelRoom(window.innerWidth, boardMin);
     return Math.max(AGENT_WIDTH.min, Math.min(AGENT_WIDTH.max, room));
   };
   return useStoredWidth('paso.agent-width', AGENT_WIDTH, widest, [drawer, boardMin]);

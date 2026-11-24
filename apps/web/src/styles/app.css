@@ -24,28 +24,27 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 /* The small spaced uppercase label above a title: “SCENE 1 OF 3”, “STEP 01”. */
 .eyebrow { color: var(--ink-3); font-size: var(--text-11); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 
-/* The activity bar, the sidebar and the main view. App sets --left to the docked panel's width. */
+/* The sidebar and the main view share the window. */
 .app {
   --window-header-bg: var(--page);
-  display: grid; height: 100%;
-  grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr);
+  --folded-main-inset: calc(var(--sidebar-toggle-inset) - var(--bar-w));
+  position: relative; display: grid; height: 100%;
+  grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr);
   background: var(--bar);
 }
 .app[data-view='canvas'] { --window-header-bg: var(--paper); }
-.shell {
-  grid-column: 2; grid-row: 1; position: relative; display: grid; min-width: 0; min-height: 0;
-  grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr);
-}
 .main {
   grid-column: 2; grid-row: 1; position: relative; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   min-width: 0; min-height: 0; border-left: 1px solid var(--bar-line); background: var(--page); overflow: hidden;
 }
-.projects, .agent {
+.sidebar {
   --surface: var(--panel-bg);
   --border: 1px solid var(--line);
   --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 5px var(--focus);
+  grid-column: 1; grid-row: 1; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0;
   background: var(--surface); color: var(--ink);
 }
+.projects, .agent { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; }
 
 /* A side's inner edge, as in Overleaf: a small tab with a chevron folds and unfolds it, and the edge drags to change its
    width. It sits on the line between the side and the board, at the middle of the window. A thin ink line shows the
@@ -86,28 +85,29 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .splitter--right[data-folded] .splitter__edge { left: -6px; width: 8px; }
 .main > * { grid-column: 1; grid-row: 1; }
 
-/* A single outline groups the activity buttons, with Diagram and Studio at the top. */
-.activity-bar {
-  --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--bar-focus);
-  grid-column: 1; grid-row: 1; display: flex; flex-direction: column; align-items: center;
-  min-height: 0; padding: var(--bar-top) 0 var(--space-1); overflow: hidden auto; scrollbar-width: none;
-}
-.activity-bar__buttons {
-  display: flex; flex: 1; flex-direction: column; justify-content: space-between; gap: var(--space-3);
+/* The expanded sidebar has two rows of controls. When folded, they share a narrow outline. */
+.sidebar__body { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.sidebar__views, .sidebar__tools { display: flex; flex: none; gap: var(--space-1); }
+.sidebar__views { padding: 0 var(--space-2) var(--space-2); }
+.sidebar__tools { margin-top: auto; padding: var(--space-2); }
+.app--folded .sidebar { align-items: center; padding: var(--bar-top) 0 var(--space-1); overflow: hidden auto; scrollbar-width: none; }
+.app--folded .sidebar__body {
+  min-height: min-content; gap: var(--space-3);
   width: calc(var(--bar-button) + 2 * var(--space-1)); padding: calc(var(--space-1) + var(--bar-top-gap)) 0 var(--space-3);
   background: var(--panel-bg); border: 1px solid var(--bar-line); border-radius: var(--radius-card);
 }
-.activity-bar__group { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
-.activity-bar__button {
+.app--folded .sidebar__views, .app--folded .sidebar__tools { flex-direction: column; align-items: center; padding: 0; }
+.sidebar__button {
+  --focus-ring: 0 0 0 2px var(--panel-bg), 0 0 0 4px var(--bar-focus);
   position: relative; display: grid; place-items: center; width: var(--bar-button); height: var(--bar-button);
   border-radius: var(--radius-md); color: var(--bar-ink);
 }
-.activity-bar__button svg.i { width: 20px; height: 20px; }
-.activity-bar__button:hover { background: var(--bar-hover); }
-.activity-bar__button[aria-expanded='true'], .activity-bar__button[aria-pressed='true'] { background: var(--bar-active); color: var(--bar-ink-active); }
-.activity-bar__button:active:not([aria-haspopup]) { scale: 0.95; }
+.sidebar__button svg.i { width: 20px; height: 20px; }
+.sidebar__button:hover { background: var(--bar-hover); }
+.sidebar__button[aria-expanded='true'], .sidebar__button[aria-pressed='true'] { background: var(--bar-active); color: var(--bar-ink-active); }
+.sidebar__button:active:not([aria-haspopup]) { scale: 0.95; }
 /* The agent works while its chat is out of view: a pink dot, the agent's mark, on its button. */
-.activity-bar__badge { position: absolute; top: var(--space-1); right: var(--space-1); width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--panel-bg); }
+.sidebar__badge { position: absolute; top: var(--space-1); right: var(--space-1); width: 8px; height: 8px; border-radius: 50%; background: var(--agent); box-shadow: 0 0 0 2px var(--panel-bg); }
 /* The gear's menu: what Excalidraw's main menu held, beside the gear. */
 .popover.settings-menu { width: 264px; max-width: calc(100vw - 16px); }
 .settings-menu hr { margin: var(--space-1) var(--space-2); border: 0; border-top: var(--border); }
@@ -131,11 +131,15 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 /* Excalidraw's main menu moved to the gear: its own button is not shown, and the shape's properties take its corner. */
 .canvas--editor .excalidraw .main-menu-trigger { display: none; }
 /* The native buttons and the panel header share the workspace colour. */
-:root[data-window-controls='mac'] .activity-bar, :root[data-window-controls='mac'] .panel-brand {
-  background: linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top));
+:root[data-window-controls='mac'] .sidebar {
+  background: linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top)) var(--surface);
 }
-:root[data-window-controls='mac'] .activity-bar { -webkit-app-region: drag; }
-/* Start the panel's drag region after the toggle. Electron treats overlapping drag regions as native title-bar input. */
+:root[data-window-controls='mac'] .app--folded .sidebar { -webkit-app-region: drag; }
+/* Leave the sidebar toggle between the two native drag regions. */
+:root[data-window-controls='mac'] .panel-brand::before {
+  content: ''; position: absolute; top: 0; left: 0; width: var(--window-controls-w); height: var(--bar-top);
+  -webkit-app-region: drag;
+}
 :root[data-window-controls='mac'] .panel-brand .brand {
   align-self: stretch; flex: 1;
   -webkit-app-region: drag;
@@ -143,7 +147,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 :root[data-window-controls='mac'] .main {
   border-image: linear-gradient(var(--window-header-bg) var(--bar-top), var(--bar-line) var(--bar-top)) 1;
 }
-:root[data-window-controls='mac'] .activity-bar__button, :root[data-window-controls='mac'] .sidebar-toggle { -webkit-app-region: no-drag; }
+:root[data-window-controls='mac'] .sidebar__button, :root[data-window-controls='mac'] .sidebar-toggle { -webkit-app-region: no-drag; }
 
 /* The agent at work with its panel folded: a floating pill at the foot of the Studio, by the chat's tab, with a pink
    pulse, the step it is changing as a pink chip, and Stop. */
@@ -166,7 +170,7 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 .brand__name { font-size: 21px; font-weight: var(--weight-bold); letter-spacing: -0.04em; line-height: 1; }
 /* The mark starts after the sidebar toggle. On macOS it shares the native buttons' centre line. */
 .panel-brand {
-  flex: none; display: flex; align-items: center; cursor: default;
+  position: relative; flex: none; display: flex; align-items: center; cursor: default;
   height: calc(var(--bar-top) + var(--bar-top-gap));
   padding: 0 var(--space-3) var(--bar-top-gap) var(--sidebar-toggle-inset);
 }
@@ -209,7 +213,6 @@ svg.i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke:
 
 /* Sidebar: the projects, laid out like tldraw's. A paper column docked to the left, the full height of the window, with
    the mark at its head; the header runs beside it. On a narrow window it opens over the content instead. */
-.projects { grid-column: 1; grid-row: 1; position: relative; z-index: 6; display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
 .projects-scrim { display: none; }
 .projects__nav { flex: none; padding: 0 var(--space-2) var(--space-2); }
 /* The workspace's name in bold with a chevron, like tldraw's. */
@@ -391,7 +394,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .notice__action:hover:not(:disabled) { background: var(--surface-sunken); }
 
 /* Popovers sit on the body, above every panel. */
-.popover { position: fixed; z-index: 10; border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-lg); }
+.popover { position: fixed; z-index: 17; border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--shadow-lg); }
 .picker { width: 280px; padding: var(--space-3); }
 .picker__title { font-weight: var(--weight-semibold); margin-bottom: var(--space-2); }
 /* A field, as T3 Code's input: 32px, 8px corners, the input's stronger edge on what you type into's fill. */
@@ -439,7 +442,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 }
 .board__top { display: flex; align-items: center; gap: var(--space-3); margin: calc(-1 * var(--space-5)) 0 var(--space-4); padding-right: 180px; }
 /* Keep notices and the title clear of the toggle when it sits over the board. */
-.app--folded .board { padding-left: max(var(--board-inline-padding), var(--sidebar-toggle-inset)); }
+.app--folded .board { padding-left: max(var(--board-inline-padding), var(--folded-main-inset)); }
 /* In the Studio the corner scrolls with the page, and the title keeps clear of it. */
 .board__corner { z-index: 2; }
 .board__head { display: flex; padding-right: 180px; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
@@ -464,22 +467,21 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* The Canvas fills everything right of the sidebar, edge to edge: the canvas, then its step strip. No card, no gutter. */
 .canvas-page { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--paper); overflow: hidden; }
 .editor-notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--danger-soft); color: var(--ink); border-bottom: var(--border); }
-.app--folded .editor-notice { padding-left: var(--sidebar-toggle-inset); }
+.app--folded .editor-notice { padding-left: max(var(--space-4), var(--folded-main-inset)); }
 .editor-notice .btn { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-sm); }
 .canvas--editor > .canvas__placeholder { height: 100%; justify-content: center; padding: var(--space-5); }
 .canvas--editor { display: block; padding: 0; flex: 1; min-height: 320px; overflow: auto; }
 .editor-message { display: grid; place-content: center; gap: var(--space-2); height: 100%; color: var(--ink-2); }
 
 /* Under 1160px the save state keeps its place for screen readers but gives its room to the agent status. */
-/* A narrow window: the left spot's panel opens over the main view, as a black drawer against the bar, the full height
-   of the window, with rounded right corners. The projects have a scrim beside them that closes them; the chat leaves the
-   board in view and usable. */
-.app--narrow .projects, .agent[data-narrow] {
-  position: fixed; z-index: 15; top: 0; bottom: 0; left: var(--bar-w);
+/* On narrow windows, the expanded sidebar opens over the board from the left edge. */
+.app--narrow:not(.app--folded) .sidebar {
+  position: fixed; z-index: 15; top: 0; bottom: 0; left: 0;
   border-right: 1px solid var(--bar-line); box-shadow: var(--shadow-lg); overflow: hidden;
 }
-.app--narrow .projects { width: min(280px, calc(100vw - var(--bar-w) - 48px)); }
-.app--narrow .projects-scrim { display: block; position: fixed; z-index: 14; inset: 0 0 0 var(--bar-w); background: var(--scrim); }
+.app--narrow.app--projects .sidebar { width: min(280px, calc(100vw - 48px)); }
+.app--narrow.app--agent .sidebar { width: min(var(--panel-agent), calc(100vw - 48px)); }
+.app--narrow .projects-scrim { display: block; position: fixed; z-index: 14; inset: 0; background: var(--scrim); }
 /* A narrower window: the board's padding shrinks before anything else does. */
 @media (max-width: 1099px) {
   .board { --board-inline-padding: var(--space-5); padding-top: var(--space-6); }

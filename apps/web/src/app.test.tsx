@@ -45,7 +45,7 @@ const readProject = async (id: string) => JSON.parse(await readFile(projectFile(
 const projectFolders = () => readdir(dataDir);
 const patience = { timeout: 5000 };
 /** The activity bar down the window's left edge: the panels, the Studio, the workspace switcher and the gear. */
-const bar = () => screen.getByRole('toolbar', { name: 'Activity bar' });
+const tools = () => screen.getByRole('toolbar', { name: 'Workspace controls' });
 /** Folders a test adds as workspaces, outside the default one. */
 let otherRoot: string | undefined;
 
@@ -213,11 +213,11 @@ describe('workspaces, from the activity bar', () => {
     expect(within(sidebar).getByRole('list', { name: 'Projects' })).toHaveTextContent('En casa');
 
     // Switch: the list, the address and the board follow the other folder.
-    await user.click(within(bar()).getByRole('button', { name: 'Workspace: My projects' }));
+    await user.click(within(tools()).getByRole('button', { name: 'Workspace: My projects' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'Clases' }, patience));
-    await within(bar()).findByRole('button', { name: 'Workspace: Clases' }, patience);
+    await within(tools()).findByRole('button', { name: 'Workspace: Clases' }, patience);
     await screen.findByRole('heading', { level: 1, name: 'Tema 1' }, patience);
-    await waitFor(() => expect(within(bar()).getByRole('button', { name: 'Workspace: Clases' })).toBeEnabled(), patience);
+    await waitFor(() => expect(within(tools()).getByRole('button', { name: 'Workspace: Clases' })).toBeEnabled(), patience);
     expect(window.location.hash).toBe('#/tema/canvas');
     expect(within(sidebar).queryByRole('button', { name: /^En casa/ })).not.toBeInTheDocument();
     expect(within(sidebar).getByRole('list', { name: 'Projects' })).toHaveTextContent('Tema 1');
@@ -230,7 +230,7 @@ describe('workspaces, from the activity bar', () => {
     expect(within(sidebar).getByRole('button', { name: /^Tema 1/ })).toBeInTheDocument();
 
     // A new workspace from the explorer: it opens beside the current one, makes a folder and uses it.
-    await user.click(within(bar()).getByRole('button', { name: 'Workspace: Clases' }));
+    await user.click(within(tools()).getByRole('button', { name: 'Workspace: Clases' }));
     await user.click(await screen.findByRole('menuitem', { name: 'New workspace…' }, patience));
     const explorer = await screen.findByRole('dialog', { name: 'New workspace' }, patience);
     await within(explorer).findByRole('button', { name: /Clases/ }, patience);
@@ -239,13 +239,13 @@ describe('workspaces, from the activity bar', () => {
     await user.type(within(explorer).getByLabelText('Name of the new folder'), 'Charlas{Enter}');
     await waitFor(() => expect(within(explorer).getByRole('navigation', { name: 'Current folder' })).toHaveTextContent('Charlas'), patience);
     await user.click(within(explorer).getByRole('button', { name: 'Use this folder' }));
-    await within(bar()).findByRole('button', { name: 'Workspace: Charlas' }, patience);
+    await within(tools()).findByRole('button', { name: 'Workspace: Charlas' }, patience);
     expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument();
     expect(await within(sidebar).findByText('Nothing here yet', undefined, patience)).toBeInTheDocument();
     expect(await readdir(join(otherRoot, 'Charlas'))).toEqual([]);
 
     // Adding the same folder again is refused in the explorer.
-    await user.click(within(bar()).getByRole('button', { name: 'Workspace: Charlas' }));
+    await user.click(within(tools()).getByRole('button', { name: 'Workspace: Charlas' }));
     await user.click(await screen.findByRole('menuitem', { name: 'New workspace…' }, patience));
     const again = await screen.findByRole('dialog', { name: 'New workspace' }, patience);
     await user.click(await within(again).findByRole('button', { name: /Clases/ }, patience));
@@ -255,14 +255,14 @@ describe('workspaces, from the activity bar', () => {
     await user.click(within(again).getByRole('button', { name: 'Cancel' }));
 
     // Off the list: back to the default workspace, and the folder is still there.
-    await user.click(within(bar()).getByRole('button', { name: 'Workspace: Charlas' }));
+    await user.click(within(tools()).getByRole('button', { name: 'Workspace: Charlas' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Remove from list' }, patience));
-    await within(bar()).findByRole('button', { name: 'Workspace: My projects' }, patience);
+    await within(tools()).findByRole('button', { name: 'Workspace: My projects' }, patience);
     await screen.findByRole('heading', { level: 1, name: 'En casa' }, patience);
     expect(await readdir(otherRoot)).toEqual(['Charlas', 'Clases']);
     // The switcher waits for the switch to finish before it opens again.
-    await waitFor(() => expect(within(bar()).getByRole('button', { name: 'Workspace: My projects' })).toBeEnabled(), patience);
-    await user.click(within(bar()).getByRole('button', { name: 'Workspace: My projects' }));
+    await waitFor(() => expect(within(tools()).getByRole('button', { name: 'Workspace: My projects' })).toBeEnabled(), patience);
+    await user.click(within(tools()).getByRole('button', { name: 'Workspace: My projects' }));
     expect((await screen.findAllByRole('menuitemradio', undefined, patience)).map((item) => item.textContent)).toEqual(['My projects', 'Clases']);
     expect(screen.queryByRole('menuitem', { name: 'Remove from list' })).not.toBeInTheDocument();
     expect(added.id).toBeTruthy();
@@ -284,8 +284,8 @@ describe('“New workspace…” in the desktop app', () => {
     render(<App config={config} />);
     const sidebar = await screen.findByRole('complementary', { name: 'Projects and diagrams' }, patience);
     const openMenu = async (name: string) => {
-      await waitFor(() => expect(within(bar()).getByRole('button', { name: `Workspace: ${name}` })).toBeEnabled(), patience);
-      await user.click(within(bar()).getByRole('button', { name: `Workspace: ${name}` }));
+      await waitFor(() => expect(within(tools()).getByRole('button', { name: `Workspace: ${name}` })).toBeEnabled(), patience);
+      await user.click(within(tools()).getByRole('button', { name: `Workspace: ${name}` }));
       await user.click(await screen.findByRole('menuitem', { name: 'New workspace…' }, patience));
     };
 
@@ -294,12 +294,12 @@ describe('“New workspace…” in the desktop app', () => {
     await waitFor(() => expect(asked).toEqual([undefined]), patience);
     expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument();
     expect(within(sidebar).queryByRole('alert')).not.toBeInTheDocument();
-    expect(within(bar()).getByRole('button', { name: 'Workspace: My projects' })).toBeInTheDocument();
+    expect(within(tools()).getByRole('button', { name: 'Workspace: My projects' })).toBeInTheDocument();
 
     // Picked: the folder becomes the open workspace.
     answer = join(otherRoot, 'Charlas');
     await openMenu('My projects');
-    await within(bar()).findByRole('button', { name: 'Workspace: Charlas' }, patience);
+    await within(tools()).findByRole('button', { name: 'Workspace: Charlas' }, patience);
     expect(screen.queryByRole('dialog', { name: 'New workspace' })).not.toBeInTheDocument();
 
     // From a folder workspace the dialog starts beside it; the service still refuses a folder already on the list.
@@ -418,7 +418,7 @@ describe('the board and its overview', () => {
     expect(present.closest('.canvas__corner')).not.toBeNull();
     expect(screen.queryByRole('group', { name: 'View' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Canvas' })).not.toBeInTheDocument();
-    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
+    const bar = screen.getByRole('toolbar', { name: 'View controls' });
     const diagram = within(bar).getByRole('button', { name: 'Diagram' });
     const studio = within(bar).getByRole('button', { name: 'Studio' });
     expect(diagram.querySelector('.lucide-presentation')).toBeInTheDocument();
@@ -511,23 +511,25 @@ describe('the board and its overview', () => {
     const { unmount } = render(<App config={config} />);
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
-    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
-    expect(bar).toHaveAttribute('aria-orientation', 'vertical');
-    expect(within(bar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Diagram', 'Studio', 'Workspace: My projects', 'Settings']);
-    // The workspace switcher is no longer in the projects panel.
+    const bar = screen.getByRole('toolbar', { name: 'View controls' });
+    expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
+    expect(within(bar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Diagram', 'Studio']);
+    expect(within(tools()).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Workspace: My projects', 'Settings']);
     expect(within(screen.getByRole('complementary', { name: 'Projects and diagrams' })).queryByRole('button', { name: /^Workspace/ })).not.toBeInTheDocument();
     for (const button of within(bar).getAllByRole('button')) expect(button).toHaveAttribute('title');
     // The projects are open at first, in the left spot, with the edge to drag.
     const sidebar = screen.getByRole('complementary', { name: 'Projects and diagrams' });
-    // The main view sits apart from the panel, in its own box with rounded left corners; the panel is not in it.
-    // The panel starts with the app's icon and name, after the window's buttons in the desktop app.
-    expect(sidebar.querySelector('.panel-brand')).toHaveTextContent('Paso');
+    const column = sidebar.closest('.sidebar');
+    expect(column?.querySelector('.panel-brand')).toHaveTextContent('Paso');
+    expect(column).toContainElement(bar);
+    expect(column).toContainElement(tools());
+    expect(bar.compareDocumentPosition(sidebar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sidebar.compareDocumentPosition(tools()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const app = bar.closest('.app');
     expect(app).toHaveClass('app--projects');
     const main = document.querySelector('.main')!;
     expect(main).toContainElement(screen.getByRole('main', { name: 'Canvas' }));
     expect(main).not.toContainElement(sidebar);
-    expect(sidebar).toHaveTextContent(/^Paso(?!\.)/);
     const toggle = screen.getByRole('button', { name: 'Hide sidebar' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveAttribute('aria-controls', 'projects-panel');
@@ -554,6 +556,8 @@ describe('the board and its overview', () => {
     expect(screen.queryByRole('separator', { name: 'Sidebar width' })).not.toBeInTheDocument();
     expect(window.localStorage.getItem('paso.side-panel')).toBe('none');
     expect(app).toHaveClass('app--folded');
+    expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+    expect(tools()).toHaveAttribute('aria-orientation', 'vertical');
     await user.click(toggle);
     expect(app).not.toHaveClass('app--folded');
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
@@ -618,7 +622,7 @@ describe('the board and its overview', () => {
     await user.keyboard('{Enter}');
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
 
-    await user.click(within(bar()).getByRole('button', { name: 'Studio' }));
+    await user.click(screen.getByRole('button', { name: 'Studio' }));
     await screen.findByRole('complementary', { name: 'Agent' }, patience);
     expect(toggle).toHaveAttribute('aria-controls', 'agent-panel');
     await user.click(toggle);
@@ -635,31 +639,29 @@ describe('the board and its overview', () => {
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
   });
 
-  it('moves through the activity bar with the keyboard and keeps one tab stop', async () => {
+  it('moves through each sidebar toolbar with the keyboard and keeps one tab stop per row', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera']);
     window.location.hash = '#/one/canvas/s1/s1t1';
     render(<App config={config} />);
     await screen.findByRole('main', { name: 'Canvas' }, patience);
-    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
-    const buttons = within(bar).getAllByRole('button');
-    const [diagram, studio, workspace, settings] = buttons;
-    expect(buttons.map((button) => button.tabIndex)).toEqual([0, -1, -1, -1]);
+    const bar = screen.getByRole('toolbar', { name: 'View controls' });
+    const [diagram, studio] = within(bar).getAllByRole('button');
+    const [workspace, settings] = within(tools()).getAllByRole('button');
+    expect([diagram, studio, workspace, settings].map((button) => button.tabIndex)).toEqual([0, -1, 0, -1]);
     diagram.focus();
-    await user.keyboard('{ArrowDown}');
+    await user.keyboard('{ArrowRight}');
     expect(studio).toHaveFocus();
-    await user.keyboard('{End}');
-    expect(settings).toHaveFocus();
-    expect(buttons.map((button) => button.tabIndex)).toEqual([-1, -1, -1, 0]);
-    await user.keyboard('{ArrowDown}');
-    expect(settings).toHaveFocus();   // it stops at the ends
-    await user.keyboard('{ArrowUp}');
-    expect(workspace).toHaveFocus();
-    await user.keyboard('{ArrowUp}');
+    await user.keyboard('{ArrowRight}');
     expect(studio).toHaveFocus();
     await user.keyboard('{Home}');
     expect(diagram).toHaveFocus();
+    workspace.focus();
+    await user.keyboard('{End}');
+    expect(settings).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(workspace).toHaveFocus();
     // The gear opens its menu by keyboard, on its first item, and Escape gives the focus back.
     settings.focus();
     await user.keyboard('{Enter}');

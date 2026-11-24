@@ -5,7 +5,6 @@ import { CloudOff, Folder, FolderPlus, Layers, Search, ServerOff, SquarePen, Tri
 import { describeContents, fold } from '../lib/format';
 import { shownFilter, showsUnder } from '../lib/project-filter';
 import { ActionError, type LooseDiagram, type ProjectRow as Row, type ProjectsStore, type StoreState } from '../state/projects-store';
-import { Brand } from './Brand';
 import { Dialog } from './Dialog';
 import { IconPicker } from './IconPicker';
 import { LooseRow, stepCount } from './LooseRow';
@@ -287,9 +286,6 @@ export function ProjectsPanel({ store, state, currentId, creating, onCreatingCha
 
   return (
     <aside id="projects-panel" className="projects" aria-label="Projects and diagrams" data-dragging={drag ? 'true' : undefined}>
-      {/* The app's icon and name, right after the window's buttons in the desktop app, which sit on the bar beside it. */}
-      <div className="panel-brand"><Brand /></div>
-
       <div className="projects__nav">
         {/* As in T3 Code, one row: “Search” on the left, then the project filter and the two ways to make something new,
             as icons. While searching, the field takes the place of “Search”. */}

@@ -48,19 +48,19 @@ describe('the chat width', () => {
     expect(screen.getByTestId('app').style.getPropertyValue('--panel-agent')).toBe(`${now()}px`);
   });
 
-  it('stays between 320px and 720px, and never takes the 440px the board keeps beside the activity bar', async () => {
+  it('stays between 320px and 720px, and leaves at least 440px for the board', async () => {
     const user = userEvent.setup();
     render(<Chat />);
     handle().focus();
     await user.keyboard('{Home}');
     expect(now()).toBe(320);
     await user.keyboard('{End}');
-    expect(now()).toBe(720);   // 1440 - 44 bar - 440 board leaves 956: the cap wins
+    expect(now()).toBe(720);   // 1440 - 440 board leaves 1000: the cap wins
     cleanup();
     window.innerWidth = 1000;
     render(<Chat />);
-    expect(handle()).toHaveAttribute('aria-valuemax', '516');   // 1000 - 44 bar - 440 board
-    expect(now()).toBe(516);   // the remembered 720 shows narrower, and is not forgotten
+    expect(handle()).toHaveAttribute('aria-valuemax', '560');   // 1000 - 440 board
+    expect(now()).toBe(560);   // the remembered 720 shows narrower, and is not forgotten
     cleanup();
     window.innerWidth = 1440;
     render(<Chat />);

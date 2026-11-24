@@ -105,7 +105,7 @@ function editsStepOne(text = 'Step 1 updated.') {
 }
 
 /** Studio also opens the chat. */
-const studioButton = () => within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Studio' });
+const studioButton = () => within(screen.getByRole('toolbar', { name: 'View controls' })).getByRole('button', { name: 'Studio' });
 /** Opens the app in the Studio with the chat in the left spot: from the bar, unless it is remembered open. */
 async function openPanel() {
   render(<App config={config} />);
@@ -335,8 +335,7 @@ describe('a turn as it happens', () => {
     const user = userEvent.setup();
     let panel = await openPanel();
 
-    // The panel starts with the app's icon and name, as the projects do.
-    expect(panel.querySelector('.panel-brand')).toHaveTextContent('Paso');
+    expect(panel.closest('.sidebar')?.querySelector('.panel-brand')).toHaveTextContent('Paso');
     // The target is the scene selected in the sidebar; the panel's head names it, and there is nothing to pick there.
     // The log starts empty.
     expect(within(panel).getByRole('log', { name: 'Conversation with the agent' })).toBeEmptyDOMElement();
@@ -422,13 +421,13 @@ describe('a turn as it happens', () => {
     const toggle = studioButton();
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(toggle).toHaveAttribute('aria-controls', 'agent-panel');
-    expect(toggle.querySelector('.activity-bar__badge')).toBeNull();
+    expect(toggle.querySelector('.sidebar__badge')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Diagram' }));
     await screen.findByRole('main', { name: 'Canvas' }, patience);
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('.app')).not.toHaveClass('app--agent');
-    expect(toggle.querySelector('.activity-bar__badge')).not.toBeNull();
+    expect(toggle.querySelector('.sidebar__badge')).not.toBeNull();
     await user.click(toggle);
     await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
     await user.click(screen.getByRole('button', { name: 'Show sidebar' }));

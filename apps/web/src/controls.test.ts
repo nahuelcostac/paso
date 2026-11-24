@@ -53,29 +53,30 @@ describe('sidebar layout', () => {
     expect(rule(tokens, ':root')).toContain('--bar-w: 44px');
     expect(rule(tokens, ':root')).toContain('--bar: var(--panel-bg)');
     expect(rule(tokens, mac)).not.toContain('--bar-w:');
-    expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--bar-w) minmax(0, 1fr)');
+    expect(rule(app, '.app')).toContain('grid-template: minmax(0, 1fr) / var(--left) minmax(0, 1fr)');
     expect(app).not.toContain('--bar-w:');
     expect(rule(app, '.sidebar-toggle')).toContain('top: calc((var(--bar-top) - var(--control-h-sm)) / 2)');
     expect(rule(app, '.sidebar-toggle')).toContain('left: var(--sidebar-toggle-start)');
     expect(rule(app, '.app')).toContain('--window-header-bg: var(--page)');
     expect(rule(app, ".app[data-view='canvas']")).toContain('--window-header-bg: var(--paper)');
-    expect(rule(app, `${mac} .activity-bar, ${mac} .panel-brand`)).toContain('linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top))');
+    expect(rule(app, `${mac} .sidebar`)).toContain('linear-gradient(var(--window-header-bg) var(--bar-top), transparent var(--bar-top)) var(--surface)');
   });
 
   it('keeps the macOS panel drag region to the right of the sidebar toggle', async () => {
     const app = await css('app.css');
     const mac = ":root[data-window-controls='mac']";
-    expect(rule(app, `${mac} .activity-bar, ${mac} .panel-brand`)).not.toContain('-webkit-app-region: drag');
+    expect(rule(app, `${mac} .sidebar`)).not.toContain('-webkit-app-region: drag');
+    expect(rule(app, `${mac} .panel-brand::before`)).toContain('width: var(--window-controls-w)');
     expect(rule(app, `${mac} .panel-brand .brand`)).toContain('-webkit-app-region: drag');
     expect(rule(app, '.panel-brand')).toContain('padding: 0 var(--space-3) var(--bar-top-gap) var(--sidebar-toggle-inset)');
   });
 
-  it('uses theme colours and one outline around the activity buttons', async () => {
+  it('uses theme colours and an outline around the folded sidebar controls', async () => {
     const app = await css('app.css');
-    expect(rule(app, '.projects, .agent')).not.toContain('color-scheme: dark');
-    expect(rule(app, '.activity-bar')).toContain('padding: var(--bar-top) 0 var(--space-1)');
-    expect(rule(app, '.activity-bar__buttons')).toContain('border: 1px solid var(--bar-line)');
-    expect(rule(app, '.activity-bar__buttons')).toContain('padding: calc(var(--space-1) + var(--bar-top-gap)) 0 var(--space-3)');
+    expect(rule(app, '.sidebar')).toContain('--surface: var(--panel-bg)');
+    expect(rule(app, '.app--folded .sidebar')).toContain('padding: var(--bar-top) 0 var(--space-1)');
+    expect(rule(app, '.app--folded .sidebar__body')).toContain('border: 1px solid var(--bar-line)');
+    expect(rule(app, '.sidebar__tools')).toContain('margin-top: auto');
   });
 
   it('uses larger text for the Loose diagrams heading than for its entries', async () => {

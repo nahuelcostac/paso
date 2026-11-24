@@ -51,7 +51,7 @@ export function WorkspaceSwitcher({ api, store, state, onSwitchWorkspace, onNoti
   const label = `Workspace: ${active?.name ?? 'loading'}`;
   return <>
     <button
-      ref={button} type="button" className="activity-bar__button" data-id="workspace" aria-label={label}
+      ref={button} type="button" className="sidebar__button" data-id="workspace" aria-label={label}
       title={active ? `${label}\n${active.path}` : label} aria-haspopup="menu" aria-expanded={open}
       aria-busy={switching || undefined} disabled={!listing || switching} tabIndex={tabIndex} onFocus={onFocus}
       onClick={() => setOpen(!open)}

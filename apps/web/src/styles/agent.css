@@ -29,16 +29,6 @@
   height: 12px;
 }
 
-/* Agent panel beside the Studio: in the left spot, where the projects are, black like them and the bar (app.css). No rule under its head: space separates. As a drawer it opens over the content (app.css). */
-.agent {
-  grid-column: 1;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  position: relative;
-  background: var(--surface);
-}
 :root[data-resizing] { cursor: col-resize; user-select: none; -webkit-user-select: none; }
 :root[data-resizing] iframe, :root[data-resizing] canvas { pointer-events: none; }
 .agent__head {
@@ -302,11 +292,7 @@ button.chip:hover {
 .agent-toggle { height: var(--control-h-lg); padding: 0 var(--space-4) 0 var(--space-3); flex: none; }
 .agent-toggle[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .agent-toggle[aria-expanded='true']:hover:not(:disabled) { background: var(--surface-hover); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.agent[data-narrow] {
-  display: none;
-  width: min(var(--panel-agent), calc(100vw - var(--bar-w) - 48px));
-}
-.agent[data-narrow][data-open='true'] { display: flex; }
+.agent[data-narrow]:not([data-open]) { display: none; }
 
 /* Each agent's own mark, in its own colours: Claude's orange, OpenAI's ink, Antigravity's gradient. */
 .provider-icon { display: block; flex: none; }

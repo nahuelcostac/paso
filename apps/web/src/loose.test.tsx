@@ -564,7 +564,7 @@ describe('the step strip of a loose diagram', () => {
     expect(document.querySelector('.canvas__corner')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Present/ })).not.toBeInTheDocument();
     const user = userEvent.setup();
-    const bar = screen.getByRole('toolbar', { name: 'Activity bar' });
+    const bar = screen.getByRole('toolbar', { name: 'View controls' });
     const studio = within(bar).getByRole('button', { name: 'Studio' });
     const diagram = within(bar).getByRole('button', { name: 'Diagram' });
     expect(studio).toHaveAttribute('aria-expanded', 'false');
@@ -641,7 +641,7 @@ describe('the gear in the activity bar', () => {
     window.history.replaceState(null, '', '#/p/canvas/p-scene');
     render(<App config={config} recovery={memory()} />);
     await screen.findByTestId('canvas', {}, patience);
-    const settings = within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Settings' });
+    const settings = within(screen.getByRole('toolbar', { name: 'Workspace controls' })).getByRole('button', { name: 'Settings' });
     expect(settings).toHaveAttribute('aria-haspopup', 'menu');
     await user.click(settings);
     let menu = await screen.findByRole('menu', { name: 'Settings' });
@@ -668,7 +668,7 @@ describe('the gear in the activity bar', () => {
     await user.keyboard('{Escape}');
 
     // In the Studio there is no canvas: its options stay in place, greyed, with a note; the theme still works.
-    await user.click(within(screen.getByRole('toolbar', { name: 'Activity bar' })).getByRole('button', { name: 'Studio' }));
+    await user.click(within(screen.getByRole('toolbar', { name: 'View controls' })).getByRole('button', { name: 'Studio' }));
     await screen.findByRole('main', { name: 'Studio' }, patience);
     await user.click(settings);
     menu = await screen.findByRole('menu', { name: 'Settings' });
