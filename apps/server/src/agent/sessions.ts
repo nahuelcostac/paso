@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path';
 import { idSchema } from '@paso/shared';
 import { z } from 'zod';
 import { ApiError, isMissing } from '../errors.js';
+import { AttachmentStore, parseAttachments, type AttachmentRef, type ImageInput } from './attachments.js';
 import { claudeAdapter, failureMessage } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { effortLevels, harnessIds, type AgentEvent, type AgentRunHooks, type AgentRunRequest, type FailureCode, type HarnessAdapter, type HarnessId } from './types.js';
@@ -34,6 +35,8 @@ export type SessionManagerOptions = {
   sessionsPath: string;
   /** One file per conversation with its messages and events, for the history. Defaults to `agent-transcripts` next to the index. */
   transcriptsDir?: string;
+  /** The images attached to each conversation's messages. Defaults to `agent-attachments` next to the index. */
+  attachmentsDir?: string;
   hooks?: AgentRunHooks;
   maxRunsPerProject?: number;
   maxRuns?: number;
@@ -82,10 +85,12 @@ export class SessionManager {
   private closing = false;
   private readonly adapters: Partial<Record<HarnessId, HarnessAdapter>>;
   private readonly workDir: string;
+  private readonly attachments: AttachmentStore;
 
   constructor(private options: SessionManagerOptions) {
     this.adapters = options.adapters ?? { claude: claudeAdapter, codex: codexAdapter };
     this.workDir = checkWorkDir(options.workDir, options.dataDir);
+    this.attachments = new AttachmentStore(options.attachmentsDir ?? join(dirname(options.sessionsPath), 'agent-attachments'));
   }
 
   subscribe(listener: (event: SessionEvent) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
@@ -125,7 +130,7 @@ export class SessionManager {
     return this.writes;
   }
   private dropHistory(id: string) {
-    const remove = () => rm(this.transcriptPath(id), { force: true });
+    const remove = async () => { await rm(this.transcriptPath(id), { force: true }); await this.attachments.drop(id); };
     this.writes = this.writes.then(remove, remove).catch(() => {});
     return this.writes;
   }
@@ -141,6 +146,9 @@ export class SessionManager {
         // A missing or damaged index only loses the ability to resume; it must not stop the service.
         if (!isMissing(error) && !(error instanceof SyntaxError)) throw error;
       }
+      // Images of conversations that were not kept, such as ones that never reached the harness before a restart.
+      const prune = () => this.attachments.prune((id) => this.sessions.has(id));
+      this.writes = this.writes.then(prune, prune).catch(() => {});
     })();
     await this.loaded;
   }
@@ -230,35 +238,59 @@ export class SessionManager {
     }
   }
 
-  async send(id: string, text: unknown, effort?: unknown): Promise<{ runId: string }> {
+  /**
+   * Starts a run with the person's message. `attachments` are images (`{ kind: 'image', mediaType, data, name? }`, data
+   * in base64): they are checked, kept with the conversation and handed to the harness as image content.
+   */
+  async send(id: string, text: unknown, effort?: unknown, attachments?: unknown): Promise<{ runId: string; attachments: AttachmentRef[] }> {
     await this.load();
-    if (typeof text !== 'string' || !text.trim() || text.length > maxMessageChars) {
-      throw new ApiError(400, 'INVALID_MESSAGE', `El mensaje debe tener texto y no superar ${maxMessageChars} caracteres.`);
+    const images = parseAttachments(attachments);
+    if (typeof text !== 'string' || text.length > maxMessageChars || (!text.trim() && !images.length)) {
+      throw new ApiError(400, 'INVALID_MESSAGE', `Write a message of up to ${maxMessageChars.toLocaleString('en-US')} characters, or attach an image.`);
     }
     if (this.closing) throw new ApiError(503, 'SERVICE_CLOSING', 'The service is shutting down.');
     const session = this.get(id);
     if (effort !== undefined && (typeof effort !== 'string' || !effortLevels[session.harness].includes(effort))) {
       throw new ApiError(400, 'INVALID_EFFORT', "That reasoning level isn't available for this agent.");
     }
-    if (!this.adapters[session.harness]) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', "This agent can't be used from Paso yet.");
+    const adapter = this.adapters[session.harness];
+    if (!adapter) throw new ApiError(422, 'HARNESS_NOT_SUPPORTED', "This agent can't be used from Paso yet.");
+    // Said before anything is sent, so the person can pick another agent or remove the images.
+    if (images.length && !adapter.acceptsImages) throw new ApiError(422, 'IMAGES_NOT_SUPPORTED', "This agent can't read images. Remove them or pick another agent.");
     await this.options.validateTarget(session.projectId, session.sceneId);
     // A continued conversation adds to its stored history, so its numbering carries on.
     await this.history(session);
-    // From here to marking the session as running there is no await, so limits cannot race.
-    if (session.state === 'running') throw new ApiError(409, 'SESSION_BUSY', 'The agent is still working in this session.');
-    const running = [...this.sessions.values()].filter((s) => s.state === 'running');
-    if (running.filter((s) => s.projectId === session.projectId).length >= (this.options.maxRunsPerProject ?? 1)) {
-      throw new ApiError(409, 'PROJECT_BUSY', 'An agent is already working on this project. Wait for it to finish, or stop it.');
-    }
-    if (running.length >= (this.options.maxRuns ?? 4)) {
-      throw new ApiError(409, 'TOO_MANY_RUNS', 'Too many agents are working at once. Wait for one to finish.');
+    const refs = await this.attachments.save(session.id, images);
+    try {
+      // From here to marking the session as running there is no await, so limits cannot race.
+      if (!this.sessions.has(session.id)) throw new ApiError(404, 'SESSION_NOT_FOUND', "That agent session doesn't exist.");
+      if (this.closing) throw new ApiError(503, 'SERVICE_CLOSING', 'The service is shutting down.');
+      if (session.state === 'running') throw new ApiError(409, 'SESSION_BUSY', 'The agent is still working in this session.');
+      const running = [...this.sessions.values()].filter((s) => s.state === 'running');
+      if (running.filter((s) => s.projectId === session.projectId).length >= (this.options.maxRunsPerProject ?? 1)) {
+        throw new ApiError(409, 'PROJECT_BUSY', 'An agent is already working on this project. Wait for it to finish, or stop it.');
+      }
+      if (running.length >= (this.options.maxRuns ?? 4)) {
+        throw new ApiError(409, 'TOO_MANY_RUNS', 'Too many agents are working at once. Wait for one to finish.');
+      }
+    } catch (error) {
+      await this.attachments.remove(session.id, refs.map((ref) => ref.id));
+      throw error;
     }
     const controller = new AbortController();
     const runId = randomUUID();
     session.state = 'running';
     session.run = { id: runId, controller, finished: Promise.resolve() };
-    session.run.finished = this.execute(session, runId, text, controller.signal, effort as string | undefined);
-    return { runId };
+    const input = images.map((image, index): ImageInput => ({ mediaType: refs[index].mediaType, data: image.bytes.toString('base64') }));
+    session.run.finished = this.execute(session, runId, text, controller.signal, effort as string | undefined, refs, input);
+    return { runId, attachments: refs };
+  }
+
+  /** One attached image of a conversation, to show it again in the history. */
+  async attachment(id: string, attachmentId: string) {
+    await this.load();
+    this.get(id);
+    return this.attachments.read(id, attachmentId);
   }
 
   async cancel(id: string) {
@@ -287,7 +319,7 @@ export class SessionManager {
   }
 
   /** The single place where a run starts and ends. Run hooks attach here. */
-  private async execute(session: Session, runId: string, text: string, signal: AbortSignal, effort?: string) {
+  private async execute(session: Session, runId: string, text: string, signal: AbortSignal, effort?: string, attachments: AttachmentRef[] = [], images: ImageInput[] = []) {
     const context = { sessionId: session.id, runId, harness: session.harness, projectId: session.projectId, sceneId: session.sceneId };
     let terminal: AgentEvent | undefined;
     const emit = (event: AgentEvent) => {
@@ -301,8 +333,8 @@ export class SessionManager {
     };
     const fail = (code: FailureCode) => emit({ type: 'failed', code, message: failureMessage(code) });
     emit({ type: 'started' });
-    emit({ type: 'message', text });
-    session.title ??= text.trim().replace(/\s+/g, ' ').slice(0, titleChars);
+    emit({ type: 'message', text, ...(attachments.length ? { attachments } : {}) });
+    session.title ??= text.trim().replace(/\s+/g, ' ').slice(0, titleChars) || (attachments.length === 1 ? 'Image' : `${attachments.length} images`);
     session.turns = (session.turns ?? 0) + 1;
     try {
       let blocked = false;
@@ -318,6 +350,7 @@ export class SessionManager {
         else {
           const request: AgentRunRequest = {
             executable: detected.path, workDir: this.workDir, text,
+            ...(images.length ? { images } : {}),
             ...(session.resumeToken && tokenPattern.test(session.resumeToken) ? { resumeToken: session.resumeToken } : {}),
             ...(session.model ? { model: session.model } : {}),
             ...(effort ? { effort } : {}),

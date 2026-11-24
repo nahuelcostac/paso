@@ -4,7 +4,7 @@ import { connectCodexBoard, codexBoardTools, codexReadOnlyTools } from './codex-
 import { classifyCodexFailure, codexDefaultEffort, codexFailureMessage, codexVersion, prepareCodex } from './codex-policy.js';
 import { forgetCodex } from './forget.js';
 import { startProcess, type ManagedProcess } from './process.js';
-import type { AgentEvent, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
+import type { AgentEvent, AgentRunRequest, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
 
 const record = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const allowedItems = new Set(['userMessage', 'agentMessage', 'reasoning', 'contextCompaction', 'dynamicToolCall']);
@@ -17,8 +17,20 @@ function targetOf(input: Record<string, unknown>) {
   return Object.keys(target).length ? target : undefined;
 }
 
+/**
+ * The turn's input: the text, then each image as a `data:` URL. Codex's `localImage` input, which names a file, is
+ * never used: the model is given the image, not a path.
+ */
+export function codexInput(request: Pick<AgentRunRequest, 'text' | 'images'>) {
+  return [
+    ...(request.text || !request.images?.length ? [{ type: 'text', text: request.text }] : []),
+    ...(request.images ?? []).map((image) => ({ type: 'image', url: `data:${image.mediaType};base64,${image.data}` })),
+  ];
+}
+
 export const codexAdapter: HarnessAdapter = {
   id: 'codex',
+  acceptsImages: true,
   forget: (token, workDir) => forgetCodex(token, workDir),
   async *run(request, signal) {
     let board: Awaited<ReturnType<typeof connectCodexBoard>> | undefined;
@@ -53,7 +65,8 @@ export const codexAdapter: HarnessAdapter = {
           if (typeof msg.result.userAgent !== 'string' || !msg.result.userAgent.includes(`/${codexVersion} `)) { fail('unsupported_version'); return; }
           proc?.write(JSON.stringify({ method: 'initialized' }));
           rpc(2, request.resumeToken ? 'thread/resume' : 'thread/start', {
-            ...(request.resumeToken ? { threadId: request.resumeToken } : { environments: [], dynamicTools: board!.tools }),
+            // A resumed thread's earlier turns (with any images in them) are not needed: Codex keeps them itself.
+            ...(request.resumeToken ? { threadId: request.resumeToken, excludeTurns: true } : { environments: [], dynamicTools: board!.tools }),
             cwd: policy.cwd, sandbox: 'read-only', approvalPolicy: 'never', approvalsReviewer: 'user',
             model: policy.model, config: policy.config,
             baseInstructions: "You are Paso's assistant. You only use the board tools, and you reply in the language of the user's message.",
@@ -84,7 +97,7 @@ export const codexAdapter: HarnessAdapter = {
             // Codex keeps a turn's effort for the turns after it, so every turn states its own: the chosen level, or
             // the catalog's default, which is what "automatic" means for Codex in Paso.
             effort: request.effort ?? codexDefaultEffort,
-            input: [{ type: 'text', text: request.text }] });
+            input: codexInput(request) });
           turnStarted = true;
           return;
         }
@@ -140,7 +153,8 @@ export const codexAdapter: HarnessAdapter = {
       proc = startProcess({ file: request.executable, args: policy.args, env: policy.env, cwd: policy.cwd,
         input: JSON.stringify({ id: 1, method: 'initialize', params: { clientInfo: { name: 'paso', version: '1.0.0' }, capabilities: { experimentalApi: true } } }),
         keepStdinOpen: true,
-      }, { ...request.limits, maxLineBytes: 16 * 1024 * 1024, signal, onLine });
+        // Codex repeats the person's message, images included as data URLs, in its item events.
+      }, { ...request.limits, maxLineBytes: 64 * 1024 * 1024, signal, onLine });
       void proc.done.then((end) => {
         if (signal.aborted) terminal = { type: 'finished', reason: 'cancelled' };
         if (!terminal) {

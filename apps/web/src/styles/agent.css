@@ -259,6 +259,79 @@ button.chip:hover {
   fill: none;
 }
 
+/* Paperclip: an icon-only composer control. */
+.composer__attach { padding: 0 5px; }
+.composer__attach:disabled { opacity: 0.45; cursor: default; }
+
+/*
+ * Attachments: a row of small chips, above the composer's text and above a sent message. Images are 56px thumbnails;
+ * each chip in the composer has a round × on its corner. Other kinds of chip (AG-13) join the same row.
+ */
+.attachments { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-2); padding: 6px var(--space-1) 0; list-style: none; }
+.attachment { position: relative; flex: none; }
+.attachment--image { width: 56px; height: 56px; border-radius: var(--radius-md); background: var(--surface-sunken); box-shadow: inset 0 0 0 1px var(--line); }
+.attachment--image img, .attachment__empty { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+/* The line sits over the picture, so a white image still has an edge. */
+.attachment--image::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; }
+.attachment__empty { display: grid; place-items: center; color: var(--ink-3); }
+.attachment__empty svg.i { width: 16px; height: 16px; }
+.attachment__remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: 0 0 0 2px var(--surface-raised);
+}
+.attachment__remove svg.i { width: 12px; height: 12px; }
+.attachment__remove:hover { background: var(--ink-2); }
+.attachment__remove:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface-raised), var(--focus-ring); }
+/* Sent with a message: on the person's side, just above the bubble. */
+.attachments--sent { align-self: flex-end; justify-content: flex-end; max-width: 80%; margin: 0 0 calc(var(--space-2) - var(--space-3)); padding: 0; }
+
+/* Why something couldn't be attached, inside the composer, until dismissed or fixed. */
+.composer__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: -2px 0 var(--space-2);
+  padding: 6px 6px 6px var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--ink);
+  font-size: var(--text-12);
+  line-height: var(--leading-ui);
+}
+.composer__notice > svg.i { flex: none; width: 14px; height: 14px; margin-top: 1px; color: var(--danger-ink); }
+.composer__notice > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.composer__notice .icon-btn { width: 20px; height: 20px; margin: -2px 0; }
+
+/* Files dragged over the chat: the whole panel takes them. */
+.agent__drop {
+  position: absolute;
+  inset: var(--space-2);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--accent-line);
+  color: var(--ink-2);
+  font-size: var(--text-14);
+  font-weight: var(--weight-medium);
+  pointer-events: none;
+}
+.agent__drop svg.i { width: 24px; height: 24px; color: var(--ink-3); }
+
 /* Harness and model menus, on the body. */
 .menu--agent { min-width: 248px; max-width: min(320px, calc(100vw - 16px)); }
 .menu .menu__item--two-lines { height: auto; min-height: 42px; padding-top: 6px; padding-bottom: 6px; }

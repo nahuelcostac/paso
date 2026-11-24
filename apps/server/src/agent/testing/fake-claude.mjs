@@ -18,7 +18,11 @@ if (args[0] === 'auth') {
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 let text = '';
-try { text = JSON.parse(input.split('\n')[0]).message.content; } catch { /* leave empty */ }
+try {
+  const content = JSON.parse(input.split('\n')[0]).message.content;
+  // With images the content is a list of blocks: the scenario is in its text block.
+  text = typeof content === 'string' ? content : content.filter((block) => block.type === 'text').map((block) => block.text).join('\n');
+} catch { /* leave empty */ }
 appendFileSync(`${dir}/runs.jsonl`, JSON.stringify({ argv: args, env: process.env, cwd: process.cwd(), stdin: input, pid: process.pid }) + '\n');
 
 const scenario = /SCENARIO:([a-z-]+)(?::(\S+))?/.exec(text);

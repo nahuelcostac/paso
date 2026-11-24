@@ -4,12 +4,14 @@ import {
   ApiRequestError,
   UnavailableError,
   harnessIds,
+  type AgentAttachment,
   type AgentEvent,
   type AgentSessionEvent,
   type AgentSessionInfo,
   type DetectedHarness,
   type CodexModel,
   type HarnessId,
+  type OutgoingImage,
   type RunSummary,
   type UndoPlan,
 } from '../lib/api';
@@ -51,6 +53,16 @@ export const HARNESS_EFFORTS: Record<HarnessId, ModelOption[]> = {
   agy: [],
 };
 
+/** Harnesses that take images as message content. A harness without it says so before anything is sent. */
+export const HARNESS_ACCEPTS_IMAGES: Record<HarnessId, boolean> = { claude: true, codex: true, agy: false };
+/** What a message may carry, as the service checks it too. */
+export const IMAGE_TYPES: Record<string, string> = { 'image/png': 'PNG', 'image/jpeg': 'JPEG', 'image/gif': 'GIF', 'image/webp': 'WebP' };
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_ATTACHMENTS = 5;
+
+/** Something attached to the next message, before it is sent. Only images today; other kinds join with their own `kind`. */
+export type DraftAttachment = { key: string; kind: 'image'; name: string; mediaType: string; size: number; blob: Blob; url: string };
+
 export type HarnessInfo = DetectedHarness & { added: boolean; supported: boolean; models?: CodexModel[] };
 export function modelOptions(harness: HarnessId, info?: HarnessInfo): ModelOption[] {
   return harness === 'codex' && info?.models?.length
@@ -86,6 +98,8 @@ export type AgentTurn = {
   harness: HarnessId;
   /** The person's message. The service replays it with the rest of the conversation. */
   userText?: string;
+  /** What the person attached to it, kept by the service. */
+  userAttachments?: AgentAttachment[];
   entries: TurnEntry[];
   status: 'running' | 'completed' | 'cancelled' | 'failed';
   errorMessage?: string;
@@ -106,6 +120,10 @@ export type AgentState = {
   turns: AgentTurn[];
   runs: Record<string, RunSummary[]>;
   notice: Record<string, string | undefined>;
+  /** What is attached to the next message, per project and scene, like the draft's text. */
+  drafts: Record<string, DraftAttachment[] | undefined>;
+  /** Why something could not be attached, per project and scene. */
+  attachNotice: Record<string, string | undefined>;
 };
 
 export const conversationKey = (projectId: string, sceneId?: string | null) => `${projectId}:${sceneId ?? ''}`;
@@ -161,6 +179,8 @@ export class AgentStore {
     turns: [],
     runs: {},
     notice: {},
+    drafts: {},
+    attachNotice: {},
   };
   private listeners = new Set<() => void>();
   private unsubscribe?: () => void;
@@ -174,6 +194,9 @@ export class AgentStore {
   /** Sessions of projects this window has not opened: their events are not needed until it does. */
   private ignored = new Set<string>();
   private runReloads = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Object URLs of the images shown in conversations, read once each. */
+  private images = new Map<string, Promise<string>>();
+  private draftCount = 0;
 
   constructor(private readonly api: ApiClient, private readonly subscribeEvents: (listener: (event: ServiceEvent) => void) => () => void) {}
 
@@ -197,6 +220,73 @@ export class AgentStore {
     this.unsubscribe = undefined;
     for (const timer of this.runReloads.values()) clearTimeout(timer);
     this.runReloads.clear();
+  }
+
+  // Attachments --------------------------------------------------------------------------------------------
+
+  /**
+   * Attaches files to the next message of a project and scene. Only PNG, JPEG, GIF and WebP images of up to 5 MB, and
+   * five per message: anything else is left out, and the notice says why.
+   */
+  async attach(projectId: string, sceneId: string | null, files: File[], harness: HarnessId) {
+    const key = conversationKey(projectId, sceneId);
+    if (!files.length) return;
+    if (!HARNESS_ACCEPTS_IMAGES[harness]) {
+      this.set({ attachNotice: { ...this.state.attachNotice, [key]: `${HARNESS_NAMES[harness]} can't read images. Pick another agent to send them.` } });
+      return;
+    }
+    const problems: string[] = [];
+    const accepted = files.filter((file) => {
+      const name = file.name || 'Pasted image';
+      if (!IMAGE_TYPES[file.type]) problems.push(`“${name}” isn't a PNG, JPEG, GIF or WebP image.`);
+      else if (file.size > MAX_IMAGE_BYTES) problems.push(`“${name}” is larger than 5 MB.`);
+      else if (!file.size) problems.push(`“${name}” is empty.`);
+      else return true;
+      return false;
+    });
+    // Each image is read now, into memory: what is sent is what was attached, even if the file on disk changes or goes.
+    const read = await Promise.all(accepted.map(async (file) => {
+      try { return new Blob([await bytesOf(file)], { type: file.type }); }
+      catch { problems.push(`“${file.name || 'Pasted image'}” couldn't be read.`); return undefined; }
+    }));
+    const current = this.state.drafts[key] ?? [];
+    const added: DraftAttachment[] = [];
+    let overLimit = false;
+    accepted.forEach((file, index) => {
+      const blob = read[index];
+      if (!blob) return;
+      if (current.length + added.length >= MAX_ATTACHMENTS) { overLimit = true; return; }
+      added.push({ key: `draft-${++this.draftCount}`, kind: 'image', name: file.name || 'Pasted image', mediaType: file.type, size: blob.size, blob, url: URL.createObjectURL(blob) });
+    });
+    if (overLimit) problems.push(`A message can have up to ${MAX_ATTACHMENTS} images.`);
+    this.set({
+      drafts: added.length ? { ...this.state.drafts, [key]: [...current, ...added] } : this.state.drafts,
+      attachNotice: { ...this.state.attachNotice, [key]: problems.length ? problems.join(' ') : undefined },
+    });
+  }
+
+  detach(projectId: string, sceneId: string | null, draftKey: string) {
+    const key = conversationKey(projectId, sceneId);
+    const current = this.state.drafts[key] ?? [];
+    const gone = current.find((item) => item.key === draftKey);
+    if (gone) URL.revokeObjectURL(gone.url);
+    this.set({ drafts: { ...this.state.drafts, [key]: current.filter((item) => item.key !== draftKey) }, attachNotice: { ...this.state.attachNotice, [key]: undefined } });
+  }
+
+  clearAttachNotice(projectId: string, sceneId: string | null) {
+    this.set({ attachNotice: { ...this.state.attachNotice, [conversationKey(projectId, sceneId)]: undefined } });
+  }
+
+  /** An image of a conversation as an object URL, read from the service once. */
+  imageUrl(sessionId: string, attachmentId: string) {
+    const key = `${sessionId}/${attachmentId}`;
+    let url = this.images.get(key);
+    if (!url) {
+      url = this.api.agentAttachment(sessionId, attachmentId).then((blob) => URL.createObjectURL(blob));
+      url.catch(() => { this.images.delete(key); });
+      this.images.set(key, url);
+    }
+    return url;
   }
 
   // Harnesses ----------------------------------------------------------------------------------------------
@@ -372,24 +462,37 @@ export class AgentStore {
 
   async send(projectId: string, sceneId: string | null, text: string) {
     const trimmed = text.trim();
-    if (!trimmed) return false;
     const key = conversationKey(projectId, sceneId);
+    const drafts = this.state.drafts[key] ?? [];
+    if (!trimmed && !drafts.length) return false;
     this.setNotice(projectId, undefined);
     try {
+      const images = await Promise.all(drafts.map(async (draft) => ({ kind: draft.kind, mediaType: draft.mediaType, data: await base64(draft.blob), name: draft.name })));
       // The open conversation keeps its own session, harness and model. Changing either ends it (see `choose`).
       let sessionId = this.state.conversation[key];
       if (sessionId && !this.state.sessions[sessionId]) sessionId = undefined;
-      let runId: string;
+      let sent: { runId: string; attachments: AgentAttachment[] };
       try {
         if (!sessionId) sessionId = await this.createSession(projectId, sceneId, key);
-        runId = await this.deliver(projectId, sessionId, trimmed);
+        sent = await this.deliver(projectId, sessionId, trimmed, images);
       } catch (error) {
         // The service forgets sessions that never reached the harness when it restarts: start a new one.
         if (!(error instanceof ApiRequestError && error.code === 'SESSION_NOT_FOUND')) throw error;
         sessionId = await this.createSession(projectId, sceneId, key);
-        runId = await this.deliver(projectId, sessionId, trimmed);
+        sent = await this.deliver(projectId, sessionId, trimmed, images);
       }
-      this.upsertTurn(runId, sessionId, (turn) => ({ ...turn, userText: trimmed }));
+      const runId = sent.runId;
+      // The images just sent are shown from the files the person picked, unless the live event already read them back.
+      sent.attachments.forEach((attachment, index) => {
+        const draft = drafts[index];
+        if (!draft) return;
+        const cached = `${sessionId}/${attachment.id}`;
+        if (this.images.has(cached)) URL.revokeObjectURL(draft.url);
+        else this.images.set(cached, Promise.resolve(draft.url));
+      });
+      const remaining = (this.state.drafts[key] ?? []).filter((item) => !drafts.includes(item));
+      this.set({ drafts: { ...this.state.drafts, [key]: remaining }, attachNotice: { ...this.state.attachNotice, [key]: undefined } });
+      this.upsertTurn(runId, sessionId, (turn) => ({ ...turn, userText: trimmed, ...(sent.attachments.length ? { userAttachments: sent.attachments } : {}) }));
       return true;
     } catch (error) {
       this.setNotice(projectId, sendErrorMessage(error));
@@ -401,9 +504,9 @@ export class AgentStore {
    * Sends one message. The service says a run is over before it has closed its restore point, so for a moment after
    * the last answer it may still be busy: when nothing is running here any more, that is waited out, briefly.
    */
-  private async deliver(projectId: string, sessionId: string, text: string) {
+  private async deliver(projectId: string, sessionId: string, text: string, images: OutgoingImage[]) {
     for (let attempt = 0; ; attempt++) {
-      try { return (await this.api.sendAgentMessage(sessionId, text, this.effortFor(sessionId))).runId; }
+      try { return await this.api.sendAgentMessage(sessionId, text, this.effortFor(sessionId), images); }
       catch (error) {
         const busy = error instanceof ApiRequestError && (error.code === 'SESSION_BUSY' || error.code === 'PROJECT_BUSY');
         const runningHere = this.state.turns.some((turn) => turn.projectId === projectId && turn.status === 'running');
@@ -520,7 +623,7 @@ export class AgentStore {
     if (event.type === 'message') {
       const session = this.state.sessions[sessionId];
       const runs = new Set(this.state.turns.filter((candidate) => candidate.sessionId === sessionId).map((candidate) => candidate.runId));
-      if (session) this.set({ sessions: { ...this.state.sessions, [sessionId]: { ...session, title: session.title ?? event.text.trim().replace(/\s+/g, ' ').slice(0, 120), turns: Math.max(session.turns, runs.size) } } });
+      if (session) this.set({ sessions: { ...this.state.sessions, [sessionId]: { ...session, title: session.title || messageTitle(event.text, event.attachments?.length ?? 0), turns: Math.max(session.turns, runs.size) } } });
     }
     if (event.type === 'finished' || event.type === 'failed') this.reloadRunsUntilClosed(turn.projectId, runId);
   }
@@ -593,7 +696,7 @@ function reduce(turn: AgentTurn, event: AgentEvent, at: string): AgentTurn {
     case 'session':
       return turn;
     case 'message':
-      return { ...turn, userText: event.text };
+      return { ...turn, userText: event.text, ...(event.attachments?.length ? { userAttachments: event.attachments } : {}) };
     case 'text_delta':
       if (last?.kind === 'text' && last.streaming) entries[entries.length - 1] = { ...last, text: last.text + event.text };
       else entries.push({ kind: 'text', id: `text-${entries.length}`, text: event.text, streaming: true });
@@ -633,6 +736,29 @@ function reduce(turn: AgentTurn, event: AgentEvent, at: string): AgentTurn {
     case 'failed':
       return { ...turn, status: 'failed', errorMessage: event.message, endedAt: at, entries: settle(entries, 'error') };
   }
+}
+
+/** How the history names a conversation: its first message, or its images when it had no text, as the service does. */
+const messageTitle = (text: string, images: number) => text.trim().replace(/\s+/g, ' ').slice(0, 120) || (images === 1 ? 'Image' : images ? `${images} images` : '');
+
+/** A file's bytes. */
+function bytesOf(file: Blob) {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error ?? new Error('read'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/** A file's bytes as base64, without the `data:` prefix. */
+function base64(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
+    reader.onerror = () => reject(reader.error ?? new Error('read'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function useAgent(store: AgentStore) {

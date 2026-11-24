@@ -8,7 +8,8 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startServer, type AgentEvent, type AgentRunRequest, type HarnessAdapter } from '@paso/server';
 import { App } from './App';
-import type { ClientConfig } from './lib/api';
+import { ApiClient, type ClientConfig } from './lib/api';
+import { AgentStore } from './state/agent-store';
 
 /**
  * The agent panel against a real service on a temporary data folder. Only the harness is fake: an adapter
@@ -157,7 +158,7 @@ beforeEach(async () => {
   })) as unknown as typeof window.matchMedia;
 
   adapterImpl = editsStepOne();
-  const adapter: HarnessAdapter = { id: 'claude', run: (request, signal) => { requests.push(request); return adapterImpl(request, signal); } };
+  const adapter: HarnessAdapter = { id: 'claude', acceptsImages: true, run: (request, signal) => { requests.push(request); return adapterImpl(request, signal); } };
   service = await startServer({
     dataDir: join(rootDir, 'projects'), port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 80,
     harnessRegistryPath, runsDir: join(rootDir, 'runs'),
@@ -762,5 +763,105 @@ describe('narrow windows', () => {
     expect(projects).not.toBeInTheDocument();
     expect(sidebarToggle).toHaveFocus();
     expect(window.localStorage.getItem('paso.side-panel')).toBeNull();
+  });
+});
+
+describe('images in the chat', () => {
+  const pngBytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0));
+  const png = (name = 'shot.png') => new File([pngBytes], name, { type: 'image/png' });
+  const base64 = btoa(String.fromCharCode(...pngBytes));
+  let urls = 0;
+  beforeEach(() => {
+    // jsdom has no object URLs.
+    urls = 0;
+    URL.createObjectURL = vi.fn(() => `blob:test/${++urls}`);
+    URL.revokeObjectURL = vi.fn();
+  });
+  const composer = (panel: HTMLElement) => within(panel).getByRole('textbox', { name: 'Message to the agent' });
+  const draftRow = (panel: HTMLElement) => within(panel).queryByRole('list', { name: 'Attachments' });
+  const filePicker = (panel: HTMLElement) => panel.querySelector<HTMLInputElement>('input[type="file"]')!;
+  /** The chat, once it knows its scene: images go with that scene's conversation. */
+  const ready = async () => {
+    const panel = await openPanel();
+    await within(panel).findByRole('heading', { name: /El problema/ }, patience);
+    return panel;
+  };
+
+  it('attaches by the paperclip, sends the images to the harness and keeps them in the history, also after a reload', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    const user = userEvent.setup();
+    let panel = await ready();
+    const picker = filePicker(panel);
+    expect(picker).toHaveAttribute('accept', 'image/png,image/jpeg,image/gif,image/webp');
+    expect(within(panel).getByRole('button', { name: 'Attach images' })).toBeEnabled();
+    await user.upload(picker, [png('one.png'), png('two.png')]);
+    const row = await within(panel).findByRole('list', { name: 'Attachments' }, patience);
+    await waitFor(() => expect(within(row).getAllByRole('img')).toHaveLength(2), patience);
+    expect(within(row).getAllByRole('img').map((img) => img.getAttribute('alt'))).toEqual(['one.png', 'two.png']);
+    // × takes one off.
+    await user.click(within(row).getByRole('button', { name: 'Remove two.png' }));
+    expect(within(row).getAllByRole('img')).toHaveLength(1);
+
+    // Images alone can be sent: the text is optional.
+    await waitFor(() => expect(within(panel).getByRole('button', { name: 'Send' })).toBeEnabled(), patience);
+    await user.type(composer(panel), 'What is this?{Enter}');
+    await waitFor(() => expect(requests).toHaveLength(1), patience);
+    expect(requests[0].text).toBe('What is this?');
+    expect(requests[0].images).toEqual([{ mediaType: 'image/png', data: base64 }]);
+    expect(draftRow(panel)).not.toBeInTheDocument();
+    const sent = await within(panel).findByRole('list', { name: 'Attached images' }, patience);
+    await waitFor(() => expect(within(sent).getByRole('img', { name: 'one.png' }).getAttribute('src')).toMatch(/^blob:test\//), patience);
+    expect(within(sent).queryByRole('button')).not.toBeInTheDocument();
+
+    // After a reload they are read back from the service.
+    cleanup();
+    panel = await ready();
+    const replayed = await within(panel).findByRole('list', { name: 'Attached images' }, patience);
+    await waitFor(() => expect(within(replayed).getByRole('img', { name: 'one.png' }).getAttribute('src')).toMatch(/^blob:test\//), patience);
+  });
+
+  it('attaches a pasted image and leaves pasted text alone', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    const panel = await ready();
+    fireEvent.paste(composer(panel), { clipboardData: { files: [png('image.png')], getData: () => '' } });
+    expect(await within(panel).findByRole('img', { name: 'image.png' }, patience)).toBeInTheDocument();
+    const text = fireEvent.paste(composer(panel), { clipboardData: { files: [], getData: () => 'hola' } });
+    expect(text).toBe(true); // Not prevented: the browser pastes the text.
+    expect(within(draftRow(panel)!).getAllByRole('img')).toHaveLength(1);
+  });
+
+  it('takes images dropped anywhere on the chat, with a hint while they are dragged over it', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    const panel = await ready();
+    const dataTransfer = { types: ['Files'], files: [png('dropped.png')], dropEffect: 'none' };
+    fireEvent.dragEnter(within(panel).getByRole('log'), { dataTransfer });
+    expect(within(panel).getByText('Drop images to attach them')).toBeInTheDocument();
+    fireEvent.dragOver(within(panel).getByRole('log'), { dataTransfer });
+    expect(fireEvent.drop(within(panel).getByRole('log'), { dataTransfer })).toBe(false); // Prevented: the file is not opened.
+    expect(within(panel).queryByText('Drop images to attach them')).not.toBeInTheDocument();
+    expect(await within(panel).findByRole('img', { name: 'dropped.png' }, patience)).toBeInTheDocument();
+    // Text dragged inside the page is not taken.
+    expect(fireEvent.drop(within(panel).getByRole('log'), { dataTransfer: { types: ['text/plain'], files: [] } })).toBe(true);
+  });
+
+  it('says plainly what was left out: other types, over 5 MB, more than five', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    const user = userEvent.setup({ applyAccept: false });
+    const panel = await ready();
+    const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'huge.png', { type: 'image/png' });
+    await user.upload(filePicker(panel), [new File(['x'], 'notes.txt', { type: 'text/plain' }), big, png('ok.png')]);
+    expect(await within(panel).findByRole('alert', {}, patience)).toHaveTextContent('“notes.txt” isn\'t a PNG, JPEG, GIF or WebP image. “huge.png” is larger than 5 MB.');
+    expect(within(draftRow(panel)!).getAllByRole('img')).toHaveLength(1);
+    await user.click(within(within(panel).getByRole('alert')).getByRole('button', { name: 'Dismiss notice' }));
+    await user.upload(filePicker(panel), Array.from({ length: 6 }, (_, i) => png(`n${i}.png`)));
+    await waitFor(() => expect(within(draftRow(panel)!).getAllByRole('img')).toHaveLength(5), patience);
+    expect(within(panel).getByRole('alert')).toHaveTextContent('A message can have up to 5 images.');
+  });
+
+  it('says before sending that an agent cannot read images', async () => {
+    const store = new AgentStore(new ApiClient(config), () => () => {});
+    await store.attach('p', 's1', [png()], 'agy');
+    expect(store.getState().drafts['p:s1']).toBeUndefined();
+    expect(store.getState().attachNotice['p:s1']).toBe("Antigravity can't read images. Pick another agent to send them.");
   });
 });
