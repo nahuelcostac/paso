@@ -10,6 +10,8 @@ export type StepFrameProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 
   title?: string;
   /** The step open on the Canvas: an ink edge and an ink number. */
   current?: boolean;
+  /** Part of the Studio's selection: the selected grey and its edge, and “selected” in its name. */
+  selected?: boolean;
   /** Whether the agent is changing this step right now or changed it in an active run. */
   agentState?: 'working' | 'changed';
   /**
@@ -46,7 +48,7 @@ function useSvgUrl(svg: string | undefined) {
  * drawing is already drawn for the current theme, so no colour filter is applied to it.
  * Anything else a button takes, such as `onClick` or `ref`, goes to the button.
  */
-export function StepFrame({ number, title, current = false, agentState, framed, svg, size = 'storyboard', className = '', ...button }: StepFrameProps) {
+export function StepFrame({ number, title, current = false, selected = false, agentState, framed, svg, size = 'storyboard', className = '', ...button }: StepFrameProps) {
   const url = useSvgUrl(svg);
   const workingClass = agentState === 'working' ? 'frame--agent-working' : '';
   return (
@@ -54,7 +56,8 @@ export function StepFrame({ number, title, current = false, agentState, framed, 
       type="button"
       className={`frame frame--${size} ${workingClass} ${className}`.replace(/\s+/g, ' ').trim()}
       aria-current={current ? 'step' : undefined}
-      aria-label={`Step ${number}${title ? `: ${title}` : ''}${framed === 'own' ? ', framed' : framed === 'previous' ? ", keeps the previous step's framing" : ''}`}
+      aria-label={`Step ${number}${title ? `: ${title}` : ''}${framed === 'own' ? ', framed' : framed === 'previous' ? ", keeps the previous step's framing" : ''}${selected ? ', selected' : ''}`}
+      data-selected={selected || undefined}
       title={title}
       {...button}
     >

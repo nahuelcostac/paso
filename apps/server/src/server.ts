@@ -14,6 +14,7 @@ import { realpath } from 'node:fs/promises';
 import { handleAgentRoute } from './agent/api.js';
 import { WorkspaceRegistry, createFolder, listFolders, workspacesPath, type Workspace } from './workspaces.js';
 import { SessionManager } from './agent/sessions.js';
+import { stepNotFound } from './agent/steps.js';
 import type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId } from './agent/types.js';
 
 export type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId };
@@ -140,6 +141,16 @@ export async function startServer(options: StartServerOptions) {
       // A loose diagram is one scene: the agent gets that scene, never every loose diagram at once.
       if (isLooseProject(projectId) && !sceneId) throw new ApiError(400, 'SCENE_REQUIRED', 'Name the loose diagram (its scene) the agent works on.');
       await current.store.read(projectId, sceneId);
+    },
+    resolveSteps: async (projectId, sceneId, stepIds) => {
+      if (switching) throw new ApiError(409, 'WORKSPACE_SWITCHING', 'Paso is switching workspaces.');
+      const places = await current.store.stepPlaces(projectId);
+      return stepIds.map((stepId) => {
+        const place = places.get(stepId);
+        // A step of another project, or gone, or (in a loose diagram) of another loose diagram: nothing is sent.
+        if (!place || (isLooseProject(projectId) && place.sceneId !== sceneId)) throw stepNotFound();
+        return { id: stepId, kind: 'step' as const, stepId, ...place };
+      });
     },
     board: () => ({
       serviceUrl: `http://127.0.0.1:${port}`, sessionToken,

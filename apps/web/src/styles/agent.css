@@ -292,6 +292,50 @@ button.chip:hover {
 .attachment__remove svg.i { width: 12px; height: 12px; }
 .attachment__remove:hover { background: var(--ink-2); }
 .attachment__remove:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface-raised), var(--focus-ring); }
+/* A Studio step: “Scene · 02 Title” on one 32px line, its number in the step card's small bordered badge. */
+.attachment--step { max-width: 100%; min-width: 0; }
+.attachment__step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  height: var(--control-h);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font-size: var(--text-12);
+  text-align: left;
+  white-space: nowrap;
+}
+/* In the composer the round × sits on the chip's corner: the text stops before it. */
+.attachment--step:has(.attachment__remove) .attachment__step { padding-right: 20px; }
+button.attachment__step:hover { box-shadow: inset 0 0 0 1px var(--line-strong); background: var(--surface-sunken); }
+button.attachment__step:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--line-strong), var(--focus-ring); }
+.attachment__scene { flex: 0 1 auto; min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; color: var(--ink-3); }
+.attachment__sep { flex: none; color: var(--ink-3); }
+.attachment__num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-2);
+  font-size: var(--text-11);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.attachment__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--weight-medium); }
+.attachment__title--empty { color: var(--ink-3); font-weight: var(--weight-regular); }
+/* A step deleted since it was attached: a dashed edge, its old name in grey, and “Deleted”. */
+.attachment[data-missing] .attachment__step { background: transparent; box-shadow: none; outline: 1px dashed var(--line-strong); outline-offset: -1px; color: var(--ink-3); }
+.attachment[data-missing] .attachment__title { text-decoration: line-through; font-weight: var(--weight-regular); }
+.attachment__gone { flex: none; color: var(--ink-2); font-weight: var(--weight-medium); }
+
 /* Sent with a message: on the person's side, just above the bubble. */
 .attachments--sent { align-self: flex-end; justify-content: flex-end; max-width: 80%; margin: 0 0 calc(var(--space-2) - var(--space-3)); padding: 0; }
 

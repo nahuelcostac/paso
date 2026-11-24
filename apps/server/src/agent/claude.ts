@@ -1,5 +1,5 @@
 import { idSchema } from '@paso/shared';
-import { describeTarget } from './where.js';
+import { describeSteps, describeTarget } from './where.js';
 import { forgetClaude } from './forget.js';
 import { harnessEnvironment, startProcess } from './process.js';
 import type { AgentEvent, AgentRunRequest, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
@@ -75,7 +75,7 @@ export function claudeArguments(request: Pick<AgentRunRequest, 'resumeToken' | '
     '--append-system-prompt',
     `You are Paso's assistant, in a whiteboard editor for explaining things step by step. You are working in the ${where} (service IDs). ` +
     "You can only use Paso's board tools: there is no terminal, no files and no web. " +
-    "Read a step before you edit it. Reply briefly, in the language of the user's message.",
+    "Read a step before you edit it. Reply briefly, in the language of the user's message." + describeSteps(request.context.steps),
     ...(request.model ? ['--model', request.model] : []),
     ...(request.effort ? ['--effort', request.effort] : []),
     ...(request.resumeToken ? ['--resume', request.resumeToken] : []),

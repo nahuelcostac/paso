@@ -41,10 +41,20 @@ export type DetectedHarness = {
 };
 
 export type ToolTarget = { projectId?: string; sceneId?: string; stepId?: string };
-/** What the service keeps of an attached image. Other kinds of attachment will carry their own `kind`. */
-export type AgentAttachment = { id: string; kind: 'image'; mediaType: string; size: number; name?: string };
+/** What the service keeps of an attached image. */
+export type ImageAttachment = { id: string; kind: 'image'; mediaType: string; size: number; name?: string };
+/**
+ * A step a message was about, as it was when sent: its scene, its place from 1, its scene's name and its title. `id` is
+ * the step's ID. The step itself is not copied.
+ */
+export type StepAttachment = { id: string; kind: 'step'; sceneId: string; stepId: string; number: number; sceneName: string; title?: string };
+/** What went with a message, each kind with its own `kind`. */
+export type AgentAttachment = ImageAttachment | StepAttachment;
 /** An image on its way to the service: its bytes as base64. */
 export type OutgoingImage = { kind: 'image'; mediaType: string; data: string; name?: string };
+/** A step on its way to the service: only its ID. The service finds where it is. */
+export type OutgoingStep = { kind: 'step'; stepId: string };
+export type OutgoingAttachment = OutgoingImage | OutgoingStep;
 export type AgentEvent =
   | { type: 'started' }
   /** The person's message, added by the service right after `started`. */
@@ -287,7 +297,7 @@ export class ApiClient {
   deleteAgentSession(id: string) {
     return this.request<void>(`/agent/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
-  sendAgentMessage(id: string, text: string, effort?: string, attachments: OutgoingImage[] = []) {
+  sendAgentMessage(id: string, text: string, effort?: string, attachments: OutgoingAttachment[] = []) {
     return this.request<{ runId: string; attachments: AgentAttachment[] }>(`/agent/sessions/${encodeURIComponent(id)}/messages`, {
       method: 'POST', body: { text, ...(effort ? { effort } : {}), ...(attachments.length ? { attachments } : {}) },
     });

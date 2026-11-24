@@ -8,3 +8,15 @@ export function describeTarget({ projectId, sceneId }: { projectId: string; scen
   }
   return `project "${projectId}"` + (sceneId ? `, scene "${sceneId}"` : '');
 }
+
+/**
+ * The steps the person attached to this message, said in the agent's instructions after where it works. Only service
+ * IDs: the model reads the steps itself with the board tools. Empty when the message names none.
+ */
+export function describeSteps(steps: { sceneId: string; stepId: string }[] | undefined) {
+  if (!steps?.length) return '';
+  const list = steps.map((step) => `step "${step.stepId}" in scene "${step.sceneId}"`).join(', ');
+  const one = steps.length === 1;
+  return ` The person attached ${one ? 'a step' : `${steps.length} steps`} to this message: ${list}. ` +
+    `Work on ${one ? 'that step' : 'those steps'} with the board tools, and leave the other steps as they are unless the message asks for more.`;
+}
