@@ -242,7 +242,8 @@ button.nav-row:hover:not(:disabled) { background: var(--surface-sunken); color: 
 .project-group + .project-group, .project-list + .project-group { margin-top: var(--space-4); }
 .project-list + .project-list { margin-top: var(--space-1); }
 .project-group__title { padding: 6px 10px; color: var(--ink-3); font-size: var(--text-12); font-weight: var(--weight-medium); }
-.project-group__title--loose { font-size: var(--text-14); }
+/* The heading's text sits as far above the first diagram's name as the names sit apart (21px); the h3's own margin went. */
+.project-group__title--loose { margin: 0 0 6px; font-size: var(--text-14); }
 .projects__empty { padding: var(--space-3) var(--space-2); color: var(--ink-3); font-size: var(--text-12); }
 .project-list { display: flex; flex-direction: column; gap: var(--space-1); }
 /* One line per project: its icon, its name, and the menu on hover. */

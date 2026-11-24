@@ -88,6 +88,8 @@ describe('sidebar layout', () => {
   it('uses larger text for the Loose diagrams heading than for its entries', async () => {
     const app = await css('app.css');
     expect(rule(app, '.project-group__title--loose')).toContain('font-size: var(--text-14)');
+    // As far above the first diagram as the diagrams sit apart: no h3 margin, 6px under its padding.
+    expect(rule(app, '.project-group__title--loose')).toContain('margin: 0 0 6px');
     expect(rule(app, '.project--loose')).toContain('font-size: var(--text-12)');
   });
 });
