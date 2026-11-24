@@ -70,8 +70,9 @@ Claude Code and `agy` hosts must place it in their supported MCP configuration
 or pass it through their launcher. Paso's own Claude Code launcher, with its
 board-only permissions, is described in [server-api.md](server-api.md#agent-sessions).
 The Codex launcher uses a host-validated dynamic-tool bridge, described in
-[server-api.md](server-api.md#codex-policy-and-protocol). The `agy` policy belongs
-to AG-07.
+[server-api.md](server-api.md#codex-policy-and-protocol). Paso's `agy` launcher
+names this server in a board-only custom agent, described in
+[server-api.md](server-api.md#antigravity-policy-and-protocol).
 
 For Codex, a host can use the documented MCP server configuration in its
 private or temporary config. Inherit the two values instead of storing them.
@@ -92,6 +93,9 @@ needed to run the protocol tests below.
 ## Tools
 
 Each tool has a strict JSON schema. Unknown input fields are errors.
+Every tool carries `_meta: { "antigravity/alwaysLoad": true }`, so Antigravity
+gives the model its schema up front instead of on demand; other clients ignore
+it.
 IDs for projects, scenes and steps are service IDs, not names or paths.
 
 | Tool | Input and result |

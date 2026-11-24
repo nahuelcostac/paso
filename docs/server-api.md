@@ -289,8 +289,9 @@ locations and the login shell, so a desktop host need not inherit a shell PATH.
 
 A session lets an agent run on the user's own harness and edit a project
 through the Paso board tools ([mcp.md](mcp.md)). Claude Code (`claude`) is
-supported, as is Codex (`codex`). `agy` (AG-07) will use the same interface;
-until then it returns 422 `HARNESS_NOT_SUPPORTED`. The harness must be
+supported, as are Codex (`codex`) and Antigravity (`agy` 1.5.16 or newer, see
+Antigravity policy and protocol). A harness the service has no adapter for
+returns 422 `HARNESS_NOT_SUPPORTED`. The harness must be
 installed and signed in on this machine with the user's own login. Paso never
 stores API keys, and `ANTHROPIC_*`, `CLAUDE_CODE_*` and other variables of the
 service's environment are not handed to the harness.
@@ -321,8 +322,10 @@ Claude Code takes `low`, `medium`, `high`, `xhigh` or `max` (passed as
 `effort`, all listed in Paso's model catalog). Without it Claude Code uses its
 default; Codex would keep a turn's level for the turns after it, so every
 Codex turn states one, and without a choice that is the catalog's default,
-`low`. It is not part of the session: the next message may choose another.
-Antigravity has no levels yet.
+`low`. Antigravity takes `low`, `medium`, `high`, `xhigh` or `max` (passed as
+`--effort` with a model ID that names no level, such as `gemini-4-neon`); the
+picker offers only the levels `agy models` lists for each model. It is not part
+of the session: the next message may choose another.
 
 **Images.** A message may carry up to five images in `attachments`, each
 `{ kind: "image", mediaType, data, name? }`: `mediaType` is `image/png`,
@@ -335,7 +338,9 @@ otherwise, also for any other kind or type), each image at most 5 MB (413
 accepts a body large enough for five of the largest images; other JSON routes
 keep `maxJsonBytes`. A harness that cannot take images refuses the message
 before anything is stored or sent (422 `IMAGES_NOT_SUPPORTED`); Claude Code and
-Codex take them. The reply's `attachments` are what the service kept:
+Codex take them. Antigravity does not: its print-mode stream input takes text
+blocks only (`agy` 1.5.16 rejects an image block), so the paperclip is disabled
+for it. The reply's `attachments` are what the service kept:
 `{ id, kind: "image", mediaType, size, name? }`, the same list the `message`
 event carries.
 
@@ -455,7 +460,10 @@ Deleting a conversation removes it from the index, deletes its history file
 and its images, and deletes the harness's own copy of it: Claude Code's transcript
 (`<config>/projects/<working directory>/<token>.jsonl` and the folder of the
 same name, where `<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`) and Codex's
-rollout in Paso's own Codex home (`codex-home/sessions/**/…-<token>.jsonl`).
+rollout in Paso's own Codex home (`codex-home/sessions/**/…-<token>.jsonl`),
+and Antigravity's conversation under `~/.gemini/antigravity-cli`
+(`conversations/<token>.db` and `.pb`, `presence/<token>.lock` and the
+`brain/<token>` folder). agy's shared summary index there is left alone.
 Only files named after that resume token, in that folder, are touched. What
 the agent changed on the board stays, with its restore points.
 
@@ -537,6 +545,92 @@ reported effective policy and fails closed if it conflicts with this policy.
 The agent picker enables Codex with the same add, send, stop and undo controls
 as Claude Code. Adding it uses the person's local login and quota.
 
+### Antigravity policy and protocol
+
+Antigravity (`agy`) runs one process per turn in print mode:
+`agy --agent paso-board --settings <json> --disable-slash-commands
+--input-format stream-json --output-format stream-json [--model]
+[--effort] [--conversation <id>] -p=`. The person's text goes to stdin as one
+`{ "event": "user", "message": { "content": [{ "type": "text", … }] } }` line,
+after a first line naming the project and scene in service IDs (the agent file
+is the same for every session, so the turn says where it works).
+
+Print mode was chosen over `agy acp`. Both stream and resume, but ACP's session
+creation reports no tool inventory either, so it proves no more; print mode
+matches the Claude Code adapter (one process, `stream-json`, the same process
+tree handling) and agy's headless mode denies, without asking anyone, any tool
+that needs a permission Paso did not grant. ACP's advantage is images, which
+print mode refuses.
+
+**The policy is an agy custom agent** that Paso writes, on every turn, to its
+own workspace, `agy-workspace/.agents/agents/paso-board.md` next to the agent
+workspace (each folder a real directory, never a link; mode 0700, file 0600).
+agy runs in that folder. The agent's frontmatter:
+
+| Field | Why |
+| --- | --- |
+| `tools: []`, `excludeDefaultComponents: true` | No built-in tools: no terminal, files, web, browser, image generation or sub-agents. |
+| `inheritCustomizations: false`, `inheritMcp: false` | None of the person's skills, rules (`AGENTS.md`, `GEMINI.md`), plugins, sub-agents or MCP servers, global or in the workspace. |
+| `mcpServers: [{ name: paso, command, args }]` | The Paso board is its only MCP server. Paths are written as JSON strings. |
+| `mainAgent: true`, `subagent: false`, `hidden: true` | Only Paso's main agent. |
+
+`--settings` holds session-only settings that agy never saves:
+`permissions.allow` is `mcp(paso/*)` and `permissions.deny` lists
+`command(*)`, `read_file(*)`, `write_file(*)` and `read_url(*)` as a second
+layer. `--dangerously-skip-permissions` is never used. The board MCP server
+inherits `PASO_SERVICE_URL` and `PASO_SESSION_TOKEN` from agy's environment
+(the usual whitelist plus those); neither the agent file nor any argument holds
+the token. The board tools ask agy to load them up front
+(`_meta: { "antigravity/alwaysLoad": true }` in `tools/list`): otherwise agy
+offers them on demand through `call_mcp_tool`, and the agent, with no file
+tool to read their schemas, guesses names and arguments.
+
+**What Paso checks.** agy's `init` event lists its default tool set (60 tools
+in 1.5.16) whatever the agent allows, so it cannot prove the policy. Instead:
+
+- The installed version must be 1.5.16 or newer, the version this policy was
+  verified with; otherwise `unsupported_version` before anything starts.
+- The message is written to stdin only after `init` reports the agent
+  `paso-board` (and, when resuming, the same conversation). An agent file agy
+  cannot load makes it refuse to start ("unknown agent"); it never falls back
+  to its default agent. Either case stops the run before the message is sent.
+- While the turn runs, every tool step must be a board tool on the `paso`
+  server, as `mcp_paso_<tool>` or `call_mcp_tool` with `ServerName: "paso"`,
+  or `list_resources`/`read_resource` on that server. Anything else, including
+  `manage_task`, stops the whole process tree with `unsafe_configuration`.
+
+**Evidence (agy 1.5.16, 2026-11-24).** Run in a scratch workspace with the
+person's own login and a cheap model (`gemini-3.8-flash`):
+
+- Control, agy's default agent, same workspace: the model listed `run_command`,
+  `read_file`, `edit_file`, `write_file`, `search_web` and more, 60 skills
+  (the person's global skills and the `gdocs`/`gdrive` plugins), quoted a
+  canary rule from the workspace's `AGENTS.md`, and started a canary MCP server
+  from a workspace plugin and tried to call its tool.
+- Paso's agent, same workspace and request: the model could call only the 13
+  board tools plus `list_resources`, `read_resource` and `manage_task`; it saw
+  no skills and no rule; the canary MCP process never started; asked to run
+  `echo SHELL-OK > <file>` and to read a file, it had no tool for either and
+  the file was never created.
+- A real turn through the compiled service read the scene and the step, added
+  two shapes and an arrow with `add_elements`, appeared live with a restore
+  point, and was continued with `--conversation` in a second message.
+
+Known limits: `manage_task` stays in agy's tool list even with
+`excludeDefaultComponents` (it can only list or stop the agent's own background
+tasks, and it has none); Paso stops a run that calls it. Administrator-managed
+agy settings still apply, and the person's global permission rules are loaded,
+though no tool they could allow exists. agy keeps each conversation under
+`~/.gemini/antigravity-cli` and caches the board tools' schemas in
+`~/.gemini/antigravity-cli/mcp/paso`. agy has no sign-in status command, so
+detection reports `unknown`; a signed-out run fails with `signed_out`.
+
+Failures are mapped from agy's result error and stderr: `RESOURCE_EXHAUSTED`,
+HTTP 429 or "quota" is `quota`; "authentication required", "authentication
+failed" or "not logged in" is `signed_out`; "invalid model selection" is
+`model_unavailable`; "unknown agent" or an unknown flag is
+`unsupported_version`. Each has a message in Antigravity's name.
+
 ### Processes
 
 The harness runs without a shell, as an argument array, in its own process
@@ -596,18 +690,8 @@ stream-json --conversation <id>`. These commands alone do not establish a
 board-only policy. Each adapter must establish and verify its own policy
 before enabling the harness.
 
-The installed `agy` 1.5.3 was investigated for AG-07. Its print-mode init
-event listed built-in shell, file and web tools even with `--sandbox` and
-`--disable-slash-commands`; `--mode plan` had no effect with slash commands
-disabled. Its help does not document an empty built-in tool allow-list or a
-strict MCP configuration equivalent to Claude's. ACP supports streaming,
-resume, cancellation and client-provided MCP servers, but its session creation
-response did not provide a tool inventory or prove that global configuration
-and built-in tools were excluded. Neither route has yet been shown to satisfy
-Paso's board-only policy. Keep `agy` unsupported until those restrictions can
-be enforced and checked before any user prompt runs. A print-mode quota error
-observed during investigation included `RESOURCE_EXHAUSTED`, HTTP 429 and
-`Individual quota reached`; a future adapter must map it to `quota`.
+Antigravity's adapter, and the evidence that its policy holds, are described in
+Antigravity policy and protocol.
 
 ### Tests
 
@@ -639,6 +723,17 @@ PASO_TEST_REAL_CODEX=1 pnpm exec vitest run apps/server/src/agent/codex.real.tes
 It defaults to `gpt-6-luna`. Set `PASO_TEST_CODEX_MODEL` if that model is not
 available with the person's account. It checks a disk edit, resume, refusal of
 shell/file/web requests and cancellation. The browser check is separate.
+
+Antigravity simulation tests use `agent/testing/fake-agy.mjs`, which loads the
+agent file from its working directory, as agy does, and starts the real
+compiled board MCP server it names. They cover text, both board-call forms,
+targets and results, the exact arguments and agent file, the message held back
+until `init` names the Paso agent, resume and a resumed conversation that comes
+back as another, quota, sign-in, model, crash and protocol failures, tools
+outside the board, an agent agy cannot load, the version floor, a linked
+workspace, cancellation with child cleanup, timeout and forgetting a
+conversation. There is no opt-in real test: the real checks above were run by
+hand, since agy has no way to spend less than a model turn.
 
 ## Agent runs and restore points
 

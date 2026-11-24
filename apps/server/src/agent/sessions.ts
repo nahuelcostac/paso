@@ -8,6 +8,7 @@ import { ApiError, isMissing } from '../errors.js';
 import { AttachmentStore, parseAttachments, type AttachmentRef, type ImageInput } from './attachments.js';
 import { claudeAdapter, failureMessage } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { agyAdapter } from './agy.js';
 import { effortLevels, harnessIds, type AgentEvent, type AgentRunHooks, type AgentRunRequest, type FailureCode, type HarnessAdapter, type HarnessId } from './types.js';
 
 export type SessionInfo = {
@@ -88,7 +89,7 @@ export class SessionManager {
   private readonly attachments: AttachmentStore;
 
   constructor(private options: SessionManagerOptions) {
-    this.adapters = options.adapters ?? { claude: claudeAdapter, codex: codexAdapter };
+    this.adapters = options.adapters ?? { claude: claudeAdapter, codex: codexAdapter, agy: agyAdapter };
     this.workDir = checkWorkDir(options.workDir, options.dataDir);
     this.attachments = new AttachmentStore(options.attachmentsDir ?? join(dirname(options.sessionsPath), 'agent-attachments'));
   }
@@ -331,7 +332,8 @@ export class SessionManager {
       }
       this.emit(session, runId, event);
     };
-    const fail = (code: FailureCode) => emit({ type: 'failed', code, message: failureMessage(code) });
+    const message = this.adapters[session.harness]?.failureMessage ?? failureMessage;
+    const fail = (code: FailureCode) => emit({ type: 'failed', code, message: message(code) });
     emit({ type: 'started' });
     emit({ type: 'message', text, ...(attachments.length ? { attachments } : {}) });
     session.title ??= text.trim().replace(/\s+/g, ' ').slice(0, titleChars) || (attachments.length === 1 ? 'Image' : `${attachments.length} images`);

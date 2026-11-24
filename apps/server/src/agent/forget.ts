@@ -45,6 +45,23 @@ export async function codexTranscriptPaths(token: string, workDir: string) {
   return found;
 }
 
+/**
+ * agy keeps each conversation under its app data folder, named after the conversation ID: the database and its
+ * protobuf, the presence lock and the `brain` folder with the transcript. Its shared summary index is left alone.
+ */
+export function agyTranscriptPaths(token: string, env: NodeJS.ProcessEnv = process.env) {
+  if (!safeToken.test(token)) return [];
+  const data = join(resolve(env.HOME ?? homedir()), '.gemini', 'antigravity-cli');
+  return [
+    join(data, 'conversations', `${token}.db`), join(data, 'conversations', `${token}.pb`),
+    join(data, 'presence', `${token}.lock`), join(data, 'brain', token),
+  ];
+}
+
+export async function forgetAgy(token: string, env: NodeJS.ProcessEnv = process.env) {
+  for (const path of agyTranscriptPaths(token, env)) await rm(path, { recursive: true, force: true });
+}
+
 export async function forgetCodex(token: string, workDir: string) {
   for (const path of await codexTranscriptPaths(token, workDir)) await rm(path, { force: true });
 }

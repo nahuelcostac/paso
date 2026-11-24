@@ -443,10 +443,17 @@ describe('API', () => {
     }
     expect(runs()).toHaveLength(0);
   });
+  it('refuses a harness the service has no adapter for', async () => {
+    await service.close();
+    await start({ adapters: { claude: { id: 'claude', async *run() { yield { type: 'finished', reason: 'completed' }; } } } });
+    const p = await project();
+    expect((await api('/api/agent/sessions', 'POST', { harness: 'agy', projectId: p })).data.error.code).toBe('HARNESS_NOT_SUPPORTED');
+  });
   it('validates input', async () => {
     const p = await project();
     expect((await api('/api/agent/sessions', 'POST', { harness: 'other', projectId: p })).status).toBe(400);
-    expect((await api('/api/agent/sessions', 'POST', { harness: 'agy', projectId: p })).data.error.code).toBe('HARNESS_NOT_SUPPORTED');
+    // Antigravity is supported (AG-07); here it is simply not installed.
+    expect((await api('/api/agent/sessions', 'POST', { harness: 'agy', projectId: p })).data.error.code).toBe('HARNESS_NOT_FOUND');
     expect((await api('/api/agent/sessions', 'POST', { harness: 'claude', projectId: '../x' })).status).toBe(400);
     expect((await api('/api/agent/sessions', 'POST', { harness: 'claude', projectId: 'missing' })).status).toBe(404);
     expect((await api('/api/agent/sessions', 'POST', { harness: 'claude', projectId: p, sceneId: 'missing' })).status).toBe(404);

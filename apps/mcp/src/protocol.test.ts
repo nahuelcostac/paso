@@ -83,6 +83,8 @@ describe('compiled stdio MCP with a compiled local service', () => {
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual(['list_projects', 'read_project', 'read_scene', 'read_step', 'create_scene', 'create_step', 'duplicate_step', 'update_step', 'delete_step', 'add_elements', 'update_elements', 'delete_elements', 'get_step_image'].sort());
     expect(tools.every((tool) => tool.description && tool.inputSchema.additionalProperties === false)).toBe(true);
+    // Antigravity gives its agent a tool's schema only when the tool asks to be loaded up front.
+    expect(tools.every((tool) => tool._meta?.['antigravity/alwaysLoad'] === true)).toBe(true);
     const projects = await value<{ projects: { id: string }[] }>('list_projects');
     expect(projects.projects.some((project) => project.id === 'protocol')).toBe(true);
   });
