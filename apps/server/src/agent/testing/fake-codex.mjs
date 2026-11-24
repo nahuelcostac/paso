@@ -23,6 +23,8 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
     scenario = q.params.input[0].text;
     appendFileSync(process.env.FAKE_RECORD, JSON.stringify({ method: q.method, params: q.params }) + '\n');
     reply(q.id, { turn: { id: 'turn' } });
+    // As the real app-server does, the person's message comes back as an item, images included.
+    notice('item/started', { threadId, item: { type: 'userMessage', id: 'user', content: q.params.input } });
     const errors = { 'signed-out': '401 authentication required', quota: 'usageLimitExceeded', model: 'modelNotFound', unsupported: 'unknown argument' };
     if (errors[scenario]) { notice('error', { willRetry: false, error: { message: errors[scenario] } }); continue; }
     if (scenario === 'crash') process.exit(3);

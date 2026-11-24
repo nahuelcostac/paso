@@ -231,11 +231,27 @@ function queue<T>() {
   };
 }
 
+/**
+ * The turn's one stdin line. Plain text stays a string, as before; with images the content is a list of image blocks
+ * with the bytes inline as base64, then the text. Nothing in it names a file.
+ */
+export function claudeInput(request: Pick<AgentRunRequest, 'text' | 'images'>) {
+  const images = request.images ?? [];
+  const content = images.length
+    ? [
+      ...images.map((image) => ({ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } })),
+      ...(request.text ? [{ type: 'text', text: request.text }] : []),
+    ]
+    : request.text;
+  return JSON.stringify({ type: 'user', message: { role: 'user', content } });
+}
+
 /** After a turn's `result`, a process that does not leave by itself is stopped after this long. */
 const exitGraceMs = 5000;
 
 export const claudeAdapter: HarnessAdapter = {
   id: 'claude',
+  acceptsImages: true,
   forget: (token, workDir) => forgetClaude(token, workDir),
   run(request, signal) {
     const events = queue<AgentEvent>();
@@ -256,10 +272,10 @@ export const claudeAdapter: HarnessAdapter = {
       file: request.executable, args: claudeArguments(request), cwd: request.workDir,
       env: claudeEnvironment(request),
       // Only content, never a command line: JSON on stdin.
-      input: JSON.stringify({ type: 'user', message: { role: 'user', content: request.text } }),
+      input: claudeInput(request),
     }, {
       onLine: (line) => { for (const event of stream.line(line)) note(event); },
-      idleTimeoutMs: request.limits.idleTimeoutMs, maxRunMs: request.limits.maxRunMs, maxLineBytes: 16 * 1024 * 1024, signal,
+      idleTimeoutMs: request.limits.idleTimeoutMs, maxRunMs: request.limits.maxRunMs, maxLineBytes: 64 * 1024 * 1024, signal,
     });
     void proc.done.then((end) => {
       clearTimeout(grace);

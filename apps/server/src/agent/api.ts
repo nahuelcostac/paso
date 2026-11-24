@@ -1,13 +1,15 @@
 import { ApiError } from '../errors.js';
+import { maxMessageBodyBytes } from './attachments.js';
 import type { SessionManager } from './sessions.js';
 
-type Reply = { status: number; data?: unknown };
+/** `file` is an attached image, sent as its own bytes. */
+type Reply = { status: number; data?: unknown; file?: { mediaType: string; bytes: Buffer } };
 
 /**
  * Routes under /api/agent. Returns null for paths that are not agent routes.
  * Authentication, Host and Origin checks already happened in the server.
  */
-export async function handleAgentRoute(manager: SessionManager, parts: string[], method: string | undefined, url: URL, json: () => Promise<unknown>): Promise<Reply | null> {
+export async function handleAgentRoute(manager: SessionManager, parts: string[], method: string | undefined, url: URL, json: (limit?: number) => Promise<unknown>): Promise<Reply | null> {
   if (parts[0] !== 'api' || parts[1] !== 'agent') return null;
   if (parts[2] !== 'sessions') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
   const notAllowed = () => new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
@@ -29,8 +31,8 @@ export async function handleAgentRoute(manager: SessionManager, parts: string[],
   if (parts.length === 5) {
     const action = parts[4];
     if (action === 'messages' && method === 'POST') {
-      const input = await json() as { text?: unknown; effort?: unknown } | null;
-      return { status: 202, data: await manager.send(id, input?.text, input?.effort) };
+      const input = await json(maxMessageBodyBytes) as { text?: unknown; effort?: unknown; attachments?: unknown } | null;
+      return { status: 202, data: await manager.send(id, input?.text, input?.effort, input?.attachments) };
     }
     if (action === 'cancel' && method === 'POST') return { status: 200, data: await manager.cancel(id) };
     if (action === 'resume' && method === 'POST') return { status: 200, data: await manager.resume(id) };
@@ -38,7 +40,11 @@ export async function handleAgentRoute(manager: SessionManager, parts: string[],
       const after = Number(url.searchParams.get('after') ?? 0);
       return { status: 200, data: await manager.events(id, Number.isInteger(after) && after >= 0 ? after : 0) };
     }
-    if (['messages', 'cancel', 'resume', 'events'].includes(action)) throw notAllowed();
+    if (['messages', 'cancel', 'resume', 'events', 'attachments'].includes(action)) throw notAllowed();
+  }
+  if (parts.length === 6 && parts[4] === 'attachments') {
+    if (method !== 'GET') throw notAllowed();
+    return { status: 200, file: await manager.attachment(id, parts[5]) };
   }
   throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
 }

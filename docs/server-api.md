@@ -302,7 +302,8 @@ All routes need the session token. Errors and messages are in English, written f
 | POST | `/agent/sessions` | `{ harness, projectId, sceneId?, model? }`, returns 201 with the session. The project and scene must exist. |
 | GET | `/agent/sessions` | `{ sessions }`, newest first. `?projectId=` filters. |
 | GET, DELETE | `/agent/sessions/:id` | Read, or delete (204): it stops a running turn, and the conversation's history goes, in Paso and in the harness's own copy (see History). |
-| POST | `/agent/sessions/:id/messages` | `{ text, effort? }` (text of 1 to 32,000 characters). Returns 202 `{ runId }`; the answer arrives as events. `effort` is the reasoning level for this message only (see below); 400 `INVALID_EFFORT` if the harness does not have it. |
+| POST | `/agent/sessions/:id/messages` | `{ text, effort?, attachments? }` (text of up to 32,000 characters; it may be empty when there are images). Returns 202 `{ runId, attachments }`; the answer arrives as events. `effort` is the reasoning level for this message only (see below); 400 `INVALID_EFFORT` if the harness does not have it. `attachments` are images (see Images). |
+| GET | `/agent/sessions/:id/attachments/:attachmentId` | The bytes of an attached image, with its own image type, `Content-Disposition: attachment`, `nosniff` and a `sandbox` CSP. 404 for an unknown ID. |
 | POST | `/agent/sessions/:id/cancel` | `{ cancelled }`. Stops the run and its whole process tree. Idempotent. |
 | POST | `/agent/sessions/:id/resume` | Reopens a stored session, for example after a restart. 409 if it never reached the harness. Sending resumes it too. |
 | GET | `/agent/sessions/:id/events?after=N` | `{ events, next }`. The conversation's history: up to the last 5,000 events, without `text_delta` (each `text` repeats them), kept across restarts. |
@@ -322,6 +323,30 @@ default; Codex would keep a turn's level for the turns after it, so every
 Codex turn states one, and without a choice that is the catalog's default,
 `low`. It is not part of the session: the next message may choose another.
 Antigravity has no levels yet.
+
+**Images.** A message may carry up to five images in `attachments`, each
+`{ kind: "image", mediaType, data, name? }`: `mediaType` is `image/png`,
+`image/jpeg`, `image/gif` or `image/webp`, `data` is the file's bytes in
+base64, at most 5 MB decoded, and `name` is only shown (its last path segment,
+up to 120 characters). The service checks all of it again, whatever the client
+did: the bytes must carry that type's signature (400 `INVALID_ATTACHMENT`
+otherwise, also for any other kind or type), each image at most 5 MB (413
+`ATTACHMENT_TOO_LARGE`), at most five (400 `TOO_MANY_ATTACHMENTS`). This route
+accepts a body large enough for five of the largest images; other JSON routes
+keep `maxJsonBytes`. A harness that cannot take images refuses the message
+before anything is stored or sent (422 `IMAGES_NOT_SUPPORTED`); Claude Code and
+Codex take them. The reply's `attachments` are what the service kept:
+`{ id, kind: "image", mediaType, size, name? }`, the same list the `message`
+event carries.
+
+The images reach the model as images, never as a file path: Claude Code gets
+image content blocks (`{ type: "image", source: { type: "base64", media_type,
+data } }`) before the text in its `stream-json` stdin message, and Codex gets
+`{ type: "image", url: "data:<type>;base64,…" }` items after the text in
+`turn/start`'s `input` (its `localImage` input, which names a file, is never
+used). Nothing about where they are stored is handed to the harness, and the
+agent still has only the board tools. The images leave the machine only inside
+the harness's own request to its model.
 
 A **run** is one message and the agent's whole answer to it. It is the unit
 that restore points attach to (see below).
@@ -344,7 +369,7 @@ output are never forwarded.
 | `event.type` | Fields |
 | --- | --- |
 | `started` | The run was accepted (added by Paso). |
-| `message` | `text`, the person's message (added by Paso right after `started`). |
+| `message` | `text`, the person's message (added by Paso right after `started`), and `attachments?`, the images kept with it. |
 | `session` | `resumeToken` (opaque, kept by Paso for resume), `model?`. |
 | `text_delta` | `text`, an increment of the assistant's answer. |
 | `text` | `text`, a complete assistant text block. Repeats the deltas before it. |
@@ -417,13 +442,17 @@ scene, model, resume token, `title` and `turns`. The history of each
 conversation, its events with the person's messages and the agent's text,
 tool names, targets and outcomes, is one file in `agent-transcripts/` next to
 the index (mode 0600 in a 0700 folder, written through a flushed temporary file
-and a rename), never inside a project folder. Tool arguments and results,
+and a rename), never inside a project folder. Attached images are kept the
+same way in `agent-attachments/<session>/<id>.<ext>` next to the index, so the
+history can show them again; the folder of a conversation that was not kept
+(one that never reached the harness before a restart) is deleted at the next
+start. Tool arguments and results,
 harness output and the service token are never in it. Only conversations that
 reached the harness are kept; the oldest idle ones go when there are more than
 200, with their history.
 
 Deleting a conversation removes it from the index, deletes its history file
-and deletes the harness's own copy of it: Claude Code's transcript
+and its images, and deletes the harness's own copy of it: Claude Code's transcript
 (`<config>/projects/<working directory>/<token>.jsonl` and the folder of the
 same name, where `<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`) and Codex's
 rollout in Paso's own Codex home (`codex-home/sessions/**/…-<token>.jsonl`).
@@ -444,7 +473,8 @@ Paso does not log prompts, answers, tokens or harness output. Its own copy of a 
 ### Codex policy and protocol
 
 Codex uses `codex app-server --listen stdio:// --strict-config`, with one process per turn.
-Paso sends `initialize`, `thread/start` or `thread/resume`, then `turn/start`.
+Paso sends `initialize`, `thread/start` or `thread/resume` (with `excludeTurns`,
+so earlier turns and their images are not sent back), then `turn/start`.
 Assistant deltas and complete messages use the common events above. Cancellation
 stops both the app-server group and the separate board MCP group, and waits for
 them before publishing the terminal event. Resume works after restarting Paso.
@@ -585,6 +615,9 @@ observed during investigation included `RESOURCE_EXHAUSTED`, HTTP 429 and
 (`agent/testing/fake-claude.mjs`), so they pass without Claude Code: event
 normalization, split and malformed output, cancel, crash, hang, resume, exact
 arguments, secrets absent from arguments and logs, and process-tree cleanup.
+`attachments.test.ts` covers images: the exact stdin content blocks, no path in
+what the harness gets, storage, mode and location, validation, refusal by a
+harness without images, and deletion.
 `claude.real.test.ts` is skipped unless asked, since it uses the user's login
 and a little quota:
 

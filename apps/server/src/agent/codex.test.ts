@@ -85,6 +85,25 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
     expect(thread.params.threadId).toBe('fake-codex-thread');
     expect(thread.params.sandbox).toBe('read-only');
     expect(thread.params.config['features.shell_tool']).toBe(false);
+    // The earlier turns, with any images in them, are not sent back to Paso.
+    expect(thread.params.excludeTurns).toBe(true);
+  });
+  it('sends attached images as data URLs in the turn input, never as local paths, even large ones', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64');
+    // Three of the largest images: Codex repeats them in one line longer than the old 16 MB limit.
+    const large = Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024 - png.length, 7)]).toString('base64');
+    const images = [{ mediaType: 'image/png' as const, data: png.toString('base64') }, ...Array.from({ length: 3 }, () => ({ mediaType: 'image/png' as const, data: large }))];
+    const events = await collect('Describe the image', { images });
+    expect(events.at(-1)).toEqual({ type: 'finished', reason: 'completed' });
+    const turn = (await records()).find((r) => r.method === 'turn/start');
+    expect(turn.params.input).toEqual([
+      { type: 'text', text: 'Describe the image' },
+      { type: 'image', url: `data:image/png;base64,${png.toString('base64')}` },
+      ...Array.from({ length: 3 }, () => ({ type: 'image', url: `data:image/png;base64,${large}` })),
+    ]);
+    expect(turn.params.input.some((item: { type: string }) => item.type === 'localImage')).toBe(false);
+    expect(JSON.stringify(turn.params)).not.toContain(root);
+    expect(codexAdapter.acceptsImages).toBe(true);
   });
   it.each([
     ['signed-out', 'signed_out'], ['quota', 'quota'], ['model', 'model_unavailable'],

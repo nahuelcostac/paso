@@ -6,6 +6,9 @@
  * adapter only translates between this interface and one CLI. Nothing in these types is
  * specific to a particular CLI: `resumeToken` is opaque and tool names are Paso board tools.
  */
+import type { AttachmentRef, ImageInput } from './attachments.js';
+
+export type { AttachmentRef, ImageInput };
 export const harnessIds = ['claude', 'codex', 'agy'] as const;
 export type HarnessId = typeof harnessIds[number];
 
@@ -41,7 +44,7 @@ export type AgentEvent =
   /** Added by Paso when a run is accepted, before the harness starts. Adapters never emit it. */
   | { type: 'started' }
   /** The person's message, added by Paso right after `started`, so every window and the history show it. Adapters never emit it. */
-  | { type: 'message'; text: string }
+  | { type: 'message'; text: string; attachments?: AttachmentRef[] }
   /** The harness identified its conversation. Store `resumeToken` to continue the session later. */
   | { type: 'session'; resumeToken: string; model?: string }
   /** Incremental assistant text. A later `text` event repeats the complete block. */
@@ -61,6 +64,11 @@ export type AgentRunRequest = {
   workDir: string;
   /** The user's text. It reaches the harness only as message content. */
   text: string;
+  /**
+   * Images attached to this message, as base64 in memory. They reach the harness only as image content of the
+   * message, never as a path. Only sent to an adapter with `acceptsImages`.
+   */
+  images?: ImageInput[];
   /** Continue an earlier conversation. */
   resumeToken?: string;
   /** Passed only when set. Otherwise the CLI's own default applies. */
@@ -81,6 +89,8 @@ export type AgentRunRequest = {
 
 export interface HarnessAdapter {
   readonly id: HarnessId;
+  /** Whether the harness can take images as message content. Without it, a message with images is refused before it is sent. */
+  readonly acceptsImages?: boolean;
   /**
    * Runs one turn and yields events. Never throws. Aborting `signal` stops the whole process
    * tree and ends the stream with `finished` (reason `cancelled`).

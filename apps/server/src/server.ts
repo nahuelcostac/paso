@@ -181,8 +181,8 @@ export async function startServer(options: StartServerOptions) {
       const method = request.method;
       const revision = typeof request.headers['if-match'] === 'string' ? request.headers['if-match'] : undefined;
       const actor = request.headers['x-paso-actor'] === 'mcp' ? 'mcp' : 'user';
-      const json = async (allowEmpty = false) => {
-        const raw = await body(request, options.maxJsonBytes ?? 10 * 1024 * 1024);
+      const json = async (allowEmpty = false, limit = options.maxJsonBytes ?? 10 * 1024 * 1024) => {
+        const raw = await body(request, limit);
         if (allowEmpty && raw.length === 0) return {};
         if (!request.headers['content-type']?.startsWith('application/json')) throw new ApiError(415, 'CONTENT_TYPE', 'Use application/json.');
         return JSON.parse(raw.toString('utf8')) as unknown;
@@ -235,7 +235,19 @@ export async function startServer(options: StartServerOptions) {
         if (method === 'POST') { send(response, 201, await createFolder(await json())); return; }
         throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Unsupported method.');
       }
-      const agentReply = await handleAgentRoute(sessions, parts, method, new URL(request.url ?? '/', 'http://127.0.0.1'), json);
+      // A message with images is larger than other JSON: its route allows enough for five of them, and no more.
+      const agentReply = await handleAgentRoute(sessions, parts, method, new URL(request.url ?? '/', 'http://127.0.0.1'),
+        (limit) => json(false, limit === undefined ? undefined : Math.max(limit, options.maxJsonBytes ?? 0)));
+      if (agentReply?.file) {
+        // Only bytes that are one of the allowed image types reach here. They are never a page or a script.
+        response.statusCode = 200;
+        response.setHeader('Content-Type', agentReply.file.mediaType);
+        response.setHeader('Content-Disposition', 'attachment');
+        response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+        response.setHeader('X-Content-Type-Options', 'nosniff');
+        response.setHeader('Cache-Control', 'no-store');
+        response.end(agentReply.file.bytes); return;
+      }
       if (agentReply) { send(response, agentReply.status, agentReply.data); return; }
       if (parts[0] !== 'api' || parts[1] !== 'projects') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
       // Every project route works in the open workspace.

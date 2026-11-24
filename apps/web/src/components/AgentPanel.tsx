@@ -1,13 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
-import { ArrowUp, Eye, FilePlus, History, LoaderCircle, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type Dispatch, type DragEvent, type KeyboardEvent, type SetStateAction } from 'react';
+import { ArrowUp, Eye, FilePlus, History, ImagePlus, LoaderCircle, Paperclip, Pencil, Square, SquarePen, Trash2, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { Scene } from '@paso/shared';
-import { ApiRequestError, UnavailableError, type AgentSessionInfo, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
+import { ApiRequestError, UnavailableError, type AgentAttachment, type AgentSessionInfo, type HarnessId, type RunSummary, type UndoPlan, type UndoWarning } from '../lib/api';
 import { formatSteps } from '../lib/format';
 import {
-  HARNESS_EFFORTS, HARNESS_MODELS, HARNESS_NAMES, conversationKey, countRunChanges, undoErrorMessage, undoableRun, useAgent,
+  HARNESS_ACCEPTS_IMAGES, HARNESS_EFFORTS, HARNESS_MODELS, HARNESS_NAMES, IMAGE_TYPES, conversationKey, countRunChanges, undoErrorMessage, undoableRun, useAgent,
   type AgentStore, type AgentTurn, type ToolItem,
 } from '../state/agent-store';
 import { AgentPicker } from './AgentPicker';
+import { AttachmentRow, useResolved } from './Attachments';
 import { ProviderIcon } from './ProviderIcon';
 import { Dialog } from './Dialog';
 import { Popover } from './Popover';
@@ -129,6 +130,23 @@ function planLines(plan: UndoPlan) {
 
 type UndoState = { runId: string; plan?: UndoPlan; busy: boolean; error?: string };
 
+/** The images of a sent message, read from the service the first time they are shown. */
+function SentAttachments({ store, sessionId, attachments }: { store: AgentStore; sessionId: string; attachments: AgentAttachment[] }) {
+  const urls = useResolved(attachments.map((item) => item.id), (id) => store.imageUrl(sessionId, id));
+  return (
+    <AttachmentRow
+      className="attachments--sent" label="Attached images"
+      items={attachments.map((item, index) => ({
+        key: item.id, kind: item.kind, label: item.name ?? `Image ${index + 1}`,
+        src: urls[item.id] ?? undefined, failed: urls[item.id] === null,
+      }))}
+    />
+  );
+}
+
+/** Whether a drag carries files: text or elements dragged inside the page are left alone. */
+const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files');
+
 function UndoDialog({ state, scenes, onCancel, onConfirm }: {
   state: UndoState & { plan: UndoPlan }; scenes: Scene[]; onCancel: () => void; onConfirm: (force: boolean) => void;
 }) {
@@ -180,6 +198,9 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   const [addError, setAddError] = useState<string>();
   const log = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
 
   useEffect(() => { void store.loadHarnesses(); }, [store]);
   useEffect(() => { void store.openProject(projectId); }, [store, projectId]);
@@ -221,6 +242,14 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   const history = store.conversations(projectId, targetSceneId);
   const info = state.harnesses.list.find((candidate) => candidate.id === harness);
   const usable = Boolean(scenesReady && info?.supported && info.found && info.added && info.session !== 'signed_out');
+  // What goes with the next message, kept per project and scene like its text.
+  const draftKey = conversationKey(projectId, targetSceneId);
+  const drafts = state.drafts[draftKey] ?? [];
+  const attachNotice = state.attachNotice[draftKey];
+  const acceptsImages = HARNESS_ACCEPTS_IMAGES[harness];
+  // Said before sending: images the agent in the picker can't read keep the message from going.
+  const imagesBlocked = drafts.length > 0 && !acceptsImages;
+  const canSend = usable && !running && !imagesBlocked && Boolean(input.trim() || drafts.length);
 
   // The latest turn stays in view.
   useEffect(() => {
@@ -229,13 +258,49 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   }, [turns]);
 
   const send = async () => {
-    if (!usable || running || !input.trim()) return;
+    if (!canSend) return;
     const text = input;
     setInput('');
     if (!(await store.send(projectId, targetSceneId, text))) setInput((current) => current || text);
   };
   const onComposerKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); }
+  };
+  // Until the scenes are read it is not known which conversation the images would go with.
+  const attach = (files: File[]) => { if (scenesReady) void store.attach(projectId, targetSceneId, files, harness); };
+  // A pasted image is attached; pasted text stays text.
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+    attach(files);
+  };
+  const drag = {
+    onDragEnter: (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      dragDepth.current += 1;
+      setDropping(true);
+    },
+    onDragOver: (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    },
+    onDragLeave: (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      dragDepth.current = Math.max(0, dragDepth.current - 1);
+      if (!dragDepth.current) setDropping(false);
+    },
+    onDrop: (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      // Without this the browser, or the desktop window, would open the file in place of the app.
+      event.preventDefault();
+      dragDepth.current = 0;
+      setDropping(false);
+      attach(Array.from(event.dataTransfer.files));
+      textarea.current?.focus();
+    },
   };
 
   const add = async (id: HarnessId) => {
@@ -306,6 +371,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
     <aside
       id="agent-panel" className="agent" aria-label="Agent"
       onKeyDown={(event) => { if (narrow && event.key === 'Escape' && !menu && !undo) { event.stopPropagation(); onClose(); } }}
+      {...drag}
     >
       <div className="agent__head">
         {/* What the agent works on: the scene selected in the sidebar. There is nothing to pick here. */}
@@ -338,6 +404,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
           const run = runs?.find((candidate) => candidate.id === turn.runId);
           return (
             <div key={turn.runId} className="agent__turn">
+              {turn.userAttachments?.length ? <SentAttachments store={store} sessionId={turn.sessionId} attachments={turn.userAttachments} /> : null}
               {turn.userText && <p className="msg-user">{turn.userText}</p>}
               {turn.entries.map((entry, index) => entry.kind === 'text' ? (
                 <p key={entry.id} className="msg-agent">
@@ -418,11 +485,36 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
       </div>
 
       <div className="composer">
+        {(attachNotice || imagesBlocked) && (
+          <div className="composer__notice" role="alert">
+            <TriangleAlert className="i" aria-hidden="true" />
+            <span>{imagesBlocked ? `${HARNESS_NAMES[harness]} can't read images. Remove them or pick another agent.` : attachNotice}</span>
+            {!imagesBlocked && (
+              <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => store.clearAttachNotice(projectId, targetSceneId)}><X className="i" aria-hidden="true" /></button>
+            )}
+          </div>
+        )}
+        <AttachmentRow
+          label="Attachments"
+          items={drafts.map((item) => ({ key: item.key, kind: item.kind, label: item.name, src: item.url }))}
+          onRemove={(key) => { store.detach(projectId, targetSceneId, key); textarea.current?.focus(); }}
+        />
         <textarea
           ref={textarea} className="composer__input" rows={2} placeholder="Ask for a change…" aria-label="Message to the agent"
-          value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={onComposerKey}
+          value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={onComposerKey} onPaste={onPaste}
         />
         <div className="composer__foot">
+          <button
+            type="button" className="composer__control composer__attach" aria-label="Attach images"
+            title={acceptsImages ? 'Attach images (PNG, JPEG, GIF or WebP, up to 5 MB)' : `${HARNESS_NAMES[harness]} can't read images`}
+            disabled={!acceptsImages || !scenesReady} onClick={() => picker.current?.click()}
+          >
+            <Paperclip className="i" aria-hidden="true" />
+          </button>
+          <input
+            ref={picker} type="file" className="composer__file" accept={Object.keys(IMAGE_TYPES).join(',')} multiple hidden tabIndex={-1}
+            onChange={(event) => { attach(Array.from(event.target.files ?? [])); event.target.value = ''; textarea.current?.focus(); }}
+          />
           <AgentPicker
             harnesses={state.harnesses.list} loading={state.harnesses.status === 'loading'}
             harness={harness} model={model.id} effort={effort?.id ?? ''}
@@ -436,12 +528,19 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
               <Square className="i" aria-hidden="true" />
             </button>
           ) : (
-            <button type="button" className="composer__send" aria-label="Send" title="Send" disabled={!usable || !input.trim()} onClick={() => void send()}>
+            <button type="button" className="composer__send" aria-label="Send" title="Send" disabled={!canSend} onClick={() => void send()}>
               <ArrowUp className="i" aria-hidden="true" />
             </button>
           )}
         </div>
       </div>
+
+      {dropping && (
+        <div className="agent__drop" aria-hidden="true">
+          <ImagePlus className="i" />
+          <span>{acceptsImages ? 'Drop images to attach them' : `${HARNESS_NAMES[harness]} can't read images`}</span>
+        </div>
+      )}
 
       {menu?.kind === 'history' && (
         <HistoryPopover

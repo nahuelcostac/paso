@@ -41,10 +41,14 @@ export type DetectedHarness = {
 };
 
 export type ToolTarget = { projectId?: string; sceneId?: string; stepId?: string };
+/** What the service keeps of an attached image. Other kinds of attachment will carry their own `kind`. */
+export type AgentAttachment = { id: string; kind: 'image'; mediaType: string; size: number; name?: string };
+/** An image on its way to the service: its bytes as base64. */
+export type OutgoingImage = { kind: 'image'; mediaType: string; data: string; name?: string };
 export type AgentEvent =
   | { type: 'started' }
   /** The person's message, added by the service right after `started`. */
-  | { type: 'message'; text: string }
+  | { type: 'message'; text: string; attachments?: AgentAttachment[] }
   | { type: 'session'; resumeToken: string; model?: string }
   | { type: 'text_delta'; text: string }
   | { type: 'text'; text: string }
@@ -283,8 +287,21 @@ export class ApiClient {
   deleteAgentSession(id: string) {
     return this.request<void>(`/agent/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
-  sendAgentMessage(id: string, text: string, effort?: string) {
-    return this.request<{ runId: string }>(`/agent/sessions/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text, ...(effort ? { effort } : {}) } });
+  sendAgentMessage(id: string, text: string, effort?: string, attachments: OutgoingImage[] = []) {
+    return this.request<{ runId: string; attachments: AgentAttachment[] }>(`/agent/sessions/${encodeURIComponent(id)}/messages`, {
+      method: 'POST', body: { text, ...(effort ? { effort } : {}), ...(attachments.length ? { attachments } : {}) },
+    });
+  }
+  /** An image of a conversation, to show it in the history. The service needs the token, so it is read as a blob. */
+  async agentAttachment(sessionId: string, attachmentId: string) {
+    let response: Response;
+    try {
+      response = await fetch(`${this.config.baseUrl}/api/agent/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}`, {
+        headers: { Authorization: `Bearer ${this.config.token}` },
+      });
+    } catch { throw new UnavailableError('network'); }
+    if (!response.ok) throw new ApiRequestError(response.status, 'ATTACHMENT', "Couldn't load the image.");
+    return response.blob();
   }
   cancelAgentSession(id: string) {
     return this.request<{ cancelled: boolean }>(`/agent/sessions/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
