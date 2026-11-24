@@ -223,6 +223,8 @@ describe('the presentation camera of a step', () => {
     fireEvent.pointerUp(tag, { clientX: 90, clientY: 160, pointerId: 3 });
     await waitFor(async () => expect((await stepFile(first)).camera).toEqual({ x: 80, y: 170, width: 500, height: 350 }), patience);
     expect(screen.getByRole('button', { name: 'Reframe' })).toBeInTheDocument();
+    // With a camera the button shows only its icon; its name stays for screen readers.
+    expect(screen.getByText('Reframe')).toHaveClass('visually-hidden');
 
     // Escape leaves the drawing mode without a change; Enter takes what the canvas shows, without the strips under the controls.
     await user.click(screen.getByRole('button', { name: 'Reframe' }));

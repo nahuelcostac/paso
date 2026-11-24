@@ -37,7 +37,7 @@ export function CameraControl({ camera, first, kept, drawing, onDraw, onClear, o
           title="Mark the area the presentation zooms to on this step: drag over the canvas, or press Enter to use what you see"
           onClick={onDraw}
         >
-          <Scan className="i" aria-hidden="true" /><span className="camera-control__label">{own ? 'Reframe' : 'Frame'}</span>
+          <Scan className="i" aria-hidden="true" />{own ? <span className="visually-hidden">Reframe</span> : <span className="camera-control__label">Frame</span>}
         </button>
         {(!first || keeps) && <button
           type="button" className="camera-control__keep" aria-pressed={keeps} aria-label="Keep previous step's framing"

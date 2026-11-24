@@ -61,6 +61,15 @@ describe('sidebar layout', () => {
     expect(rule(app, ":root .sidebar-toggle[aria-expanded='true']")).toContain('--surface: var(--panel-bg)');
   });
 
+  it('gives Present and “Frame” one column, so they line up at one width in both views', async () => {
+    const app = await css('app.css');
+    expect(rule(app, '.canvas__corner')).toContain('--corner-w: 104px');
+    expect(rule(app, '.canvas__corner')).toContain('grid-template-columns: max-content var(--corner-w)');
+    expect(rule(app, '.canvas__corner > .btn--primary')).toContain('grid-column: 2');
+    expect(rule(app, '.canvas__corner > .camera-control')).toContain('grid-column: 2');
+    expect(rule(app, '.canvas__corner > .camera-control')).not.toContain('justify-self');
+  });
+
   it('keeps the macOS panel drag region to the right of the sidebar toggle', async () => {
     const app = await css('app.css');
     const mac = ":root[data-window-controls='mac']";

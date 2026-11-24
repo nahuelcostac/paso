@@ -440,7 +440,7 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 /* In the Studio the corner scrolls with the page, and the title keeps clear of it: the view switch and Present, with
    their labels, or their icons only on a narrow Studio. */
 .board__corner { z-index: 2; }
-.board { --board-corner-w: 320px; }
+.board { --board-corner-w: 328px; }
 .board__head { display: flex; padding-right: var(--board-corner-w); align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
 .board__heading { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .board__title { font-size: var(--text-28); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); overflow-wrap: anywhere; }
@@ -488,15 +488,20 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 
 
 /* Present sits over the top right corner, where Excalidraw's library button was, at the height of its islands. On the
-   Canvas, “Frame” is under it, and Present is as wide. */
-.canvas__corner { position: absolute; z-index: 4; top: var(--space-4); right: var(--space-4); display: grid; grid-template-columns: max-content max-content; gap: var(--space-2); }
-/* Diagram | Studio, then Present, in one row. “Frame” sits under Present, at least as wide, and grows to its left
-   without widening Present's column, so the switch is in the same place in both views. Its note wraps to Present's
-   width. Why Present could not start stays left of them all. A plain whiteboard's corner has only the switch. */
+   Canvas, “Frame” is under it, aligned with it and as wide. */
+.canvas__corner {
+  --corner-w: 104px;
+  position: absolute; z-index: 4; top: var(--space-4); right: var(--space-4);
+  display: grid; grid-template-columns: max-content var(--corner-w); gap: var(--space-2);
+}
+/* Diagram | Studio, then Present, in one row. Present's column has one width, about Present's own, in both views and
+   whatever the step's framing: Present and “Frame” fill it, so they line up, and the switch is in the same place in
+   both views. To fit, “Frame” is drawn tight, and once the step has a camera its button keeps only its icon. Its note wraps to that width.
+   Why Present could not start stays left of them all. A plain whiteboard's corner has only the switch. */
 .canvas__corner:not(:has(> .btn--primary)) { grid-template-columns: max-content; }
 .canvas__corner > .view-switch { grid-column: 1; grid-row: 1; }
 .canvas__corner > .btn--primary { grid-column: 2; grid-row: 1; }
-.canvas__corner > .camera-control { grid-column: 1 / -1; justify-self: end; }
+.canvas__corner > .camera-control { grid-column: 2; }
 .canvas__corner > .camera-control__note { grid-column: 2; }
 /* The view switch, a segmented control after T3 Code's: 32px options with 16px icons, 2px inside an island as tall as
    Present and Excalidraw's, on the paper with a thin line like “Frame” beside it. The open view is the selected grey,
@@ -519,10 +524,10 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .camera-control button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: var(--text-14); font-weight: var(--weight-medium); cursor: pointer; }
 .camera-control button:hover { background: var(--surface-sunken); color: var(--ink); }
 .camera-control button:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
-.camera-control__take { flex: 1; padding: 0 var(--space-3); }
-.camera-control__clear { width: 34px; flex: none; border-left: 1px solid var(--line) !important; }
+.camera-control__take { flex: 1; padding: 0 var(--space-1); }
+.camera-control__clear { width: 32px; flex: none; border-left: 1px solid var(--line) !important; }
 .camera-control[data-set] .camera-control__take { color: var(--ink); }
-.camera-control__keep { width: 34px; flex: none; border-left: 1px solid var(--line) !important; }
+.camera-control__keep { width: 32px; flex: none; border-left: 1px solid var(--line) !important; }
 .camera-control__keep[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
 /* Under the island while the step keeps a camera that shows the whole scene. It wraps to the corner's width. */
 .camera-control__note { width: 0; min-width: 100%; margin: 0; padding: 6px 10px; border-radius: var(--radius-md); background: var(--paper); box-shadow: 0 0 0 1px var(--line), var(--shadow-sm); color: var(--ink-3); font-size: var(--text-12); line-height: 1.35; }
@@ -565,24 +570,18 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
 .camera-control__take[aria-pressed='true'] { background: var(--accent-soft) !important; color: var(--ink) !important; }
 /* Excalidraw's toolbar stays centred, and the corner never meets it. The corner follows the main view's width, the
    same in both views, so the switch stays under the pointer when the view changes: with room, the switch and Present
-   have labels; narrower, the switch keeps its icons; narrower still, Present and “Frame” keep theirs; and on the
-   narrowest boards that still have the toolbar on top, the switch steps down beside “Frame”. */
+   have labels; narrower, the switch keeps its icons; and on the narrowest boards that still have the toolbar on top,
+   it steps down beside “Frame”. */
 .canvas--editor { container: board / inline-size; }
 .board { container: studio / inline-size; }
 .main { container: main / inline-size; }
-@container main (max-width: 1179px) {
+@container main (max-width: 1203px) {
   .view-switch__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .view-switch__option { width: var(--control-h); padding: 0; }
-  .board { --board-corner-w: 216px; }
-}
-@container main (max-width: 959px) {
-  .camera-control__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .canvas__corner .btn--primary { width: var(--control-h-lg); padding: 0; font-size: 0; gap: 0; }
-  .canvas__corner .btn--primary svg.i { margin: 0; }
-  .board { --board-corner-w: 140px; }
+  .board { --board-corner-w: 220px; }
 }
 /* Narrower, Excalidraw's toolbar would reach the switch: it steps down, beside “Frame”. */
-@container main (max-width: 829px) {
+@container main (max-width: 965px) {
   .canvas__corner:has(> .btn--primary) > .view-switch { grid-row: 2; }
   .canvas__corner:has(> .btn--primary) > .camera-control { grid-column: 2; }
 }
