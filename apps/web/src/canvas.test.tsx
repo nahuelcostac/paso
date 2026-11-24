@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
@@ -36,7 +36,8 @@ const patience = { timeout: 5000 };
 const shape = (id: string) => ({ id, type: 'rectangle', version: 1, versionNonce: 1, isDeleted: false, x: 0, y: 0, width: 10, height: 10 });
 
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-canvas-'));
+  // Its own folder, so the app's files beside the data (runs, workspace list) are not shared with other tests.
+  dataDir = join(await mkdtemp(join(tmpdir(), 'paso-canvas-')), 'projects');
   window.history.replaceState(null, '', '/');
   window.matchMedia ??= ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
   service = await startServer({ dataDir, port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100,
@@ -44,7 +45,7 @@ beforeEach(async () => {
     harnessDetection: { searchPaths: [], loginShell: false } });
   config = { baseUrl: service.url, token }; api = new ApiClient(config); recovery = memory();
 });
-afterEach(async () => { cleanup(); await service.close(); await rm(dataDir, { recursive: true, force: true }); });
+afterEach(async () => { cleanup(); await service.close(); await rm(dirname(dataDir), { recursive: true, force: true }); });
 
 /** One project with scenes of the given sizes. Step 1 of the first scene holds a rectangle called `r1`. */
 async function seed(sizes: number[]) {

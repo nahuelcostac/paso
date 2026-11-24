@@ -321,6 +321,8 @@ describe('cancel, shutdown and process trees', () => {
     }, 'cancellation');
     expect(events.at(-1)!.event).toEqual({ type: 'finished', reason: 'cancelled' });
     await waitFor(() => (!alive(grandchild) && !alive(harness)) || undefined, 'the tree to stop', 5000);
+    // The run stays open after its last event until its hooks and the session index are written; then nothing is left.
+    await waitFor(async () => (await api(`/api/agent/sessions/${id}`)).data.state === 'idle' || undefined, 'idle');
     expect((await api(`/api/agent/sessions/${id}/cancel`, 'POST')).data).toEqual({ cancelled: false });
     // The session can be used again afterwards.
     expect((await run(id, 'SCENARIO:ok')).end).toEqual({ type: 'finished', reason: 'completed' });

@@ -1,6 +1,6 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { startServer } from '@paso/server';
 import { createStep, type Step } from '@paso/shared';
@@ -16,14 +16,15 @@ const element = (id: string) => ({ id, type: 'rectangle', version: 1, versionNon
 const memory = (): Recovery => { const drafts = new Map<string, Draft>(); return { read: async (key) => drafts.get(key), write: async (key, draft) => { drafts.set(key, structuredClone(draft)); }, remove: async (key) => { drafts.delete(key); } }; };
 
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-actions-'));
+  // Its own folder, so the app's files beside the data (runs, workspace list) are not shared with other tests.
+  dataDir = join(await mkdtemp(join(tmpdir(), 'paso-actions-')), 'projects');
   service = await startServer({ dataDir, port: 0, sessionToken: token, pollIntervalMs: 100 });
   api = new ApiClient({ baseUrl: service.url, token });
   store = new StepStore(api, memory(), 60_000);
   actions = new StepActions(api, store);
   await api.createProject({ name: 'P' }).then(async ({ document }) => { expect(document.id).toBeTruthy(); });
 });
-afterEach(async () => { store.stopTimers(); await service.close(); await rm(dataDir, { recursive: true, force: true }); });
+afterEach(async () => { store.stopTimers(); await service.close(); await rm(dirname(dataDir), { recursive: true, force: true }); });
 
 /** A scene with steps. `first` carries a drawing, a title and speaker notes. */
 async function scene(count = 3) {
