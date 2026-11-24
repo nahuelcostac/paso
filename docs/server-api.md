@@ -302,7 +302,7 @@ All routes need the session token. Errors and messages are in English, written f
 | POST | `/agent/sessions` | `{ harness, projectId, sceneId?, model? }`, returns 201 with the session. The project and scene must exist. |
 | GET | `/agent/sessions` | `{ sessions }`, newest first. `?projectId=` filters. |
 | GET, DELETE | `/agent/sessions/:id` | Read, or delete (204): it stops a running turn, and the conversation's history goes, in Paso and in the harness's own copy (see History). |
-| POST | `/agent/sessions/:id/messages` | `{ text, effort?, attachments? }` (text of up to 32,000 characters; it may be empty when there are images). Returns 202 `{ runId, attachments }`; the answer arrives as events. `effort` is the reasoning level for this message only (see below); 400 `INVALID_EFFORT` if the harness does not have it. `attachments` are images (see Images). |
+| POST | `/agent/sessions/:id/messages` | `{ text, effort?, attachments? }` (text of up to 32,000 characters; it may be empty when there are images or steps). Returns 202 `{ runId, attachments }`; the answer arrives as events. `effort` is the reasoning level for this message only (see below); 400 `INVALID_EFFORT` if the harness does not have it. `attachments` are images and steps (see Images and Steps). |
 | GET | `/agent/sessions/:id/attachments/:attachmentId` | The bytes of an attached image, with its own image type, `Content-Disposition: attachment`, `nosniff` and a `sandbox` CSP. 404 for an unknown ID. |
 | POST | `/agent/sessions/:id/cancel` | `{ cancelled }`. Stops the run and its whole process tree. Idempotent. |
 | POST | `/agent/sessions/:id/resume` | Reopens a stored session, for example after a restart. 409 if it never reached the harness. Sending resumes it too. |
@@ -348,6 +348,31 @@ used). Nothing about where they are stored is handed to the harness, and the
 agent still has only the board tools. The images leave the machine only inside
 the harness's own request to its model.
 
+**Steps.** A message may also name steps of the project in `attachments`,
+each `{ kind: "step", stepId }`, up to 50 (400 `TOO_MANY_STEPS`); a step named
+twice counts once, and anything else in the item is ignored. The service finds
+each step in the session's project, under the project's lock, and in a loose
+diagram only in the session's own scene. If any of them is not there (deleted
+since it was attached, or a step of another project or diagram), the whole
+message is refused with 422 `STEP_NOT_FOUND` and nothing is stored or sent: the
+agent is never told to work on a step that does not exist, and the person
+chooses what to send instead. The app leaves deleted steps out before sending,
+so this only happens in a race. The reply's `attachments`, and the `message`
+event, list the steps first, as they were when sent: `{ id, kind: "step",
+sceneId, stepId, number, sceneName, title? }`, where `id` is the step's ID,
+`number` its place in its scene from 1, and `sceneName` and `title` are kept for
+the history. Then the images.
+
+The harness gets the steps as service IDs in the turn's context
+(`context.steps`, `[{ sceneId, stepId }]`, next to `projectId` and
+`sceneId`), and the instructions for that turn say: “The person attached 2
+steps to this message: step "a" in scene "s", step "b" in scene "s". Work on
+those steps with the board tools, and leave the other steps as they are unless
+the message asks for more.” (Claude Code's `--append-system-prompt`, Codex's
+`developerInstructions`). Nothing else of the steps is sent: no file, path,
+title or drawing. The model reads them with the board tools. A later message
+without steps says nothing of them.
+
 A **run** is one message and the agent's whole answer to it. It is the unit
 that restore points attach to (see below).
 
@@ -369,7 +394,7 @@ output are never forwarded.
 | `event.type` | Fields |
 | --- | --- |
 | `started` | The run was accepted (added by Paso). |
-| `message` | `text`, the person's message (added by Paso right after `started`), and `attachments?`, the images kept with it. |
+| `message` | `text`, the person's message (added by Paso right after `started`), and `attachments?`, the steps it named and the images kept with it. |
 | `session` | `resumeToken` (opaque, kept by Paso for resume), `model?`. |
 | `text_delta` | `text`, an increment of the assistant's answer. |
 | `text` | `text`, a complete assistant text block. Repeats the deltas before it. |
@@ -618,6 +643,10 @@ arguments, secrets absent from arguments and logs, and process-tree cleanup.
 `attachments.test.ts` covers images: the exact stdin content blocks, no path in
 what the harness gets, storage, mode and location, validation, refusal by a
 harness without images, and deletion.
+`steps.test.ts` covers steps: the IDs in the turn context and the
+instructions of Claude Code and Codex, no path or title in what the harness
+gets, the history after a restart, and refusal of a deleted step, one of another
+project or of another loose diagram, malformed IDs and too many.
 `claude.real.test.ts` is skipped unless asked, since it uses the user's login
 and a little quota:
 

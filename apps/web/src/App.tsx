@@ -23,7 +23,7 @@ import { createCanvasMenu } from './editor/canvas-menu';
 import { PresentButton } from './present/PresentButton';
 import { useScenes } from './state/scenes';
 import { ActionError, ProjectsStore, useProjects, type ProjectRow } from './state/projects-store';
-import { AgentStore, HARNESS_NAMES, activeTurn, stepMarks, useAgent } from './state/agent-store';
+import { AgentStore, HARNESS_NAMES, activeTurn, stepMarks, useAgent, type StepToAttach } from './state/agent-store';
 import { formatSize } from './lib/format';
 import { shownFilter, showsUnder } from './lib/project-filter';
 import { stepCount } from './components/LooseRow';
@@ -361,6 +361,13 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       <button type="button" className="icon-btn" aria-label="Dismiss notice" onClick={() => setSceneError(undefined)}>×</button>
     </div>}
   </> : undefined;
+  /** Steps from the Studio join the next message of their scene's chat, which opens if it is not in view. */
+  const addToChat = (picked: StepToAttach[]) => {
+    if (!openProject || !picked.length) return 0;
+    const added = agentStore.attachSteps(openProject.id, picked[0].sceneId, picked);
+    if (shown !== 'agent') chooseSide('agent');
+    return added;
+  };
   const hideAgent = () => {
     chooseSide(null);
     sidebarToggle.current?.focus();
@@ -505,7 +512,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
             notices={shown === 'projects' ? undefined : notices}
             views={viewSwitch} corner={presentButton} subscribeEvents={store.subscribeEvents} loose={looseOpen} menu={canvasMenu}
           />
-        </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} views={viewSwitch} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} />}</div>
+        </Suspense> : <Storyboard key={row.id} api={api} projectId={row.id} projectName={row.project.name} onlySceneId={onlySceneId} listedSize={onlySceneId ? stepCount(row.steps) : formatSize(row.scenes, row.steps)} events={store.subscribeEvents} thumbnails={thumbnails} route={route} navigate={navigate} stepAgentStates={marks} notices={shown === 'projects' ? undefined : notices} views={viewSwitch} corner={presentButton} renameStep={(target, title) => steps.retitleStep(target, title)} addToChat={addToChat} />}</div>
       : <div className="main"><MainView state={state} row={row} requestedId={route.projectId} onCreate={startCreating} onRetry={() => store.retry()} /></div>}
     </div>
   );

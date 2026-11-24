@@ -6,6 +6,7 @@ import { useTheme } from '../editor/use-theme';
 import type { ThumbnailCache } from '../editor/thumbnails';
 import { ActionError, type ServiceEvent } from '../state/projects-store';
 import { StoryboardStore, useStoryboard, type SceneEntry } from '../state/storyboard-store';
+import type { StepToAttach } from '../state/agent-store';
 import { Dialog } from './Dialog';
 import { SceneSection } from './SceneSection';
 import '../styles/storyboard.css';
@@ -32,6 +33,8 @@ type Props = {
   corner?: React.ReactNode;
   /** Saves a step's title, through the steps the Canvas may have open. */
   renameStep?: (target: { projectId: string; sceneId: string; stepId: string }, title: string) => Promise<void>;
+  /** Attaches steps to the agent chat's next message, opening the chat. Returns how many were new there. */
+  addToChat?: (steps: StepToAttach[]) => number;
 };
 
 const reasonText = (error: unknown) => error instanceof ActionError ? error.message : 'Try again.';
@@ -47,7 +50,7 @@ function insertAt(order: string[], from: number, to: number) {
  * The Studio: the selected scene at a glance, its steps as cards with thumbnails, beside the chat that works on it.
  * Studio opens it from the activity bar. Diagram, a step or Escape goes back to the board.
  */
-export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, views, corner, renameStep }: Props) {
+export function Storyboard({ api, projectId, projectName, listedSize, onlySceneId, events, thumbnails, route, navigate, stepAgentStates, notices, views, corner, renameStep, addToChat }: Props) {
   const store = useMemo(() => new StoryboardStore(api, projectId, events), [api, projectId, events]);
   useEffect(() => { store.start(); return () => store.dispose(); }, [store]);
   const state = useStoryboard(store);
@@ -311,6 +314,14 @@ export function Storyboard({ api, projectId, projectName, listedSize, onlySceneI
             setNotice(null);
           } : undefined}
           onAddStep={async () => { await run(() => store.createStep(scene.id), 'add the step'); }}
+          onAddToChat={addToChat ? (stepIds) => {
+            const added = addToChat(stepIds.map((stepId) => ({
+              sceneId: scene.id, stepId, sceneName: scene.name, number: scene.stepIds.indexOf(stepId) + 1,
+              ...(state.steps[stepId]?.title ? { title: state.steps[stepId]!.title } : {}),
+            })));
+            const many = stepIds.length > 1;
+            setAnnouncement(added ? `${added === 1 ? 'Step' : `${added} steps`} added to the chat.` : many ? 'Those steps are already in the chat.' : 'That step is already in the chat.');
+          } : undefined}
           onRename={async (name) => {
             try { await store.renameScene(scene.id, name); setRenamingId(null); setNotice(null); }
             catch (error) { throw new Error(`Couldn't rename the scene. ${reasonText(error)}`); }

@@ -1,5 +1,5 @@
 import { idSchema } from '@paso/shared';
-import { describeTarget } from './where.js';
+import { describeSteps, describeTarget } from './where.js';
 import { connectCodexBoard, codexBoardTools, codexReadOnlyTools } from './codex-board.js';
 import { classifyCodexFailure, codexDefaultEffort, codexFailureMessage, codexVersion, prepareCodex } from './codex-policy.js';
 import { forgetCodex } from './forget.js';
@@ -70,7 +70,7 @@ export const codexAdapter: HarnessAdapter = {
             cwd: policy.cwd, sandbox: 'read-only', approvalPolicy: 'never', approvalsReviewer: 'user',
             model: policy.model, config: policy.config,
             baseInstructions: "You are Paso's assistant. You only use the board tools, and you reply in the language of the user's message.",
-            developerInstructions: `You are working in the ${where} (service IDs). Read a step before you edit it. You have no terminal, files or web.`,
+            developerInstructions: `You are working in the ${where} (service IDs). Read a step before you edit it. You have no terminal, files or web.${describeSteps(request.context.steps)}`,
             runtimeWorkspaceRoots: [],
           });
           return;

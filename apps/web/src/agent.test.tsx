@@ -809,14 +809,14 @@ describe('images in the chat', () => {
     expect(requests[0].text).toBe('What is this?');
     expect(requests[0].images).toEqual([{ mediaType: 'image/png', data: base64 }]);
     expect(draftRow(panel)).not.toBeInTheDocument();
-    const sent = await within(panel).findByRole('list', { name: 'Attached images' }, patience);
+    const sent = await within(panel).findByRole('list', { name: 'Attached to this message' }, patience);
     await waitFor(() => expect(within(sent).getByRole('img', { name: 'one.png' }).getAttribute('src')).toMatch(/^blob:test\//), patience);
     expect(within(sent).queryByRole('button')).not.toBeInTheDocument();
 
     // After a reload they are read back from the service.
     cleanup();
     panel = await ready();
-    const replayed = await within(panel).findByRole('list', { name: 'Attached images' }, patience);
+    const replayed = await within(panel).findByRole('list', { name: 'Attached to this message' }, patience);
     await waitFor(() => expect(within(replayed).getByRole('img', { name: 'one.png' }).getAttribute('src')).toMatch(/^blob:test\//), patience);
   });
 
@@ -863,5 +863,125 @@ describe('images in the chat', () => {
     await store.attach('p', 's1', [png()], 'agy');
     expect(store.getState().drafts['p:s1']).toBeUndefined();
     expect(store.getState().attachNotice['p:s1']).toBe("Antigravity can't read images. Pick another agent to send them.");
+  });
+});
+
+describe('steps in the chat', () => {
+  /** The Studio on scene 1, whose three steps are Inicio, Medio and an untitled one, with the chat hidden. */
+  async function studio() {
+    await call('POST', '/projects/p/scenes/s1/steps', { id: 'step1b', title: 'Medio', elements: [rect('r3', 30)] });
+    await call('POST', '/projects/p/scenes/s1/steps', { id: 'step1c', elements: [rect('r4', 40)] });
+    await call('POST', '/harnesses', { id: 'claude' });
+    window.history.replaceState(null, '', '#/p/storyboard/s1/step1');
+    window.localStorage.setItem('paso.side-panel', 'none');
+    render(<App config={config} />);
+    const board = await screen.findByRole('main', { name: 'Studio' }, patience);
+    const steps = await within(board).findByRole('group', { name: 'Steps of El problema' }, patience);
+    await within(steps).findByRole('button', { name: 'Step 3' }, patience);
+    await within(steps).findByRole('button', { name: 'Step 2: Medio' }, patience);
+    return { board, steps };
+  }
+  const card = (steps: HTMLElement, name: RegExp) => within(steps).getByRole('button', { name });
+  const chips = (panel: HTMLElement) => within(within(panel).getByRole('list', { name: 'Attachments' })).getAllByRole('listitem').map((item) => item.textContent);
+
+  it('adds one step from its card and several selected with ⌘/Ctrl-click and Shift-click, opening the chat; the harness gets their IDs', async () => {
+    const user = userEvent.setup();
+    const { steps } = await studio();
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+
+    // One step: its card's own button. The chat opens with the step as a chip.
+    await user.hover(card(steps, /^Step 2: Medio/));
+    await user.click(within(steps).getByRole('button', { name: 'Add step 2 to chat' }));
+    const panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
+    expect(chips(panel)).toEqual(['El problema·02Medio']);
+    // The card stayed in the Studio: a plain click there still opens a step, so nothing else was selected.
+    expect(within(steps).queryByRole('group', { name: 'Selected steps' })).not.toBeInTheDocument();
+
+    // Several: ⌘-click one, Shift-click to extend the range, and one action adds them all.
+    await user.keyboard('{Meta>}');
+    await user.click(card(steps, /^Step 1: Inicio/));
+    await user.keyboard('{/Meta}');
+    expect(card(steps, /^Step 1: Inicio/)).toHaveAccessibleName('Step 1: Inicio, selected');
+    expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument(); // Selecting does not open the step.
+    await user.keyboard('{Shift>}');
+    await user.click(card(steps, /^Step 3/));
+    await user.keyboard('{/Shift}');
+    const selection = within(steps.parentElement!).getByRole('group', { name: 'Selected steps' });
+    expect(selection).toHaveTextContent('3 steps selected');
+    // Ctrl-click takes one out again.
+    fireEvent.click(card(steps, /^Step 2: Medio/), { ctrlKey: true });
+    expect(selection).toHaveTextContent('2 steps selected');
+    await user.click(within(selection).getByRole('button', { name: 'Add to chat' }));
+    expect(chips(panel)).toEqual(['El problema·02Medio', 'El problema·01Inicio', 'El problema·03Untitled']);
+    expect(within(steps.parentElement!).queryByRole('group', { name: 'Selected steps' })).not.toBeInTheDocument();
+    // Adding one that is there already does not repeat it.
+    await user.click(within(steps).getByRole('button', { name: 'Add step 1 to chat' }));
+    expect(chips(panel)).toHaveLength(3);
+
+    // × takes one off; the message goes with the others, as IDs in the turn's context and nothing else.
+    await user.click(within(panel).getByRole('button', { name: 'Remove step El problema · 03 Untitled' }));
+    await send(panel, user, 'Hazlos más claros');
+    await waitFor(() => expect(requests).toHaveLength(1), patience);
+    expect(requests[0].text).toBe('Hazlos más claros');
+    expect(requests[0].context).toEqual({ projectId: 'p', sceneId: 's1', steps: [{ sceneId: 's1', stepId: 'step1b' }, { sceneId: 's1', stepId: 'step1' }] });
+    expect(requests[0].images).toBeUndefined();
+    expect(within(panel).queryByRole('list', { name: 'Attachments' })).not.toBeInTheDocument();
+
+    // The sent message keeps its chips, after a reload too, and a chip opens its step on the Canvas.
+    const sent = await within(panel).findByRole('list', { name: 'Attached to this message' }, patience);
+    expect(within(sent).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Open step El problema · 02 Medio', 'Open step El problema · 01 Inicio']);
+    cleanup();
+    window.localStorage.setItem('paso.side-panel', 'agent');
+    render(<App config={config} />);
+    const again = await screen.findByRole('complementary', { name: 'Agent' }, patience);
+    const replayed = await within(again).findByRole('list', { name: 'Attached to this message' }, patience);
+    await user.click(within(replayed).getByRole('button', { name: 'Open step El problema · 02 Medio' }));
+    expect(await screen.findByRole('main', { name: 'Canvas' }, patience)).toBeInTheDocument();
+    expect(window.location.hash).toBe('#/p/canvas/s1/step1b');
+  });
+
+  it('selects and adds with the keyboard', async () => {
+    const user = userEvent.setup();
+    const { steps } = await studio();
+    card(steps, /^Step 1: Inicio/).focus();
+    // Shift and the arrows extend the selection; ⌘/Ctrl+Space takes one in or out; Escape lets it go, not the Studio.
+    await user.keyboard('{Shift>}{ArrowRight}{ArrowRight}{/Shift}');
+    expect(card(steps, /^Step 3/)).toHaveFocus();
+    const group = () => within(steps.parentElement!).queryByRole('group', { name: 'Selected steps' });
+    expect(group()).toHaveTextContent('3 steps selected');
+    await user.keyboard('{Control>} {/Control}');
+    expect(group()).toHaveTextContent('2 steps selected');
+    await user.keyboard('{Escape}');
+    expect(group()).not.toBeInTheDocument();
+    expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
+    await user.keyboard('{Meta>}a{/Meta}');
+    expect(group()).toHaveTextContent('3 steps selected');
+    // Tab from the card reaches its “Add to chat”, which adds the whole selection.
+    await user.tab();
+    expect(within(steps).getByRole('button', { name: 'Add step 3 and the 2 other selected steps to chat' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    const panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
+    expect(chips(panel)).toEqual(['El problema·01Inicio', 'El problema·02Medio', 'El problema·03Untitled']);
+    expect(screen.getByText('3 steps added to the chat.')).toBeInTheDocument();
+  });
+
+  it('says on its chip that a step was deleted, and does not send it', async () => {
+    const user = userEvent.setup();
+    const { steps } = await studio();
+    await user.hover(card(steps, /^Step 2: Medio/));
+    await user.click(within(steps).getByRole('button', { name: 'Add step 2 to chat' }));
+    const panel = await screen.findByRole('complementary', { name: 'Agent' }, patience);
+    await waitFor(() => expect(within(panel).getByRole('button', { name: 'Send' })).toBeEnabled(), patience);
+
+    const step = await call<StepEnvelope>('GET', '/projects/p/scenes/s1/steps/step1b');
+    await call('DELETE', '/projects/p/scenes/s1/steps/step1b', undefined, step.revision);
+    const gone = await within(panel).findByRole('img', { name: "step El problema · Medio (deleted, it won't be sent)" }, patience);
+    expect(gone).toHaveTextContent('Deleted');
+    // A deleted step alone is not a message.
+    expect(within(panel).getByRole('button', { name: 'Send' })).toBeDisabled();
+    await send(panel, user, 'Solo texto');
+    await waitFor(() => expect(requests).toHaveLength(1), patience);
+    expect(requests[0].context).toEqual({ projectId: 'p', sceneId: 's1' });
+    expect(within(panel).queryByRole('list', { name: 'Attachments' })).not.toBeInTheDocument();
   });
 });

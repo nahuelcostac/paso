@@ -61,3 +61,31 @@
 .step-card__rename { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; min-height: 46px; padding: 6px var(--space-2); border-radius: 0 0 var(--radius-card) var(--radius-card); background: var(--surface); }
 .step-card__rename .namefield { flex: 1; min-width: 0; }
 .step-card__rename .namefield__error { position: absolute; top: 100%; left: 0; right: 0; margin-top: var(--space-1); }
+
+/* Selected in the Studio, for the chat: the selected grey under its label and its edge. The open step keeps its ink edge. */
+.frame[data-selected] { box-shadow: 0 0 0 2px var(--accent-line), var(--shadow-sm); }
+.frame[data-selected] .frame__label { background: var(--accent-soft); }
+.frame[data-selected][aria-current='step'] { box-shadow: 0 0 0 2px var(--accent); }
+.step-card:hover .frame[data-selected]:not([aria-current='step']) { box-shadow: 0 0 0 2px var(--accent-line), var(--shadow-md); }
+
+/* “Add to chat”: a small white button on the drawing's top-right corner, on hover or focus, and on every selected card. */
+.step-card__chat {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-sm);
+  color: var(--ink-2);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+.step-card[data-framed] .step-card__chat { right: 38px; }
+.step-card:hover .step-card__chat, .step-card:focus-within .step-card__chat, .step-card[data-selected] .step-card__chat { opacity: 1; }
+.step-card__chat:hover { background: var(--surface-sunken); color: var(--ink); }
+.step-card__chat:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--line-strong), var(--focus-ring); opacity: 1; }
+@media (hover: none) { .step-card__chat { opacity: 1; } }

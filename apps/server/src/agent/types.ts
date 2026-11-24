@@ -6,9 +6,9 @@
  * adapter only translates between this interface and one CLI. Nothing in these types is
  * specific to a particular CLI: `resumeToken` is opaque and tool names are Paso board tools.
  */
-import type { AttachmentRef, ImageInput } from './attachments.js';
+import type { AttachmentRef, ImageInput, StepAttachmentRef } from './attachments.js';
 
-export type { AttachmentRef, ImageInput };
+export type { AttachmentRef, ImageInput, StepAttachmentRef };
 export const harnessIds = ['claude', 'codex', 'agy'] as const;
 export type HarnessId = typeof harnessIds[number];
 
@@ -57,6 +57,9 @@ export type AgentEvent =
   | { type: 'finished'; reason: 'completed' | 'cancelled' }
   | { type: 'failed'; code: FailureCode; message: string };
 
+/** A step a message is about, as the harness receives it. */
+export type TurnStep = { sceneId: string; stepId: string };
+
 export type AgentRunRequest = {
   /** Absolute path of the executable, as resolved by harness detection. */
   executable: string;
@@ -75,7 +78,11 @@ export type AgentRunRequest = {
   model?: string;
   /** One of the harness's `effortLevels`, passed only when set. */
   effort?: string;
-  context: { projectId: string; sceneId?: string };
+  /**
+   * Where the turn works, in service IDs. `steps` are the steps the person attached to this message: the instructions
+   * ask the model to work on them with the board tools. Only IDs; no file path or content.
+   */
+  context: { projectId: string; sceneId?: string; steps?: TurnStep[] };
   board: {
     /** Loopback origin of this service. */
     serviceUrl: string;
