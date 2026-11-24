@@ -39,6 +39,8 @@ Change the mark only in `brand.ts`. The web picks the change up on reload, and t
 
 ## Checking that it stays offline
 
+The web production build removes Excalidraw's esm.sh font fallback. The bundled font files are the sources for both drawing and SVG font subsetting. Chromium checks every source in a `FontFace` against CSP when the face is created, even when the local file works, so leaving the unused remote source in place caused CSP violations. The build fails if the pinned Excalidraw font code changes and the removal needs review. `apps/desktop/test/fonts.test.mjs` builds the web app and checks local font loading and canvas and SVG export in an isolated Electron window using the packaged page's scheme and CSP.
+
 Launch the packaged binary with an isolated profile and Chromium's network log, and sample the sockets of the whole process tree:
 
 ```sh
