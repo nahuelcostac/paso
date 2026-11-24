@@ -11,7 +11,7 @@ import {
   type DetectedHarness,
   type CodexModel,
   type HarnessId,
-  type OutgoingImage,
+  type OutgoingAttachment,
   type RunSummary,
   type UndoPlan,
 } from '../lib/api';
@@ -73,9 +73,20 @@ export const HARNESS_ACCEPTS_IMAGES: Record<HarnessId, boolean> = { claude: true
 export const IMAGE_TYPES: Record<string, string> = { 'image/png': 'PNG', 'image/jpeg': 'JPEG', 'image/gif': 'GIF', 'image/webp': 'WebP' };
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_ATTACHMENTS = 5;
+/** How many steps one message may name, as the service checks it too. */
+export const MAX_STEPS = 50;
 
-/** Something attached to the next message, before it is sent. Only images today; other kinds join with their own `kind`. */
-export type DraftAttachment = { key: string; kind: 'image'; name: string; mediaType: string; size: number; blob: Blob; url: string };
+/** An image attached to the next message, read into memory. */
+export type DraftImage = { key: string; kind: 'image'; name: string; mediaType: string; size: number; blob: Blob; url: string };
+/**
+ * A Studio step attached to the next message: only its IDs go, and the service finds it. Its scene's name, place and
+ * title are kept to name its chip, from when it was added.
+ */
+export type DraftStep = { key: string; kind: 'step'; sceneId: string; stepId: string; sceneName: string; number: number; title?: string };
+/** Something attached to the next message, before it is sent. */
+export type DraftAttachment = DraftImage | DraftStep;
+/** A step to attach, as the Studio sees it. */
+export type StepToAttach = Omit<DraftStep, 'key' | 'kind'>;
 
 export type HarnessInfo = DetectedHarness & { added: boolean; supported: boolean; models?: CodexModel[] };
 export function modelOptions(harness: HarnessId, info?: HarnessInfo): ModelOption[] {
@@ -266,12 +277,13 @@ export class AgentStore {
       catch { problems.push(`“${file.name || 'Pasted image'}” couldn't be read.`); return undefined; }
     }));
     const current = this.state.drafts[key] ?? [];
+    const images = current.filter((item) => item.kind === 'image').length;
     const added: DraftAttachment[] = [];
     let overLimit = false;
     accepted.forEach((file, index) => {
       const blob = read[index];
       if (!blob) return;
-      if (current.length + added.length >= MAX_ATTACHMENTS) { overLimit = true; return; }
+      if (images + added.length >= MAX_ATTACHMENTS) { overLimit = true; return; }
       added.push({ key: `draft-${++this.draftCount}`, kind: 'image', name: file.name || 'Pasted image', mediaType: file.type, size: blob.size, blob, url: URL.createObjectURL(blob) });
     });
     if (overLimit) problems.push(`A message can have up to ${MAX_ATTACHMENTS} images.`);
@@ -281,11 +293,33 @@ export class AgentStore {
     });
   }
 
+  /**
+   * Attaches Studio steps to the next message of a project and scene, after what is already there. A step already
+   * attached is not added again; past fifty, the notice says so.
+   */
+  attachSteps(projectId: string, sceneId: string | null, steps: StepToAttach[]) {
+    const key = conversationKey(projectId, sceneId);
+    const current = this.state.drafts[key] ?? [];
+    const have = new Set(current.flatMap((item) => item.kind === 'step' ? [item.stepId] : []));
+    const room = Math.max(0, MAX_STEPS - have.size);
+    const fresh: StepToAttach[] = [];
+    for (const step of steps) if (!have.has(step.stepId)) { have.add(step.stepId); fresh.push(step); }
+    const added: DraftStep[] = fresh.slice(0, room).map((step) => ({ ...step, key: `draft-${++this.draftCount}`, kind: 'step' }));
+    // Steps come before images, as the service keeps them.
+    const before = current.filter((item) => item.kind === 'step');
+    const after = current.filter((item) => item.kind !== 'step');
+    this.set({
+      drafts: added.length ? { ...this.state.drafts, [key]: [...before, ...added, ...after] } : this.state.drafts,
+      attachNotice: { ...this.state.attachNotice, [key]: fresh.length > room ? `A message can name up to ${MAX_STEPS} steps.` : this.state.attachNotice[key] },
+    });
+    return added.length;
+  }
+
   detach(projectId: string, sceneId: string | null, draftKey: string) {
     const key = conversationKey(projectId, sceneId);
     const current = this.state.drafts[key] ?? [];
     const gone = current.find((item) => item.key === draftKey);
-    if (gone) URL.revokeObjectURL(gone.url);
+    if (gone?.kind === 'image') URL.revokeObjectURL(gone.url);
     this.set({ drafts: { ...this.state.drafts, [key]: current.filter((item) => item.key !== draftKey) }, attachNotice: { ...this.state.attachNotice, [key]: undefined } });
   }
 
@@ -476,31 +510,38 @@ export class AgentStore {
 
   // Sending and stopping ------------------------------------------------------------------------------------
 
-  async send(projectId: string, sceneId: string | null, text: string) {
+  /**
+   * Sends the next message with what is attached to it. `stepExists` says which attached steps are still in the project:
+   * a deleted one is left out (its chip says so) and leaves the draft with the rest.
+   */
+  async send(projectId: string, sceneId: string | null, text: string, stepExists: (stepId: string) => boolean = () => true) {
     const trimmed = text.trim();
     const key = conversationKey(projectId, sceneId);
     const drafts = this.state.drafts[key] ?? [];
-    if (!trimmed && !drafts.length) return false;
+    const imageDrafts = drafts.filter((draft): draft is DraftImage => draft.kind === 'image');
+    const stepDrafts = drafts.filter((draft): draft is DraftStep => draft.kind === 'step' && stepExists(draft.stepId));
+    if (!trimmed && !imageDrafts.length && !stepDrafts.length) return false;
     this.setNotice(projectId, undefined);
     try {
-      const images = await Promise.all(drafts.map(async (draft) => ({ kind: draft.kind, mediaType: draft.mediaType, data: await base64(draft.blob), name: draft.name })));
+      const images: OutgoingAttachment[] = await Promise.all(imageDrafts.map(async (draft) => ({ kind: draft.kind, mediaType: draft.mediaType, data: await base64(draft.blob), name: draft.name })));
+      const outgoing: OutgoingAttachment[] = [...stepDrafts.map((draft) => ({ kind: 'step' as const, stepId: draft.stepId })), ...images];
       // The open conversation keeps its own session, harness and model. Changing either ends it (see `choose`).
       let sessionId = this.state.conversation[key];
       if (sessionId && !this.state.sessions[sessionId]) sessionId = undefined;
       let sent: { runId: string; attachments: AgentAttachment[] };
       try {
         if (!sessionId) sessionId = await this.createSession(projectId, sceneId, key);
-        sent = await this.deliver(projectId, sessionId, trimmed, images);
+        sent = await this.deliver(projectId, sessionId, trimmed, outgoing);
       } catch (error) {
         // The service forgets sessions that never reached the harness when it restarts: start a new one.
         if (!(error instanceof ApiRequestError && error.code === 'SESSION_NOT_FOUND')) throw error;
         sessionId = await this.createSession(projectId, sceneId, key);
-        sent = await this.deliver(projectId, sessionId, trimmed, images);
+        sent = await this.deliver(projectId, sessionId, trimmed, outgoing);
       }
       const runId = sent.runId;
       // The images just sent are shown from the files the person picked, unless the live event already read them back.
-      sent.attachments.forEach((attachment, index) => {
-        const draft = drafts[index];
+      sent.attachments.filter((attachment) => attachment.kind === 'image').forEach((attachment, index) => {
+        const draft = imageDrafts[index];
         if (!draft) return;
         const cached = `${sessionId}/${attachment.id}`;
         if (this.images.has(cached)) URL.revokeObjectURL(draft.url);
@@ -520,9 +561,9 @@ export class AgentStore {
    * Sends one message. The service says a run is over before it has closed its restore point, so for a moment after
    * the last answer it may still be busy: when nothing is running here any more, that is waited out, briefly.
    */
-  private async deliver(projectId: string, sessionId: string, text: string, images: OutgoingImage[]) {
+  private async deliver(projectId: string, sessionId: string, text: string, attachments: OutgoingAttachment[]) {
     for (let attempt = 0; ; attempt++) {
-      try { return await this.api.sendAgentMessage(sessionId, text, this.effortFor(sessionId), images); }
+      try { return await this.api.sendAgentMessage(sessionId, text, this.effortFor(sessionId), attachments); }
       catch (error) {
         const busy = error instanceof ApiRequestError && (error.code === 'SESSION_BUSY' || error.code === 'PROJECT_BUSY');
         const runningHere = this.state.turns.some((turn) => turn.projectId === projectId && turn.status === 'running');
@@ -639,7 +680,7 @@ export class AgentStore {
     if (event.type === 'message') {
       const session = this.state.sessions[sessionId];
       const runs = new Set(this.state.turns.filter((candidate) => candidate.sessionId === sessionId).map((candidate) => candidate.runId));
-      if (session) this.set({ sessions: { ...this.state.sessions, [sessionId]: { ...session, title: session.title || messageTitle(event.text, event.attachments?.length ?? 0), turns: Math.max(session.turns, runs.size) } } });
+      if (session) this.set({ sessions: { ...this.state.sessions, [sessionId]: { ...session, title: session.title || messageTitle(event.text, event.attachments ?? []), turns: Math.max(session.turns, runs.size) } } });
     }
     if (event.type === 'finished' || event.type === 'failed') this.reloadRunsUntilClosed(turn.projectId, runId);
   }
@@ -754,8 +795,15 @@ function reduce(turn: AgentTurn, event: AgentEvent, at: string): AgentTurn {
   }
 }
 
-/** How the history names a conversation: its first message, or its images when it had no text, as the service does. */
-const messageTitle = (text: string, images: number) => text.trim().replace(/\s+/g, ' ').slice(0, 120) || (images === 1 ? 'Image' : images ? `${images} images` : '');
+/** How the history names a conversation: its first message, or what it carried when it had no text, as the service does. */
+function messageTitle(text: string, attachments: AgentAttachment[]) {
+  const named = text.trim().replace(/\s+/g, ' ').slice(0, 120);
+  if (named) return named;
+  const steps = attachments.filter((item) => item.kind === 'step').length;
+  const images = attachments.length - steps;
+  if (steps) return steps === 1 ? 'Step' : `${steps} steps`;
+  return images === 1 ? 'Image' : images ? `${images} images` : '';
+}
 
 /** A file's bytes. */
 function bytesOf(file: Blob) {

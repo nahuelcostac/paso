@@ -8,7 +8,7 @@ import {
   type AgentStore, type AgentTurn, type ToolItem,
 } from '../state/agent-store';
 import { AgentPicker } from './AgentPicker';
-import { AttachmentRow, useResolved } from './Attachments';
+import { AttachmentRow, useResolved, type AttachmentItem } from './Attachments';
 import { ProviderIcon } from './ProviderIcon';
 import { Dialog } from './Dialog';
 import { Popover } from './Popover';
@@ -130,16 +130,35 @@ function planLines(plan: UndoPlan) {
 
 type UndoState = { runId: string; plan?: UndoPlan; busy: boolean; error?: string };
 
-/** The images of a sent message, read from the service the first time they are shown. */
-function SentAttachments({ store, sessionId, attachments }: { store: AgentStore; sessionId: string; attachments: AgentAttachment[] }) {
-  const urls = useResolved(attachments.map((item) => item.id), (id) => store.imageUrl(sessionId, id));
+/**
+ * The chip of an attached step: “Scene · 02 Title”. While the step is in the project its number is its place now and a
+ * click opens it; once deleted the chip says so, and keeps the name it had.
+ */
+function stepItem(step: { key: string; stepId: string; sceneName: string; number: number; title?: string }, scenes: Scene[], onOpenStep: (sceneId: string, stepId: string) => void, unsent = false): AttachmentItem {
+  const where = locateStep(scenes, step.stepId);
+  const title = step.title?.trim() ?? '';
+  const scene = where?.scene.name ?? step.sceneName;
+  const number = where ? pad(where.stepNumber) : undefined;
+  const name = `${scene} · ${number ? `${number} ` : ''}${title || 'Untitled'}`;
+  return {
+    key: step.key, kind: 'step', scene, title, number, missing: !where,
+    label: where ? `step ${name}` : `step ${name} (deleted${unsent ? ", it won't be sent" : ''})`,
+    onOpen: where ? () => onOpenStep(where.scene.id, step.stepId) : undefined,
+  };
+}
+
+/** What went with a sent message: its steps, which open on a click, and its images, read from the service the first time they are shown. */
+function SentAttachments({ store, sessionId, attachments, scenes, onOpenStep }: {
+  store: AgentStore; sessionId: string; attachments: AgentAttachment[]; scenes: Scene[]; onOpenStep: (sceneId: string, stepId: string) => void;
+}) {
+  const images = attachments.filter((item) => item.kind === 'image');
+  const urls = useResolved(images.map((item) => item.id), (id) => store.imageUrl(sessionId, id));
   return (
     <AttachmentRow
-      className="attachments--sent" label="Attached images"
-      items={attachments.map((item, index) => ({
-        key: item.id, kind: item.kind, label: item.name ?? `Image ${index + 1}`,
-        src: urls[item.id] ?? undefined, failed: urls[item.id] === null,
-      }))}
+      className="attachments--sent" label="Attached to this message"
+      items={attachments.map((item): AttachmentItem => item.kind === 'step'
+        ? stepItem({ ...item, key: `step-${item.stepId}` }, scenes, onOpenStep)
+        : { key: item.id, kind: 'image', label: item.name ?? `Image ${images.indexOf(item) + 1}`, src: urls[item.id] ?? undefined, failed: urls[item.id] === null })}
     />
   );
 }
@@ -247,9 +266,13 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
   const drafts = state.drafts[draftKey] ?? [];
   const attachNotice = state.attachNotice[draftKey];
   const acceptsImages = HARNESS_ACCEPTS_IMAGES[harness];
+  const stepExists = (stepId: string) => locateStep(scenes, stepId) !== undefined;
+  const draftImages = drafts.filter((item) => item.kind === 'image');
+  // A deleted step's chip stays, saying so, but it is not sent: it does not make a message on its own.
+  const liveSteps = drafts.filter((item) => item.kind === 'step' && stepExists(item.stepId));
   // Said before sending: images the agent in the picker can't read keep the message from going.
-  const imagesBlocked = drafts.length > 0 && !acceptsImages;
-  const canSend = usable && !running && !imagesBlocked && Boolean(input.trim() || drafts.length);
+  const imagesBlocked = draftImages.length > 0 && !acceptsImages;
+  const canSend = usable && !running && !imagesBlocked && Boolean(input.trim() || draftImages.length || liveSteps.length);
 
   // The latest turn stays in view.
   useEffect(() => {
@@ -261,7 +284,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
     if (!canSend) return;
     const text = input;
     setInput('');
-    if (!(await store.send(projectId, targetSceneId, text))) setInput((current) => current || text);
+    if (!(await store.send(projectId, targetSceneId, text, stepExists))) setInput((current) => current || text);
   };
   const onComposerKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); }
@@ -404,7 +427,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
           const run = runs?.find((candidate) => candidate.id === turn.runId);
           return (
             <div key={turn.runId} className="agent__turn">
-              {turn.userAttachments?.length ? <SentAttachments store={store} sessionId={turn.sessionId} attachments={turn.userAttachments} /> : null}
+              {turn.userAttachments?.length ? <SentAttachments store={store} sessionId={turn.sessionId} attachments={turn.userAttachments} scenes={scenes} onOpenStep={onOpenStep} /> : null}
               {turn.userText && <p className="msg-user">{turn.userText}</p>}
               {turn.entries.map((entry, index) => entry.kind === 'text' ? (
                 <p key={entry.id} className="msg-agent">
@@ -496,7 +519,7 @@ export function AgentPanel({ store, input, setInput, projectId, projectName, sce
         )}
         <AttachmentRow
           label="Attachments"
-          items={drafts.map((item) => ({ key: item.key, kind: item.kind, label: item.name, src: item.url }))}
+          items={drafts.map((item): AttachmentItem => item.kind === 'step' ? stepItem(item, scenes, onOpenStep, true) : { key: item.key, kind: 'image', label: item.name, src: item.url })}
           onRemove={(key) => { store.detach(projectId, targetSceneId, key); textarea.current?.focus(); }}
         />
         <textarea

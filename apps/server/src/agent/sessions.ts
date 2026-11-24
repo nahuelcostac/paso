@@ -5,10 +5,11 @@ import { basename, dirname, join, resolve, sep } from 'node:path';
 import { idSchema } from '@paso/shared';
 import { z } from 'zod';
 import { ApiError, isMissing } from '../errors.js';
-import { AttachmentStore, parseAttachments, type AttachmentRef, type ImageInput } from './attachments.js';
+import { AttachmentStore, parseAttachments, type AttachmentRef, type ImageInput, type StepAttachmentRef } from './attachments.js';
 import { claudeAdapter, failureMessage } from './claude.js';
-import { codexAdapter } from './codex.js';
 import { agyAdapter } from './agy.js';
+import { codexAdapter } from './codex.js';
+import { isStepItem, parseStepAttachments, stepNotFound } from './steps.js';
 import { effortLevels, harnessIds, type AgentEvent, type AgentRunHooks, type AgentRunRequest, type FailureCode, type HarnessAdapter, type HarnessId } from './types.js';
 
 export type SessionInfo = {
@@ -28,6 +29,11 @@ export type SessionManagerOptions = {
   detect(id: HarnessId): Promise<{ found: boolean; path: string | null; session: string }>;
   /** Throws an ApiError (404) if the project or scene does not exist. */
   validateTarget(projectId: string, sceneId?: string): Promise<void>;
+  /**
+   * The steps a message names, as they are now: their scene, place and title. Each must be a step of the project, and of
+   * the session's scene in a loose diagram. Throws an ApiError (422 `STEP_NOT_FOUND`) if any is not.
+   */
+  resolveSteps?(projectId: string, sceneId: string | undefined, stepIds: string[]): Promise<StepAttachmentRef[]>;
   board(): AgentRunRequest['board'];
   /** Neutral, empty directory the harness runs in. */
   workDir: string;
@@ -241,13 +247,16 @@ export class SessionManager {
 
   /**
    * Starts a run with the person's message. `attachments` are images (`{ kind: 'image', mediaType, data, name? }`, data
-   * in base64): they are checked, kept with the conversation and handed to the harness as image content.
+   * in base64), which are checked, kept with the conversation and handed to the harness as image content, and steps of
+   * the project (`{ kind: 'step', stepId }`), which the harness gets as IDs in the turn's context.
    */
   async send(id: string, text: unknown, effort?: unknown, attachments?: unknown): Promise<{ runId: string; attachments: AttachmentRef[] }> {
     await this.load();
-    const images = parseAttachments(attachments);
-    if (typeof text !== 'string' || text.length > maxMessageChars || (!text.trim() && !images.length)) {
-      throw new ApiError(400, 'INVALID_MESSAGE', `Write a message of up to ${maxMessageChars.toLocaleString('en-US')} characters, or attach an image.`);
+    const items = Array.isArray(attachments) ? attachments : undefined;
+    const images = parseAttachments(items ? items.filter((item) => !isStepItem(item)) : attachments);
+    const stepIds = parseStepAttachments(items ? items.filter(isStepItem) : []);
+    if (typeof text !== 'string' || text.length > maxMessageChars || (!text.trim() && !images.length && !stepIds.length)) {
+      throw new ApiError(400, 'INVALID_MESSAGE', `Write a message of up to ${maxMessageChars.toLocaleString('en-US')} characters, or attach an image or a step.`);
     }
     if (this.closing) throw new ApiError(503, 'SERVICE_CLOSING', 'The service is shutting down.');
     const session = this.get(id);
@@ -259,6 +268,9 @@ export class SessionManager {
     // Said before anything is sent, so the person can pick another agent or remove the images.
     if (images.length && !adapter.acceptsImages) throw new ApiError(422, 'IMAGES_NOT_SUPPORTED', "This agent can't read images. Remove them or pick another agent.");
     await this.options.validateTarget(session.projectId, session.sceneId);
+    // A step that is gone (deleted since it was attached) refuses the whole message: the agent is never told to work on
+    // a step that is not there, and the person decides what to send instead.
+    const steps = stepIds.length ? await this.resolveSteps(session.projectId, session.sceneId, stepIds) : [];
     // A continued conversation adds to its stored history, so its numbering carries on.
     await this.history(session);
     const refs = await this.attachments.save(session.id, images);
@@ -283,8 +295,21 @@ export class SessionManager {
     session.state = 'running';
     session.run = { id: runId, controller, finished: Promise.resolve() };
     const input = images.map((image, index): ImageInput => ({ mediaType: refs[index].mediaType, data: image.bytes.toString('base64') }));
-    session.run.finished = this.execute(session, runId, text, controller.signal, effort as string | undefined, refs, input);
-    return { runId, attachments: refs };
+    const kept: AttachmentRef[] = [...steps, ...refs];
+    session.run.finished = this.execute(session, runId, text, controller.signal, effort as string | undefined, kept, input);
+    return { runId, attachments: kept };
+  }
+
+  private async resolveSteps(projectId: string, sceneId: string | undefined, stepIds: string[]) {
+    if (!this.options.resolveSteps) throw stepNotFound();
+    const resolved = await this.options.resolveSteps(projectId, sceneId, stepIds);
+    // Belt and braces: exactly the steps asked for, in the order asked, or nothing is sent.
+    const byId = new Map(resolved.map((step) => [step.stepId, step]));
+    return stepIds.map((stepId) => {
+      const step = byId.get(stepId);
+      if (!step) throw stepNotFound();
+      return step;
+    });
   }
 
   /** One attached image of a conversation, to show it again in the history. */
@@ -336,7 +361,8 @@ export class SessionManager {
     const fail = (code: FailureCode) => emit({ type: 'failed', code, message: message(code) });
     emit({ type: 'started' });
     emit({ type: 'message', text, ...(attachments.length ? { attachments } : {}) });
-    session.title ??= text.trim().replace(/\s+/g, ' ').slice(0, titleChars) || (attachments.length === 1 ? 'Image' : `${attachments.length} images`);
+    session.title ??= text.trim().replace(/\s+/g, ' ').slice(0, titleChars) || attachmentsTitle(attachments);
+    const steps = attachments.flatMap((item) => item.kind === 'step' ? [{ sceneId: item.sceneId, stepId: item.stepId }] : []);
     session.turns = (session.turns ?? 0) + 1;
     try {
       let blocked = false;
@@ -356,7 +382,7 @@ export class SessionManager {
             ...(session.resumeToken && tokenPattern.test(session.resumeToken) ? { resumeToken: session.resumeToken } : {}),
             ...(session.model ? { model: session.model } : {}),
             ...(effort ? { effort } : {}),
-            context: { projectId: session.projectId, ...(session.sceneId ? { sceneId: session.sceneId } : {}) },
+            context: { projectId: session.projectId, ...(session.sceneId ? { sceneId: session.sceneId } : {}), ...(steps.length ? { steps } : {}) },
             board: this.options.board(),
             limits: { idleTimeoutMs: this.options.idleTimeoutMs ?? 120_000, maxRunMs: this.options.maxRunMs ?? 20 * 60_000 },
           };
@@ -405,6 +431,14 @@ export class SessionManager {
     await Promise.all(runs.map((run) => run.finished));
     await this.writes;
   }
+}
+
+/** How the history names a conversation whose first message has no text: what it carried. */
+function attachmentsTitle(attachments: AttachmentRef[]) {
+  const steps = attachments.filter((item) => item.kind === 'step').length;
+  const images = attachments.length - steps;
+  if (steps) return steps === 1 ? 'Step' : `${steps} steps`;
+  return images === 1 ? 'Image' : `${images} images`;
 }
 
 /** Writes a file only this user can read, through a flushed temporary file and a rename, so a crash never leaves half of it. */

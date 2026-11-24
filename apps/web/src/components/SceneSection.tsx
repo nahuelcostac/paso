@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ArrowDown, ArrowUp, Ellipsis, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Ellipsis, GripVertical, MessageSquarePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { ApiClient } from '../lib/api';
 import { useGridColumns, useNear } from '../lib/dom-hooks';
 import { formatSteps } from '../lib/format';
@@ -45,6 +45,11 @@ type Props = {
   manage?: boolean;
   /** Names a step: a click on a card's title, or F2 on the card, opens the field. Resolves when saved. */
   onRenameStep?: (stepId: string, title: string) => Promise<void>;
+  /**
+   * Sends steps to the agent chat, in the scene's order. With it, each card has “Add to chat” on hover or focus, and
+   * steps can be selected (⌘/Ctrl-click, Shift-click, Shift and the arrows) to add them all at once.
+   */
+  onAddToChat?: (stepIds: string[]) => void;
   registerGrip: (element: HTMLButtonElement | null) => void;
 };
 
@@ -59,6 +64,10 @@ export function SceneSection(props: Props) {
   const [active, setActive] = useState(0);
   const [adding, setAdding] = useState(false);
   const [renamingStep, setRenamingStep] = useState<string | null>(null);
+  // The selection, for adding steps to the chat. The anchor is where a Shift range starts.
+  const [selection, setSelection] = useState<string[]>([]);
+  const anchor = useRef<string | null>(null);
+  const selectable = Boolean(props.onAddToChat);
   // Focus goes back to the card whose title was being edited.
   const endStepRename = (at: number) => { setRenamingStep(null); requestAnimationFrame(() => items.current[at]?.focus()); };
 
@@ -68,6 +77,21 @@ export function SceneSection(props: Props) {
 
   const count = scene.stepIds.length;
   const columns = useGridColumns(grid);
+  // In the scene's order, and only steps it still has.
+  const selected = scene.stepIds.filter((id) => selection.includes(id));
+  const toggle = (id: string) => {
+    anchor.current = id;
+    setSelection((current) => current.includes(id) ? current.filter((other) => other !== id) : [...current, id]);
+  };
+  /** Selects from the anchor to `id`, as Shift does in a file list; without an anchor, the open step or the first is one. */
+  const selectRange = (id: string, from = anchor.current ?? (currentStepId && scene.stepIds.includes(currentStepId) ? currentStepId : id)) => {
+    anchor.current = scene.stepIds.includes(from) ? from : id;
+    const a = scene.stepIds.indexOf(anchor.current);
+    const b = scene.stepIds.indexOf(id);
+    setSelection(scene.stepIds.slice(Math.min(a, b), Math.max(a, b) + 1));
+  };
+  const clearSelection = () => { setSelection([]); anchor.current = null; };
+  const addToChat = (ids: string[]) => { props.onAddToChat?.(ids); clearSelection(); };
   const last = Math.min(active, count); // The add slot is the last stop.
 
   // After renaming, give focus back to the scene's menu, which the field replaced.
@@ -80,13 +104,17 @@ export function SceneSection(props: Props) {
   const move = (event: KeyboardEvent) => {
     const at = items.current.indexOf(document.activeElement as HTMLButtonElement);
     if (at < 0) return;
-    const end = count; // index of the add slot
+    // Shift extends the selection over the steps; the add slot is never part of it.
+    const extend = selectable && event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey;
+    const end = extend ? count - 1 : count; // index of the add slot, or of the last step while selecting
+    if (extend && at >= count) return;
     const target: Record<string, number> = { ArrowRight: at + 1, ArrowLeft: at - 1, ArrowDown: at + columns, ArrowUp: at - columns, Home: 0, End: end };
     if (!(event.key in target)) return;
     event.preventDefault();
     let next = target[event.key];
     if (next > end) next = event.key === 'ArrowDown' && at < end ? end : at;
     if (next < 0) next = at;
+    if (extend) selectRange(scene.stepIds[next], anchor.current ?? scene.stepIds[at]);
     setActive(next);
     items.current[next]?.focus();
   };
@@ -118,6 +146,17 @@ export function SceneSection(props: Props) {
           ) : <h2 className="scene__title">{name}</h2>}
         </div>
         <span className="scene__meta">{formatSteps(count)}</span>
+        {selectable && selected.length > 0 && (
+          <div className="scene__selection" role="group" aria-label="Selected steps">
+            <span className="scene__selected" aria-live="polite">{selected.length === 1 ? '1 step selected' : `${selected.length} steps selected`}</span>
+            <button type="button" className="btn btn--soft" onClick={() => addToChat(selected)}>
+              <MessageSquarePlus className="i" aria-hidden="true" />Add to chat
+            </button>
+            <button type="button" className="icon-btn" aria-label="Clear selection" title="Clear selection (Esc)" onClick={clearSelection}>
+              <X className="i" aria-hidden="true" />
+            </button>
+          </div>
+        )}
         {!renaming && props.manage !== false && (
           <span className="scene__tools">
             <button
@@ -143,9 +182,18 @@ export function SceneSection(props: Props) {
         )}
       </div>
 
-      <div ref={grid} className="scene__steps" role="group" aria-label={`Steps of ${name}`} onKeyDown={move}>
+      <div
+        ref={grid} className="scene__steps" role="group" aria-label={`Steps of ${name}`}
+        onKeyDown={(event) => {
+          // Escape lets the selection go before it closes the Studio.
+          if (event.key === 'Escape' && selected.length && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); clearSelection(); return; }
+          move(event);
+        }}
+      >
         {scene.stepIds.map((id, at) => {
           const title = state.steps[id]?.title;
+          const isSelected = selected.includes(id);
+          const shortcuts = [props.onRenameStep ? 'F2' : '', selectable ? 'Meta+Space Control+Space' : ''].filter(Boolean).join(' ');
           const frame = (
             <StepFrame
               key={id}
@@ -154,22 +202,47 @@ export function SceneSection(props: Props) {
               title={title}
               framed={state.steps[id]?.framed}
               current={id === currentStepId}
+              selected={isSelected}
               agentState={stepAgentStates?.[id]}
               svg={thumbnails?.[id]?.svg}
               tabIndex={last === at ? 0 : -1}
-              aria-keyshortcuts={props.onRenameStep ? 'F2' : undefined}
+              aria-keyshortcuts={shortcuts || undefined}
               onFocus={() => setActive(at)}
-              onClick={() => props.onOpenStep(id)}
-              onKeyDown={props.onRenameStep ? (event) => { if (event.key === 'F2') { event.preventDefault(); setRenamingStep(id); } } : undefined}
+              onClick={(event) => {
+                // ⌘/Ctrl adds or takes one step from the selection, Shift selects a range; a plain click opens the step.
+                if (selectable && (event.metaKey || event.ctrlKey)) { event.preventDefault(); toggle(id); return; }
+                if (selectable && event.shiftKey) { event.preventDefault(); selectRange(id); return; }
+                props.onOpenStep(id);
+              }}
+              onKeyDown={(event) => {
+                if (props.onRenameStep && event.key === 'F2') { event.preventDefault(); setRenamingStep(id); return; }
+                if (!selectable) return;
+                const mod = event.metaKey || event.ctrlKey;
+                if (event.key === ' ' && (mod || event.shiftKey)) { event.preventDefault(); if (mod) toggle(id); else selectRange(id); return; }
+                if (mod && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'a') { event.preventDefault(); anchor.current = scene.stepIds[0] ?? null; setSelection([...scene.stepIds]); return; }
+              }}
             />
           );
-          if (!props.onRenameStep) return frame;
+          if (!props.onRenameStep && !selectable) return frame;
           const rename = props.onRenameStep;
+          // With a selection, a selected card's button adds all of it; otherwise it adds its own step.
+          const adds = isSelected && selected.length > 1 ? selected : [id];
+          const others = adds.length - 1;
+          const addLabel = others ? `Add step ${at + 1} and the ${others === 1 ? 'other selected step' : `${others} other selected steps`} to chat` : `Add step ${at + 1} to chat`;
           // The card opens the step; its title, on top of the card's label, names it.
           return (
-            <div key={id} className="step-card" data-renaming={renamingStep === id || undefined}>
+            <div key={id} className="step-card" data-renaming={renamingStep === id || undefined} data-selected={isSelected || undefined} data-framed={state.steps[id]?.framed ? true : undefined}>
               {frame}
-              {renamingStep === id ? (
+              {selectable && renamingStep !== id && (
+                <button
+                  type="button" className="step-card__chat" tabIndex={last === at ? 0 : -1} aria-label={addLabel}
+                  title={adds.length > 1 ? `Add ${adds.length} steps to chat` : 'Add to chat'}
+                  onFocus={() => setActive(at)} onClick={() => addToChat(adds)}
+                >
+                  <MessageSquarePlus className="i" aria-hidden="true" />
+                </button>
+              )}
+              {!rename ? null : renamingStep === id ? (
                 <div className="step-card__rename">
                   <NameField
                     initial={title ?? ''}

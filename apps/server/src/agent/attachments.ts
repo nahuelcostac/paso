@@ -4,10 +4,16 @@ import { join } from 'node:path';
 import { ApiError, isMissing } from '../errors.js';
 
 /**
- * What a person attaches to a message. Only images exist today; the list is generic so other kinds (such as Studio
- * steps) can join it with their own `kind`.
+ * What a person attaches to a message, each with its own `kind`: an image, kept with the conversation, or a step of the
+ * project (`steps.ts`), which is only named, never copied.
  */
-export type AttachmentRef = { id: string; kind: 'image'; mediaType: ImageMediaType; size: number; name?: string };
+export type ImageAttachmentRef = { id: string; kind: 'image'; mediaType: ImageMediaType; size: number; name?: string };
+/**
+ * A step the message is about, as it was when the message was sent: its IDs, its place (`number`, from 1) and its
+ * scene's name and its title, so the history can name it even after it changes or goes. `id` is the step's ID.
+ */
+export type StepAttachmentRef = { id: string; kind: 'step'; sceneId: string; stepId: string; number: number; sceneName: string; title?: string };
+export type AttachmentRef = ImageAttachmentRef | StepAttachmentRef;
 /** An image on its way to the harness: its bytes as base64, in memory only. It never names a file. */
 export type ImageInput = { mediaType: ImageMediaType; data: string };
 
@@ -77,12 +83,12 @@ export class AttachmentStore {
     return join(this.dir, sessionId);
   }
 
-  async save(sessionId: string, images: ParsedImage[]): Promise<AttachmentRef[]> {
+  async save(sessionId: string, images: ParsedImage[]): Promise<ImageAttachmentRef[]> {
     if (!images.length) return [];
     const folder = this.folder(sessionId);
     await mkdir(this.dir, { recursive: true, mode: 0o700 });
     await mkdir(folder, { recursive: true, mode: 0o700 });
-    const saved: AttachmentRef[] = [];
+    const saved: ImageAttachmentRef[] = [];
     try {
       for (const image of images) {
         const id = randomUUID();

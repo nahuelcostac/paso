@@ -246,6 +246,22 @@ export class Store {
       } catch (error) { return { id, error: { code: 'INVALID_PROJECT', message: error instanceof Error ? error.message : 'Invalid project.' } }; }
     }))) };
   }
+  /** Where each step of a project is: its scene, its scene's name, its place from 1 and its title. */
+  async stepPlaces(id: string) {
+    return this.lock(id, async () => {
+      const { tree } = await this.load(id);
+      const places = new Map<string, { sceneId: string; sceneName: string; number: number; title?: string }>();
+      for (const sceneId of tree.project.sceneIds) {
+        const entry = tree.scenes.find(({ scene }) => scene.id === sceneId);
+        if (!entry) continue;
+        entry.scene.stepIds.forEach((stepId, index) => {
+          const title = entry.steps.find((step) => step.id === stepId)?.title?.trim();
+          places.set(stepId, { sceneId, sceneName: entry.scene.name, number: index + 1, ...(title ? { title } : {}) });
+        });
+      }
+      return places;
+    });
+  }
   async read(id: string, sceneId?: string, stepId?: string, list?: 'scenes' | 'steps') {
     return this.lock(id, async () => {
       const { tree, records } = await this.load(id);

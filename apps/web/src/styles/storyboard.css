@@ -48,3 +48,9 @@
 .board__empty-title { font-size: var(--text-20); font-weight: var(--weight-bold); line-height: var(--leading-tight); letter-spacing: var(--tracking-title); }
 .board__empty .btn--soft { background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-sm); }
 .board__empty .btn--soft:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 84%, var(--surface)); box-shadow: var(--shadow-sm); }
+
+/* The steps selected for the chat (⌘/Ctrl-click, Shift-click, Shift and the arrows): how many, and one action for all of them. */
+.scene__selection { margin-left: auto; align-self: flex-end; display: flex; align-items: center; gap: var(--space-2); }
+.scene__selected { color: var(--ink-2); font-size: var(--text-12); font-weight: var(--weight-medium); white-space: nowrap; }
+.scene__selection .btn { height: var(--control-h-sm); padding: 0 10px; gap: 6px; }
+.scene__selection .icon-btn { width: var(--control-h-sm); height: var(--control-h-sm); }

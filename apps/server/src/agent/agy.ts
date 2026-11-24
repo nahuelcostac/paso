@@ -3,7 +3,7 @@ import { lstat, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { idSchema } from '@paso/shared';
-import { describeTarget } from './where.js';
+import { describeSteps, describeTarget } from './where.js';
 import { forgetAgy } from './forget.js';
 import { harnessEnvironment, startProcess, type ManagedProcess } from './process.js';
 import type { AgentEvent, AgentRunRequest, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
@@ -129,8 +129,8 @@ export function agyEnvironment(request: Pick<AgentRunRequest, 'board'>, source: 
  * (`acceptsImages` is false). Where the agent works is said first, as the agent file is the same for every session.
  */
 export function agyInput(request: Pick<AgentRunRequest, 'text' | 'context'>) {
-  const where = `[Paso] You are working in the ${describeTarget(request.context)} (service IDs).`;
-  return JSON.stringify({ event: 'user', message: { content: [{ type: 'text', text: `${where}\n\n${request.text}` }] } });
+  const where = `[Paso] You are working in the ${describeTarget(request.context)} (service IDs).${describeSteps(request.context.steps)}`;
+  return JSON.stringify({ event: 'user', message: { content: [{ type: 'text', text: request.text ? `${where}\n\n${request.text}` : where }] } });
 }
 
 /** Decides a failure from what agy said. Text is only inspected, never forwarded. */
