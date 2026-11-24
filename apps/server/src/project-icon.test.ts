@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProject } from '@paso/shared';
 import { startServer } from './server.js';
@@ -21,12 +21,13 @@ async function api(path: string, method = 'GET', input?: unknown, revision?: str
 }
 
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-icon-'));
+  // Its own folder, so the app's files beside the data (runs, workspace list) are not shared with other tests.
+  dataDir = join(await mkdtemp(join(tmpdir(), 'paso-icon-')), 'projects');
   service = await startServer({ dataDir, port: 0, sessionToken: token, pollIntervalMs: 100 });
 });
 afterEach(async () => {
   await service.close();
-  await rm(dataDir, { recursive: true, force: true });
+  await rm(dirname(dataDir), { recursive: true, force: true });
 });
 
 describe('project icon', () => {

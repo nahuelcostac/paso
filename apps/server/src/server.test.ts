@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { request } from 'node:http';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -66,13 +66,14 @@ function rejectedSocket(protocols: string[], headers: Record<string, string> = {
 }
 
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-service-'));
+  // Its own folder, so the app's files beside the data (runs, workspace list) are not shared with other tests.
+  dataDir = join(await mkdtemp(join(tmpdir(), 'paso-service-')), 'projects');
   service = await startServer({ dataDir, port: 0, sessionToken: token, pollIntervalMs: 100 });
 });
 afterEach(async () => {
   for (const client of clients.splice(0)) client.terminate();
   await service.close();
-  await rm(dataDir, { recursive: true, force: true });
+  await rm(dirname(dataDir), { recursive: true, force: true });
 });
 
 describe('documents and revisions', () => {

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { LOOSE_PROJECT_ID } from '@paso/shared';
 import { startServer } from '@paso/server';
 import { ApiClient } from '../lib/api';
 import { ActionError, ProjectsStore } from './projects-store';
@@ -21,14 +22,15 @@ const until = async (check: () => boolean, ms = 5000) => {
 };
 
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-store-'));
+  // Its own folder, so the app's files beside the data (runs, workspace list) are not shared with other tests.
+  dataDir = join(await mkdtemp(join(tmpdir(), 'paso-store-')), 'projects');
   service = await startServer({ dataDir, port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100 });
   store = new ProjectsStore(new ApiClient({ baseUrl: service.url, token }));
 });
 afterEach(async () => {
   store.dispose();
   await service.close();
-  await rm(dataDir, { recursive: true, force: true });
+  await rm(dirname(dataDir), { recursive: true, force: true });
 });
 
 describe('ProjectsStore', () => {
@@ -139,6 +141,41 @@ describe('ProjectsStore: loose diagrams', () => {
     expect(loose!.diagrams.map((diagram) => [diagram.id, diagram.scene.name, diagram.steps])).toEqual([['first', 'Primero', 1], ['second', 'Segundo', 0]]);
     await store.renameLoose('second', 'Ábaco');
     expect(store.getState().loose?.diagrams.map((diagram) => diagram.id)).toEqual(['second', 'first']);
+  });
+
+  it('shows a rename as soon as it returns, even while a newer re-read of the loose diagrams is on its way', async () => {
+    const api = new ApiClient({ baseUrl: service.url, token });
+    const list = api.listScenes.bind(api);
+    let armed = false;
+    let calls = 0;
+    let late: Promise<void> | undefined;
+    let open!: () => void;
+    const gate = new Promise<void>((resolve) => { open = resolve; });
+    // Once armed, the rename's own re-read starts a newer one and answers first; the newer one answers only later.
+    api.listScenes = async (id) => {
+      if (id !== LOOSE_PROJECT_ID || !armed) return list(id);
+      calls += 1;
+      if (calls === 1) {
+        late = store.refreshLoose();
+        const answer = await list(id);
+        setTimeout(open, 50);
+        return answer;
+      }
+      const answer = await list(id);
+      if (calls === 2) await gate;
+      return answer;
+    };
+    store.dispose();
+    store = new ProjectsStore(api);
+    await post('/api/projects/_loose/scenes', { id: 'first', name: 'Primero' });
+    await post('/api/projects/_loose/scenes', { id: 'second', name: 'Segundo' });
+    store.start();
+    await until(() => store.getState().loose?.diagrams.length === 2);
+    armed = true;
+    await store.renameLoose('second', 'Ábaco');
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(store.getState().loose?.diagrams.map((diagram) => diagram.id)).toEqual(['second', 'first']);
+    await late;
   });
 
   it('renames, deletes and moves one into a project', async () => {

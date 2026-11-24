@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
@@ -48,7 +48,8 @@ const box = (id: string, x = 0) => ({ id, type: 'rectangle', version: 1, version
 beforeEach(async () => {
   mocks.renders.length = 0; mocks.failing.clear();
   URL.revokeObjectURL ??= () => {};
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-present-'));
+  // Its own folder, so the app's files beside the data (runs, workspace list) are not shared with other tests.
+  dataDir = join(await mkdtemp(join(tmpdir(), 'paso-present-')), 'projects');
   window.history.replaceState(null, '', '/');
   window.matchMedia ??= ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
   service = await startServer({ dataDir, port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 100,
@@ -56,7 +57,7 @@ beforeEach(async () => {
     harnessDetection: { searchPaths: [], loginShell: false } });
   config = { baseUrl: service.url, token }; api = new ApiClient(config); recovery = memory();
 });
-afterEach(async () => { cleanup(); await service.close(); await rm(dataDir, { recursive: true, force: true }); });
+afterEach(async () => { cleanup(); await service.close(); await rm(dirname(dataDir), { recursive: true, force: true }); });
 
 /** Steps with the given elements. The address opens the step at `start`. */
 async function open(contents: Array<Array<ReturnType<typeof box>>>, start = 0) {

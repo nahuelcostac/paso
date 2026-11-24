@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { LOOSE_PROJECT_ID, isLooseProject, type Project, type Scene } from '@paso/shared';
 import { ApiClient, ApiRequestError, UnavailableError, type AgentEvent, type ProjectListItem, type WorkspaceListing } from '../lib/api';
+import { untilNewest } from '../lib/newest';
 
 export type ProjectRow =
   /** `sceneList` holds the scenes in order, so the sidebar can show them under the row without opening the project. */
@@ -69,6 +70,9 @@ export class ProjectsStore {
   private attempts = 0;
   private dirty = new Set<string>();
   private versions = new Map<string, number>();
+  /** The newest re-read of each project, and of the loose diagrams (a full load reads them too). */
+  private rowReads = new Map<string, Promise<void>>();
+  private looseRead?: Promise<void>;
   private disposed = false;
   private loading?: number;
 
@@ -172,8 +176,16 @@ export class ProjectsStore {
     return { project: envelope.document, revision: envelope.revision, diagrams };
   }
   private looseVersion = 0;
-  /** Re-read the loose diagrams. Older answers never overwrite newer ones. */
-  async refreshLoose() {
+  /**
+   * Re-read the loose diagrams. Older answers never overwrite newer ones, and it ends once the newest read is shown,
+   * so a change just made is in the state when it returns.
+   */
+  refreshLoose() {
+    const read = this.readLooseNow();
+    this.looseRead = read;
+    return untilNewest(read, () => this.looseRead);
+  }
+  private async readLooseNow() {
     const version = ++this.looseVersion;
     let loose: LooseState;
     try { loose = await this.readLoose(); }
@@ -189,7 +201,12 @@ export class ProjectsStore {
     try { this.set({ workspaces: await this.api.listWorkspaces() }); } catch { /* The next event or reconnect reads it again. */ }
   }
 
-  private async loadAll() {
+  private loadAll() {
+    const read = this.readAll();
+    this.looseRead = read;
+    return untilNewest(read, () => this.looseRead);
+  }
+  private async readAll() {
     const load = (this.loading ?? 0) + 1;
     this.loading = load;
     try {
@@ -216,9 +233,19 @@ export class ProjectsStore {
     }
   }
 
-  /** Re-read one project. Older answers never overwrite newer ones. */
-  async refresh(id: string) {
+  /**
+   * Re-read one project. Older answers never overwrite newer ones, and it ends once the newest read is shown, so a
+   * change just made is in the state when it returns.
+   */
+  refresh(id: string) {
     if (isLooseProject(id)) return this.refreshLoose();
+    const read = this.readRow(id);
+    this.rowReads.set(id, read);
+    return untilNewest(read, () => this.rowReads.get(id)).finally(() => {
+      if (this.rowReads.get(id) === read) this.rowReads.delete(id);
+    });
+  }
+  private async readRow(id: string) {
     const version = (this.versions.get(id) ?? 0) + 1;
     this.versions.set(id, version);
     let row: ProjectRow | null;

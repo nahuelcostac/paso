@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
@@ -75,7 +75,8 @@ const scene = (name: RegExp | string) => screen.getByRole('region', { name: type
 
 beforeEach(async () => {
   drawn.loads = 0; drawn.calls.length = 0;
-  dataDir = await mkdtemp(join(tmpdir(), 'paso-storyboard-'));
+  // Its own folder, so the app's files beside the data (runs, workspace list) are not shared with other tests.
+  dataDir = join(await mkdtemp(join(tmpdir(), 'paso-storyboard-')), 'projects');
   window.history.replaceState(null, '', '#/p/storyboard');
   window.localStorage.removeItem('paso.side-panel');
   window.matchMedia ??= ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
@@ -89,7 +90,7 @@ afterEach(async () => {
   delete document.documentElement.dataset.theme;
   vi.unstubAllGlobals();
   await service.close();
-  await rm(dataDir, { recursive: true, force: true });
+  await rm(dirname(dataDir), { recursive: true, force: true });
 });
 
 describe('the Studio against the real service', () => {

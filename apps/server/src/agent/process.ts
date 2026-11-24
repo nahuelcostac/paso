@@ -131,19 +131,25 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
   armIdle();
 
   const decoder = new StringDecoder('utf8');
-  let pending = '';
+  // The unfinished line, in pieces: each chunk is searched once, so a line of many megabytes (Codex repeats attached
+  // images) costs time in proportion to its length, not to its length squared.
+  let pending: string[] = [];
+  let pendingLength = 0;
   const emit = (line: string) => { if (line.trim()) options.onLine(line); };
   child.stdout!.on('data', (chunk: Buffer) => {
     if (wanted) return;
     armIdle();
-    pending += decoder.write(chunk);
+    let text = decoder.write(chunk);
     let newline: number;
-    while ((newline = pending.indexOf('\n')) >= 0) {
-      const line = pending.slice(0, newline);
-      pending = pending.slice(newline + 1);
+    while ((newline = text.indexOf('\n')) >= 0) {
+      pending.push(text.slice(0, newline));
+      const line = pending.join('');
+      pending = []; pendingLength = 0;
+      text = text.slice(newline + 1);
       emit(line);
     }
-    if (pending.length > options.maxLineBytes) { pending = ''; void stop('line-too-long'); }
+    if (text) { pending.push(text); pendingLength += text.length; }
+    if (pendingLength > options.maxLineBytes) { pending = []; pendingLength = 0; void stop('line-too-long'); }
   });
   child.stderr!.on('data', (chunk: Buffer) => { stderrTail = (stderrTail + chunk.toString('utf8')).slice(-4096); });
   child.stdin!.on('error', () => {});
@@ -165,8 +171,8 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
       // A normal exit can leave helpers behind (such as the MCP server). Remove them too.
       if (pid !== undefined && groupAlive(pid)) await terminateTree(pid, 500);
       live.delete(pid ?? -1);
-      if (!wanted && pending) emit(pending);
-      pending = '';
+      if (!wanted && pending.length) emit(pending.join(''));
+      pending = []; pendingLength = 0;
       settle({ reason: wanted ?? 'exit', code, signal, stderrTail });
     })();
   });
