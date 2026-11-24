@@ -581,10 +581,11 @@ li[data-drop='true'] > .project .project__name, li[data-drop='true'] > .project 
   .view-switch__option { width: var(--control-h); padding: 0; }
   .board { --board-corner-w: 220px; }
 }
-/* Narrower, Excalidraw's toolbar would reach the switch: it steps down, beside “Frame”. */
+/* Narrower, Excalidraw's toolbar would reach the switch on the canvas: it steps down, beside “Frame”. The Studio has no
+   toolbar, so there it stays beside Present. */
 @container main (max-width: 965px) {
-  .canvas__corner:has(> .btn--primary) > .view-switch { grid-row: 2; }
-  .canvas__corner:has(> .btn--primary) > .camera-control { grid-column: 2; }
+  .canvas__corner:not(.board__corner):has(> .btn--primary) > .view-switch { grid-row: 2; }
+  .canvas__corner:not(.board__corner):has(> .btn--primary) > .camera-control { grid-column: 2; }
 }
 /* Why Present could not start: beside it, to its left, so the corner's column keeps its width. */
 .present-error { position: absolute; top: 0; right: calc(100% + var(--space-2)); display: inline-flex; align-items: center; gap: var(--space-1); width: max-content; max-width: 320px; padding: 0 var(--space-1) 0 var(--space-3); height: 36px; border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); font-size: var(--text-12); box-shadow: var(--shadow-sm); }
