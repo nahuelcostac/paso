@@ -70,6 +70,14 @@ describe('sidebar layout', () => {
     expect(rule(app, '.canvas__corner > .camera-control')).not.toContain('justify-self');
   });
 
+  it('keeps the step strip\'s scrollbar slim, so its thumbnails stay under its top', async () => {
+    const carousel = await css('carousel.css');
+    // Over its bar the strip is 100px and its thumbnails 88px, anchored at its foot: a scrollbar over 9px pushes them up
+    // under the canvas.
+    expect(carousel).toContain('.carousel__frames::-webkit-scrollbar { height: 4px; }');
+    expect(carousel).toContain('.carousel__frames { scrollbar-width: auto; scrollbar-color: auto; }');
+  });
+
   it('keeps the macOS panel drag region to the right of the sidebar toggle', async () => {
     const app = await css('app.css');
     const mac = ":root[data-window-controls='mac']";
