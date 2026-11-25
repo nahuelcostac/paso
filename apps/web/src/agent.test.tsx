@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -10,6 +10,7 @@ import { startServer, type AgentEvent, type AgentRunRequest, type HarnessAdapter
 import { App } from './App';
 import { ApiClient, type ClientConfig } from './lib/api';
 import { AgentStore } from './state/agent-store';
+import { fakePath, writeLauncher } from '../../server/src/agent/testing/launcher.js';
 
 /**
  * The agent panel against a real service on a temporary data folder. Only the harness is fake: an adapter
@@ -76,14 +77,11 @@ async function agentEdits(path: string, change: (document: StepEnvelope['documen
 const rect = (id: string, x = 0) => ({ id, type: 'rectangle', x, y: 0, width: 40, height: 30, version: 1, versionNonce: 1, isDeleted: false });
 
 async function installHarness(id: string, version: string, loggedIn = true) {
-  const script = join(binDir, id);
-  await writeFile(script, `#!/bin/sh
-if [ "$1" = "--version" ]; then echo "${version}"; exit 0; fi
-if [ "$1" = "auth" ]; then echo '{"loggedIn":${loggedIn}}'; exit 0; fi
-if [ "$1" = "login" ]; then echo "Logged in"; exit 0; fi
-exit 0
-`, 'utf8');
-  await chmod(script, 0o755);
+  await writeLauncher(fakePath(join(binDir, id)), `
+    if (process.argv[2] === '--version') console.log(${JSON.stringify(version)});
+    if (process.argv[2] === 'auth') console.log(JSON.stringify({ loggedIn: ${loggedIn} }));
+    if (process.argv[2] === 'login') console.log('Logged in');
+  `);
 }
 
 async function seedProject() {

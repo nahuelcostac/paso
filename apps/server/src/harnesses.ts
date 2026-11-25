@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process';
-import { constants } from 'node:fs';
-import { access, mkdir, open, readFile, realpath, rename, unlink } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, delimiter, isAbsolute, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { ApiError, isMissing } from './errors.js';
 import { harnessEnvironment } from './agent/process.js';
+import { executable, harnessLaunch, windowsEnv, windowsPathDirectories } from './agent/launch.js';
 import { discoverCodexModels, fallbackModels, type CodexModel } from './codex-models.js';
 
 const ids = ['claude', 'codex', 'agy'] as const;
@@ -14,24 +14,33 @@ type Status = 'signed_in' | 'signed_out' | 'unknown';
 export type DetectionOptions = { searchPaths?: string[]; loginShell?: boolean; timeoutMs?: number };
 function validId(value: unknown): value is HarnessId { return typeof value === 'string' && ids.some((id) => id === value); }
 function run(file: string, args: string[], timeout: number): Promise<{ ok: boolean; output: string }> {
-  return new Promise((done) => execFile(file, args, { timeout, maxBuffer: 64 * 1024, windowsHide: true,
+  const launch = harnessLaunch(file, args);
+  if (!launch) return Promise.resolve({ ok: false, output: '' });
+  return new Promise((done) => execFile(launch.file, launch.args, { timeout, maxBuffer: 64 * 1024, windowsHide: true, shell: false,
     // The same reduced environment a session gets, so "signed in" means what the session will see.
-    env: harnessEnvironment({}) }, (error, stdout, stderr) => {
+    env: harnessEnvironment(launch.env ?? {}) }, (error, stdout, stderr) => {
     done({ ok: !error, output: String(stdout) + (args[0] === 'login' ? String(stderr) : '') });
   }));
 }
-async function executable(path: string) {
-  try { await access(path, constants.X_OK); return await realpath(path); } catch { return null; }
-}
 async function find(id: HarnessId, options: DetectionOptions) {
-  const paths = options.searchPaths ?? [
+  const windows = process.platform === 'win32';
+  const paths = options.searchPaths ?? (windows ? [
+    ...windowsPathDirectories(windowsEnv('PATH') ?? ''),
+    ...(windowsEnv('APPDATA') ? [join(windowsEnv('APPDATA')!, 'npm')] : []),
+    join(homedir(), '.local', 'bin'), join(homedir(), 'bin'),
+  ] : [
     ...(process.env.PATH ?? '').split(delimiter), join(homedir(), '.local', 'bin'),
     join(homedir(), 'bin'), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin',
-  ];
+  ]);
   for (const dir of paths) {
     if (!dir || !isAbsolute(dir)) continue;
-    const result = await executable(join(dir, id));
-    if (result) return result;
+    for (const extension of windows ? ['.exe', '.cmd'] : ['']) {
+      const candidate = join(dir, id + extension);
+      const result = executable(candidate);
+      // Keep the shim's path: npm resolves its entry relative to the directory containing it.
+      if (result && extension !== '.cmd') return result;
+      if (result && harnessLaunch(candidate, [])) return candidate;
+    }
   }
   if (options.loginShell !== false && process.platform !== 'win32') {
     const shell = process.env.SHELL;
@@ -53,7 +62,7 @@ export async function detectHarness(id: HarnessId, options: DetectionOptions = {
     id === 'claude' ? run(path, ['auth', 'status', '--json'], timeout) :
       id === 'codex' ? run(path, ['login', 'status'], timeout) : Promise.resolve(null),
   ]);
-  const match = versionResult.ok ? versionResult.output.trim().match(/\b\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\b/) : null;
+  const match = versionResult.ok ? versionResult.output.trim().match(/\bv?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\b/) : null;
   let session: Status = 'unknown';
   if (id === 'claude' && auth) {
     try { const data = JSON.parse(auth.output) as { loggedIn?: unknown }; if (typeof data.loggedIn === 'boolean') session = data.loggedIn ? 'signed_in' : 'signed_out'; } catch { /* Unknown output. */ }
@@ -63,7 +72,7 @@ export async function detectHarness(id: HarnessId, options: DetectionOptions = {
     if (/not logged in/i.test(auth.output)) session = 'signed_out';
     else if (auth.ok && /logged in/i.test(auth.output)) session = 'signed_in';
   }
-  return { id, found: true, path, version: match?.[0] ?? null, session,
+  return { id, found: true, path, version: match?.[1] ?? null, session,
     ...(session === 'signed_out' ? { message: 'Sign in to this agent and detect it again.' } : {}) };
 }
 export class HarnessRegistry {

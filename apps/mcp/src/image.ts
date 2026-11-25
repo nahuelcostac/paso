@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import type { Step } from '@paso/shared';
 import type { BoardApi } from './api.js';
 import { chromiumImage } from './chromium.js';
+import { fontDirectory } from './font.js';
 
 export async function renderStep(api: BoardApi, projectId: string, step: Step): Promise<string> {
   if (!api.config.browserExecutable) throw new Error('IMAGE_UNAVAILABLE. No browser is configured. The host can set PASO_MCP_BROWSER_EXECUTABLE to an installed Chromium executable and restart MCP. No download is automatic. Use read_step for positions, labels, connections and potential overlaps, or open this step in Paso for a visual check.');
@@ -25,7 +26,8 @@ export async function renderStep(api: BoardApi, projectId: string, step: Step): 
     const path = request.url.slice(prefix.length) || 'index.html';
     if (path === 'snapshot') { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ step, files })); return; }
     if (!/^(index\.html|assets\/[A-Za-z0-9_.-]+|fonts\/[A-Za-z]+\/[A-Za-z0-9_-]+\.woff2)$/.test(path)) { response.writeHead(404).end(); return; }
-    void readFile(join(root, path)).then((bytes) => {
+    const file = path.startsWith('fonts/') ? join(fontDirectory, path.slice('fonts/'.length)) : join(root, path);
+    void readFile(file).then((bytes) => {
       response.writeHead(200, { 'Content-Type': types[path.split('.').at(-1)!] ?? 'application/octet-stream' }); response.end(bytes);
     }).catch(() => { response.writeHead(404).end(); });
   });

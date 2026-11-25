@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openSync, type Font } from 'fontkit';
 
-const bundledFonts = fileURLToPath(new URL('./fonts/', import.meta.url));
+const bundledFonts = fileURLToPath(new URL('../web/excalidraw/fonts/', import.meta.url));
 export const fontDirectory = existsSync(bundledFonts) ? bundledFonts : join(dirname(createRequire(import.meta.url).resolve('@excalidraw/excalidraw')), 'fonts');
 // Excalidraw 0.18.1 fonts/Excalifont/index.ts unicodeRange descriptors.
 const subsets = [

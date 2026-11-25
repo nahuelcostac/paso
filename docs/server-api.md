@@ -659,10 +659,12 @@ failed" or "not logged in" is `signed_out`; "invalid model selection" is
 ### Processes
 
 The harness runs without a shell, as an argument array, in its own process
-group. Cancelling, a timeout, an unsafe configuration or closing the service
-sends SIGTERM to the group, then SIGKILL after 1.5 s, so Claude, its MCP
-server and anything they started end together (`taskkill /T /F` on Windows,
-which has not been tested). `close()` waits for them; the CLI handles SIGINT and
+group on POSIX. On Windows, Paso detects native executables and npm-generated
+`.cmd` shims on PATH or in the default npm global directory. It resolves the
+shim to its Node entry or native executable and passes the arguments directly.
+Cancelling, a timeout, an unsafe configuration or closing the service
+sends SIGTERM to the group, then SIGKILL after 1.5 s on POSIX. On Windows Paso
+runs `taskkill /T /F` for the harness PID and waits for it. `close()` waits for them; the CLI handles SIGINT and
 SIGTERM, and an exit handler kills the groups if the service dies abnormally.
 If the service is killed outright (SIGKILL), a running harness cannot be
 stopped by anyone: it finishes its current turn on its own, within seconds to

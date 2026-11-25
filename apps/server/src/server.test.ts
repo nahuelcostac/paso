@@ -238,14 +238,16 @@ describe('assets and disk validation', () => {
     const outside = await mkdtemp(join(tmpdir(), 'paso-outside-'));
     try {
       await writeFile(join(outside, 'keep'), 'unchanged');
-      await symlink(outside, join(dataDir, 'link'));
+      await symlink(outside, join(dataDir, 'link'), 'junction');
       expect((await api('/api/projects/link')).status).toBe(422);
       await mkdir(join(dataDir, 'p/assets'), { recursive: true });
-      await symlink(join(outside, 'keep'), join(dataDir, 'p/assets/link.png'));
+      // A junction also exercises link rejection without requiring Windows Developer Mode.
+      if (process.platform === 'win32') await symlink(outside, join(dataDir, 'p/assets/link.png'), 'junction');
+      else await symlink(join(outside, 'keep'), join(dataDir, 'p/assets/link.png'));
       expect((await api(`${p}/assets/link.png`)).status).toBe(422);
       await rm(join(dataDir, 'p/assets/link.png'));
       await mkdir(join(dataDir, 'p/scenes'), { recursive: true });
-      await symlink(outside, join(dataDir, 'p/scenes/link'));
+      await symlink(outside, join(dataDir, 'p/scenes/link'), 'junction');
       expect((await api(p)).status).toBe(422);
       expect(await readFile(join(outside, 'keep'), 'utf8')).toBe('unchanged');
     } finally { await rm(outside, { recursive: true, force: true }); }

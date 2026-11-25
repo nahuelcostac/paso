@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { fakePath, windows, writeFixture, writeLauncher } from './testing/launcher.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -71,8 +72,7 @@ const stored = async (sessionId: string) => readdir(join(root, 'agent-attachment
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'paso-attach-'));
   await mkdir(join(root, 'bin'), { recursive: true });
-  await writeFile(join(root, 'bin', 'claude'), `#!/bin/sh\nFAKE_DIR='${root}' exec '${process.execPath}' '${fixture}' "$@"\n`);
-  await chmod(join(root, 'bin', 'claude'), 0o755);
+  await writeFixture(fakePath(join(root, 'bin', 'claude')), fixture, { FAKE_DIR: root });
   await start();
 });
 afterEach(async () => {
@@ -113,8 +113,10 @@ describe('images attached to a message', () => {
     // Kept in the service's data folder, private, outside the project folder.
     const files = await stored(id);
     expect(files.sort()).toEqual([`${refs[0].id}.png`, `${refs[1].id}.jpg`].sort());
-    expect((await stat(join(root, 'agent-attachments', id, `${refs[0].id}.png`))).mode & 0o777).toBe(0o600);
-    expect((await stat(join(root, 'agent-attachments', id))).mode & 0o777).toBe(0o700);
+    if (!windows) {
+      expect((await stat(join(root, 'agent-attachments', id, `${refs[0].id}.png`))).mode & 0o777).toBe(0o600);
+      expect((await stat(join(root, 'agent-attachments', id))).mode & 0o777).toBe(0o700);
+    }
     expect(JSON.stringify(await readdir(join(root, 'projects'), { recursive: true }))).not.toMatch(/\.png|\.jpg/);
 
     // Shown again in the history: the bytes, typed as the image they are, and only with the token.
@@ -192,8 +194,7 @@ describe('images attached to a message', () => {
   });
 
   it('are refused before sending to Antigravity, whose print mode takes text only', async () => {
-    await writeFile(join(root, 'bin', 'agy'), '#!/bin/sh\necho 1.5.16\n');
-    await chmod(join(root, 'bin', 'agy'), 0o755);
+    await writeLauncher(fakePath(join(root, 'bin', 'agy')), "console.log('1.5.16')");
     const id = await session(await project(), 'agy');
     const reply = await api(`/api/agent/sessions/${id}/messages`, 'POST', { text: 'Mira', attachments: [image(png, 'image/png')] });
     expect([reply.status, reply.data.error.code]).toEqual([422, 'IMAGES_NOT_SUPPORTED']);

@@ -1,12 +1,13 @@
-import { chmod, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startServer } from '../server.js';
 import { codexAdapter } from './codex.js';
 import { codexTranscriptPaths } from './forget.js';
 import { codexCatalog, codexConfiguration } from './codex-policy.js';
 import type { AgentEvent, AgentRunRequest } from './types.js';
+import { fakePath, writeFixture, writeLauncher } from './testing/launcher.js';
 
 let root: string;
 let server: Awaited<ReturnType<typeof startServer>>;
@@ -21,26 +22,28 @@ const collect = async (text = 'ok', extra: Partial<AgentRunRequest> = {}, signal
 const records = async () => (await readFile(join(root, 'records.jsonl'), 'utf8')).trim().split('\n').map((l) => JSON.parse(l));
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'paso-codex-'));
+  vi.stubEnv('CODEX_HOME', root);
+  await writeFile(join(root, 'auth.json'), '{}');
   server = await startServer({ dataDir: join(root, 'projects'), port: 0, sessionToken: token });
   const api = async (path: string, body: unknown) => fetch(server.url + '/api' + path, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   await api('/projects', { id: 'p', name: 'Prueba' });
   await api('/projects/p/scenes', { id: 's', name: 'Escena' });
   await api('/projects/p/scenes/s/steps', { id: 'st', title: 'Paso' });
-  const executable = join(root, 'codex');
-  await writeFile(executable, `#!/bin/sh\nFAKE_RECORD='${root}/records.jsonl' exec '${process.execPath}' '${fixture}' "$@"\n`);
-  await chmod(executable, 0o755);
+  const executable = await writeFixture(fakePath(join(root, 'codex')), fixture, { FAKE_RECORD: join(root, 'records.jsonl') });
   const workDir = join(root, 'work'); await mkdir(workDir);
   request = { executable, workDir, text: 'ok', context: { projectId: 'p', sceneId: 's' },
     board: { serviceUrl: server.url, sessionToken: token, mcp: { command: process.execPath, args: [join(import.meta.dirname, '../../../mcp/dist/cli.js')] } },
     limits: { idleTimeoutMs: 5000, maxRunMs: 15000 } };
 });
-afterEach(async () => { await server?.close(); await rm(root, { recursive: true, force: true }); });
+afterEach(async () => { vi.unstubAllEnvs(); await server?.close(); await rm(root, { recursive: true, force: true }); });
 
 describe('Codex app-server adapter with a simulated harness and real board MCP', () => {
   it('passes Electron Node mode to the MCP child', async () => {
-    const executable = join(root, 'electron-node');
-    await writeFile(executable, `#!/bin/sh\n[ "$ELECTRON_RUN_AS_NODE" = 1 ] || exit 1\nexec '${process.execPath}' "$@"\n`);
-    await chmod(executable, 0o755);
+    const executable = await writeLauncher(fakePath(join(root, 'electron-node')), `
+      import { pathToFileURL } from 'node:url';
+      if (process.env.ELECTRON_RUN_AS_NODE !== '1') process.exit(1);
+      process.argv.splice(1, 1);
+      await import(pathToFileURL(process.argv[1]).href);`);
     const board = { ...request.board, mcp: { ...request.board.mcp, command: executable, electronRunAsNode: true } };
     expect((await collect('ok', { board })).at(-1)).toEqual({ type: 'finished', reason: 'completed' });
   });
@@ -116,7 +119,7 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
     expect(events.filter((e) => e.type === 'failed' || e.type === 'finished')).toHaveLength(1);
   });
   it('rejects an unverified CLI version before submitting a turn', async () => {
-    await writeFile(request.executable, `#!/bin/sh\nFAKE_CODEX_VERSION='0.165.0' FAKE_RECORD='${root}/records.jsonl' exec '${process.execPath}' '${fixture}' "$@"\n`);
+    await writeFixture(request.executable, fixture, { FAKE_CODEX_VERSION: '0.165.0', FAKE_RECORD: join(root, 'records.jsonl') });
     expect((await collect()).at(-1)).toMatchObject({ type: 'failed', code: 'unsupported_version' });
     expect((await records()).some((r) => r.method === 'turn/start')).toBe(false);
   });
@@ -125,7 +128,7 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
     await writeFile(join(root, 'codex-home', 'config.toml'), '[mcp_servers.evil]\ncommand="evil"');
     expect((await collect()).at(-1)).toMatchObject({ type: 'failed', code: 'unsafe_configuration' });
     expect((await records()).filter((r) => r.method === 'turn/start')).toHaveLength(1);
-    expect(await readlink(join(root, 'codex-home', 'auth.json'))).toMatch(/auth\.json$/);
+    expect(await readFile(join(root, 'codex-home', 'auth.json'), 'utf8')).toBe('{}');
   });
   it('reports a board process that cannot start', async () => {
     expect((await collect('ok', { board: { ...request.board, mcp: { command: join(root, 'missing-mcp'), args: [] } } })).at(-1)).toMatchObject({ type: 'failed', code: 'board_unavailable' });
@@ -145,8 +148,8 @@ describe('Codex app-server adapter with a simulated harness and real board MCP',
     expect((await result).at(-1)).toEqual({ type: 'finished', reason: 'cancelled' });
     expect(() => process.kill(pid!, 0)).toThrow();
   });
-  it('times out an idle harness', async () => {
-    expect((await collect('hang', { limits: { idleTimeoutMs: 500, maxRunMs: 5000 } })).at(-1)).toMatchObject({ type: 'failed', code: 'timeout' });
+  it('times out an idle harness', { timeout: 10_000 }, async () => {
+    expect((await collect('hang', { limits: { idleTimeoutMs: 1500, maxRunMs: 6000 } })).at(-1)).toMatchObject({ type: 'failed', code: 'timeout' });
   });
 
   it('asks for the chosen reasoning effort on the turn only, and offers it in the catalog', async () => {

@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -6,6 +6,7 @@ import { startServer } from '../server.js';
 import { agyAdapter, agyAgentFile, agyArguments, agyFailureMessage, agyVersionSupported, agyWorkspace, classifyAgyFailure } from './agy.js';
 import { agyTranscriptPaths, forgetAgy } from './forget.js';
 import type { AgentEvent, AgentRunRequest } from './types.js';
+import { fakePath, writeFixture, writeLauncher } from './testing/launcher.js';
 
 let root: string;
 let server: Awaited<ReturnType<typeof startServer>>;
@@ -18,10 +19,8 @@ const collect = async (text = 'ok', extra: Partial<AgentRunRequest> = {}, signal
   return events;
 };
 const records = async () => (await readFile(join(root, 'records.jsonl'), 'utf8')).trim().split('\n').map((l) => JSON.parse(l));
-const fakeAgy = async (env = '') => {
-  await writeFile(request.executable, `#!/bin/sh\n${env} FAKE_RECORD='${root}/records.jsonl' exec '${process.execPath}' '${fixture}' "$@"\n`);
-  await chmod(request.executable, 0o755);
-};
+const fakeAgy = (env: Record<string, string> = {}) =>
+  writeFixture(request.executable, fixture, { ...env, FAKE_RECORD: join(root, 'records.jsonl') });
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'paso-agy-'));
   server = await startServer({ dataDir: join(root, 'projects'), port: 0, sessionToken: token });
@@ -30,7 +29,7 @@ beforeEach(async () => {
   await api('/projects/p/scenes', { id: 's', name: 'Escena' });
   await api('/projects/p/scenes/s/steps', { id: 'st', title: 'Paso' });
   const workDir = join(root, 'work'); await mkdir(workDir);
-  request = { executable: join(root, 'agy'), workDir, text: 'ok', context: { projectId: 'p', sceneId: 's' },
+  request = { executable: fakePath(join(root, 'agy')), workDir, text: 'ok', context: { projectId: 'p', sceneId: 's' },
     board: { serviceUrl: server.url, sessionToken: token, mcp: { command: process.execPath, args: [join(import.meta.dirname, '../../../mcp/dist/cli.js')] } },
     limits: { idleTimeoutMs: 5000, maxRunMs: 15000 } };
   await fakeAgy();
@@ -103,13 +102,13 @@ describe('agy adapter with a simulated harness and real board MCP', () => {
   });
 
   it('refuses a resumed session that comes back as another conversation', async () => {
-    await fakeAgy("FAKE_AGY_CONVERSATION='other'");
+    await fakeAgy({ FAKE_AGY_CONVERSATION: 'other' });
     expect((await collect('ok', { resumeToken: 'fake-agy-conversation' })).at(-1)).toMatchObject({ type: 'failed', code: 'protocol' });
     expect((await records()).some((r) => r.stdin !== undefined)).toBe(false);
   });
 
   it('never sends the message to a session that is not running the Paso agent', async () => {
-    await fakeAgy("FAKE_AGY_AGENT=''");
+    await fakeAgy({ FAKE_AGY_AGENT: '' });
     const events = await collect();
     expect(events.at(-1)).toMatchObject({ type: 'failed', code: 'unsafe_configuration' });
     expect(events.some((e) => e.type === 'session')).toBe(false);
@@ -136,12 +135,17 @@ describe('agy adapter with a simulated harness and real board MCP', () => {
   });
 
   it('refuses an agent file the CLI cannot load, without falling back', async () => {
-    await writeFile(request.executable, `#!/bin/sh\n[ "$1" = --version ] && { echo 1.5.16; exit 0; }\necho 'error: unknown agent "paso-board" (no custom agents are available)' >&2\nexit 1\n`);
+    await writeLauncher(request.executable, `
+      if (process.argv[2] === '--version') console.log('1.5.16');
+      else {
+        console.error('error: unknown agent "paso-board" (no custom agents are available)');
+        process.exitCode = 1;
+      }`);
     expect((await collect()).at(-1)).toMatchObject({ type: 'failed', code: 'unsupported_version' });
   });
 
   it('rejects a version older than the verified one before starting a turn', async () => {
-    await fakeAgy("FAKE_AGY_VERSION='1.5.15'");
+    await fakeAgy({ FAKE_AGY_VERSION: '1.5.15' });
     expect((await collect()).at(-1)).toMatchObject({ type: 'failed', code: 'unsupported_version' });
     await expect(readFile(join(root, 'records.jsonl'), 'utf8')).rejects.toThrow();
     expect(agyVersionSupported('1.5.16')).toBe(true);
@@ -153,7 +157,7 @@ describe('agy adapter with a simulated harness and real board MCP', () => {
 
   it('refuses a workspace replaced by a link', async () => {
     const elsewhere = join(root, 'elsewhere'); await mkdir(elsewhere);
-    await symlink(elsewhere, agyWorkspace(request.workDir));
+    await symlink(elsewhere, agyWorkspace(request.workDir), 'junction');
     expect((await collect()).at(-1)).toMatchObject({ type: 'failed', code: 'unsafe_configuration' });
     expect(await readdir(elsewhere)).toEqual([]);
   });

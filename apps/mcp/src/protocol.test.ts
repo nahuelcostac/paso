@@ -3,7 +3,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
+import { resolve, join, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -207,10 +207,10 @@ describe('compiled stdio MCP with a compiled local service', () => {
     // Compare every file. Only updatedAt and the intentional human-only edit differ.
     for (const [path, original] of before) {
       const actual = after.get(path)!;
-      if (path.endsWith('/project.json')) {
+      if (path.endsWith(sep + 'project.json')) {
         const project = JSON.parse(actual.toString());
         expect(project).toEqual({ ...JSON.parse(original.toString()), updatedAt: project.updatedAt });
-      } else if (path.endsWith('/steps/a.json')) expect(actual).toEqual(humanBytes);
+      } else if (path.endsWith(sep + join('steps', 'a.json'))) expect(actual).toEqual(humanBytes);
       else expect(actual).toEqual(original);
     }
   });

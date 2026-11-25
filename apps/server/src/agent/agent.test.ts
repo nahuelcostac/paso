@@ -1,12 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { startServer, type AgentOptions } from '../server.js';
 import { ClaudeStream, claudeArguments, classifyClaudeFailure } from './claude.js';
 import { harnessEnvironment } from './process.js';
+import { fakePath, windows, writeFixture } from './testing/launcher.js';
 import { checkWorkDir } from './sessions.js';
 import type { AgentEvent, AgentRunHooks } from './types.js';
 
@@ -21,8 +22,7 @@ const polluted = { CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: 'outer-session', ANT
 async function install(id = 'claude') {
   await mkdir(join(root, 'bin'), { recursive: true });
   const file = join(root, 'bin', id);
-  await writeFile(file, `#!/bin/sh\nFAKE_DIR='${root}' exec '${process.execPath}' '${fixture}' "$@"\n`);
-  await chmod(file, 0o755);
+  await writeFixture(fakePath(file), fixture, { FAKE_DIR: root });
 }
 async function start(agent: AgentOptions = {}) {
   service = await startServer({
@@ -136,7 +136,7 @@ describe('Claude Code session: arguments, environment and isolation', () => {
     // A neutral, empty working directory that is not the repository or the home folder.
     expect(await realpath(call.cwd)).toBe(await realpath(join(root, 'agent-workspace')));
     expect(await realpath(call.cwd)).not.toBe(await realpath(homedir()));
-    expect((await stat(call.cwd)).mode & 0o777).toBe(0o700);
+    if (!windows) expect((await stat(call.cwd)).mode & 0o777).toBe(0o700);
   });
   it('passes the model only when requested, validates it, and uses the stored token to resume', async () => {
     const p = await project();
@@ -202,7 +202,7 @@ describe('Claude Code session: arguments, environment and isolation', () => {
     expect(() => checkWorkDir(process.cwd(), '/data/projects')).toThrow();
     expect(() => checkWorkDir('/data/projects/agent', '/data/projects')).toThrow();
     expect(() => checkWorkDir('/data', '/data/projects')).toThrow();
-    expect(checkWorkDir('/data/agent-workspace', '/data/projects')).toBe('/data/agent-workspace');
+    expect(checkWorkDir('/data/agent-workspace', '/data/projects')).toBe(resolve('/data/agent-workspace'));
   });
   it('does not run when the working directory is not empty', async () => {
     await mkdir(join(root, 'agent-workspace'));
@@ -299,7 +299,7 @@ describe('failures surface as failed events with messages a person can act on', 
     await writeFile(join(root, 'auth.json'), '{"loggedIn":false}');
     expect((await run(id, 'hola')).end).toMatchObject({ type: 'failed', code: 'signed_out' });
     expect(runs()).toHaveLength(0);
-    await rm(join(root, 'bin', 'claude'));
+    await rm(fakePath(join(root, 'bin', 'claude')));
     expect((await run(id, 'hola')).end).toMatchObject({ type: 'failed', code: 'not_installed' });
     expect((await api('/api/agent/sessions', 'POST', { harness: 'claude', projectId: p })).status).toBe(422);
   });
@@ -382,12 +382,12 @@ describe('sessions, limits and resume', () => {
       expect(JSON.parse(stored)).toMatchObject([{ id, title: 'SCENARIO:ok un mensaje privado', turns: 1 }]);
       expect(stored).not.toMatch(/ARGUMENT|SECRET|Hola/);
       expect(stored).not.toContain(token);
-      expect((await stat(indexFile)).mode & 0o777).toBe(0o600);
+      if (!windows) expect((await stat(indexFile)).mode & 0o777).toBe(0o600);
       // The history is a private file next to the index, outside the projects.
       const historyFile = join(root, 'agent-transcripts', `${id}.json`);
       // It is written just after the session is free again.
       await waitFor(() => existsSync(historyFile) || undefined, 'the history file');
-      expect((await stat(historyFile)).mode & 0o777).toBe(0o600);
+      if (!windows) expect((await stat(historyFile)).mode & 0o777).toBe(0o600);
       expect(await readFile(historyFile, 'utf8')).toContain('un mensaje');
       expect(await readFile(historyFile, 'utf8')).not.toContain(token);
 

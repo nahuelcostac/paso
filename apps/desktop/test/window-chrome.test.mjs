@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { windowChrome } from '../lib/app-shell.mjs';
+import { describe, expect, it, vi } from 'vitest';
+import { configureLoopbackProxy, windowChrome } from '../lib/app-shell.mjs';
 
 describe('the window frame', () => {
   it('drops the title bar on macOS and places the window buttons at the top of the activity bar', () => {
@@ -9,4 +9,12 @@ describe('the window frame', () => {
     expect(windowChrome('win32')).toEqual({});
     expect(windowChrome('linux')).toEqual({});
   });
+});
+
+it('connects directly to the loopback service in the Windows desktop session', async () => {
+  const session = { setProxy: vi.fn() };
+  await configureLoopbackProxy(session, 'darwin');
+  expect(session.setProxy).not.toHaveBeenCalled();
+  await configureLoopbackProxy(session, 'win32');
+  expect(session.setProxy).toHaveBeenCalledExactlyOnceWith({ mode: 'direct' });
 });
