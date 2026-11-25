@@ -17,7 +17,7 @@ describe.skipIf(!runnable)('offline desktop fonts', () => {
   it('loads the bundled font families and embeds them in an SVG without external sources or CSP violations', async () => {
     root = await mkdtemp(join(tmpdir(), 'paso-fonts-'));
     const web = join(root, 'web');
-    await promisify(execFile)(join(repo, 'apps/web/node_modules/.bin/vite'), ['build', '--outDir', web], { cwd: join(repo, 'apps/web'), env: { ...process.env, NODE_ENV: 'production' }, maxBuffer: 4_000_000, timeout: 90_000 });
+    await promisify(execFile)(process.execPath, [join(repo, 'apps/web/node_modules/vite/bin/vite.js'), 'build', '--outDir', web], { cwd: join(repo, 'apps/web'), env: { ...process.env, NODE_ENV: 'production' }, maxBuffer: 4_000_000, timeout: 90_000 });
     const entry = (await readdir(join(web, 'assets'))).find((name) => /^prod-.*\.js$/.test(name));
     expect(entry).toBeTruthy();
     const result = await new Promise((resolveResult, reject) => {

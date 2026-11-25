@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { fakePath, writeFixture } from './testing/launcher.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -74,8 +75,7 @@ const step = (stepId: string) => ({ kind: 'step', stepId });
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'paso-steps-'));
   await mkdir(join(root, 'bin'), { recursive: true });
-  await writeFile(join(root, 'bin', 'claude'), `#!/bin/sh\nFAKE_DIR='${root}' exec '${process.execPath}' '${fakeClaude}' "$@"\n`);
-  await chmod(join(root, 'bin', 'claude'), 0o755);
+  await writeFixture(fakePath(join(root, 'bin', 'claude')), fakeClaude, { FAKE_DIR: root });
   await start();
 });
 afterEach(async () => {
@@ -209,9 +209,7 @@ describe('steps in the instructions', () => {
   });
   it('reach Codex in its developer instructions', async () => {
     const record = join(root, 'records.jsonl');
-    const executable = join(root, 'codex');
-    await writeFile(executable, `#!/bin/sh\nFAKE_RECORD='${record}' exec '${process.execPath}' '${fakeCodex}' "$@"\n`);
-    await chmod(executable, 0o755);
+    const executable = await writeFixture(fakePath(join(root, 'codex')), fakeCodex, { FAKE_RECORD: record });
     await project();
     const workDir = join(root, 'work'); await mkdir(workDir);
     const request: AgentRunRequest = {
@@ -232,9 +230,7 @@ describe('steps in the instructions', () => {
       text: '[Paso] You are working in the project "p", scene "p-intro" (service IDs). The person attached a step to this message: step "p-b" in scene "p-intro". Work on that step with the board tools, and leave the other steps as they are unless the message asks for more.',
     }]);
     const record = join(root, 'agy-records.jsonl');
-    const executable = join(root, 'agy');
-    await writeFile(executable, `#!/bin/sh\nFAKE_RECORD='${record}' exec '${process.execPath}' '${fakeAgy}' "$@"\n`);
-    await chmod(executable, 0o755);
+    const executable = await writeFixture(fakePath(join(root, 'agy')), fakeAgy, { FAKE_RECORD: record });
     await project();
     const workDir = join(root, 'agy-work'); await mkdir(workDir);
     const request: AgentRunRequest = {

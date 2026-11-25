@@ -6,6 +6,7 @@ import { idSchema } from '@paso/shared';
 import { describeSteps, describeTarget } from './where.js';
 import { forgetAgy } from './forget.js';
 import { harnessEnvironment, startProcess, type ManagedProcess } from './process.js';
+import { harnessLaunch } from './launch.js';
 import type { AgentEvent, AgentRunRequest, FailureCode, HarnessAdapter, ToolTarget } from './types.js';
 
 /**
@@ -263,7 +264,9 @@ export function agyVersionSupported(version: string | null) {
 }
 /** The installed version, or `missing` when there is no executable to ask. */
 function installedVersion(executable: string, env: Record<string, string>): Promise<string | null | 'missing'> {
-  return new Promise((done) => execFile(executable, ['--version'], { timeout: 5000, maxBuffer: 64 * 1024, windowsHide: true, env },
+  const launch = harnessLaunch(executable, ['--version']);
+  if (!launch) return Promise.resolve('missing');
+  return new Promise((done) => execFile(launch.file, launch.args, { timeout: 5000, maxBuffer: 64 * 1024, windowsHide: true, shell: false, env: { ...env, ...launch.env } },
     (error, stdout) => done((error as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? 'missing'
       : error ? null : String(stdout).match(/\b\d+\.\d+\.\d+\b/)?.[0] ?? null)));
 }

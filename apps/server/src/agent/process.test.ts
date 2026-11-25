@@ -1,6 +1,9 @@
 import { tmpdir } from 'node:os';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { startProcess } from './process.js';
+import { windows, writeLauncher } from './testing/launcher.js';
 
 /** Runs a Node script as a harness and collects the lines it prints. */
 function lines(script: string, maxLineBytes = 64 * 1024 * 1024) {
@@ -37,4 +40,26 @@ describe('harness output lines', () => {
     expect((await done).reason).toBe('line-too-long');
     expect(seen).toEqual([]);
   });
+});
+
+it.runIf(windows)('passes literal arguments through an npm shim and waits for its Windows process tree to be killed', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'Paso windows & paths '));
+  const controller = new AbortController();
+  const argv = ['', 'C:\\Program Files\\Paso\\mcp\\cli.mjs', '{"config":"a & b | c ^ %PATH% !x! \\"q\\""}', 'trailing\\'];
+  try {
+    const file = await writeLauncher(join(cwd, 'claude.cmd'), `
+      import { spawn } from 'node:child_process';
+      const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+      child.once('spawn', () => console.log(JSON.stringify({ pid: process.pid, child: child.pid, cwd: process.cwd(), argv: process.argv.slice(2) })));
+      setInterval(() => {}, 1000);`);
+    const records: Array<{ pid: number; child: number; cwd: string; argv: string[] }> = [];
+    const proc = startProcess({ file, args: argv, cwd, env: {}, input: '' }, {
+      onLine(line) { records.push(JSON.parse(line)); controller.abort(); },
+      idleTimeoutMs: 5000, maxRunMs: 5000, maxLineBytes: 4096, signal: controller.signal,
+    });
+    expect((await proc.done).reason).toBe('aborted');
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ cwd, argv });
+    for (const pid of [records[0].pid, records[0].child]) expect(() => process.kill(pid, 0)).toThrow();
+  } finally { await rm(cwd, { recursive: true, force: true }); }
 });

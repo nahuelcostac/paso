@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, readlink, realpath, rename, symlink, unlink, writeFile } from 'node:fs/promises';
+import { link, lstat, mkdir, readlink, realpath, rename, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { harnessEnvironment } from './process.js';
@@ -49,7 +49,23 @@ export function codexConfiguration(catalogPath: string) {
   };
 }
 
-/** No credential contents are read or copied. The CLI follows this link and manages its own login. */
+/** No credential contents are read or copied. Windows hard links need no symlink privilege. */
+export async function linkCodexLogin(source: string, destination: string) {
+  try {
+    if (process.platform === 'win32') await link(source, destination);
+    else await symlink(source, destination);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (process.platform === 'win32' && code === 'ENOENT') return;
+    if (code !== 'EEXIST') throw error;
+    if (process.platform === 'win32') {
+      const [original, existing] = await Promise.all([lstat(source, { bigint: true }), lstat(destination, { bigint: true })]);
+      if (original.isFile() && existing.isFile() && original.dev === existing.dev && original.ino === existing.ino) return;
+    } else if (await readlink(destination) === source) return;
+    throw new Error('unsafe_configuration');
+  }
+}
+
 export async function prepareCodex(request: AgentRunRequest, source: NodeJS.ProcessEnv = process.env) {
   const home = join(dirname(request.workDir), 'codex-home');
   await mkdir(home, { recursive: true, mode: 0o700 });
@@ -61,10 +77,7 @@ export async function prepareCodex(request: AgentRunRequest, source: NodeJS.Proc
   }
   const loginHome = resolve(source.CODEX_HOME ?? join(homedir(), '.codex'));
   const auth = join(home, 'auth.json');
-  try { await symlink(join(loginHome, 'auth.json'), auth); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || await readlink(auth) !== join(loginHome, 'auth.json')) throw new Error('unsafe_configuration');
-  }
+  await linkCodexLogin(join(loginHome, 'auth.json'), auth);
   // One catalog per model avoids races between sessions using different models.
   const model = request.model ?? codexDefaultModel;
   const catalogPath = join(home, `model-${Buffer.from(model).toString('hex')}.json`);

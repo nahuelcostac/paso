@@ -1,18 +1,19 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, screen, session, shell } from 'electron';
 import { startServer } from './service.mjs';
-import { homedir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { menuTemplate } from './lib/menu.mjs';
+import { desktopDataDirectory } from './lib/data-directory.mjs';
 import { placeWindow, readState, trackWindowState } from './lib/window-state.mjs';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
-import { claimSingleInstance, registerPermissions, windowChrome } from './lib/app-shell.mjs';
+import { claimSingleInstance, configureLoopbackProxy, registerPermissions, windowChrome } from './lib/app-shell.mjs';
 import { APP_ORIGIN, APP_SCHEME_PRIVILEGES, APP_URL, appCsp, eventsUrl, hostOf, isAppUrl, isRequestAllowed } from './lib/app-origin.mjs';
 import { serveApp, staticPage } from './lib/app-protocol.mjs';
 
 let service;
 let closing = false;
 const root = app.getAppPath();
-const dataDir = process.env.PASO_DATA_DIR ?? join(homedir(), 'Library', 'Application Support', 'Paso', 'projects');
+const dataDir = desktopDataDirectory(app.getPath('appData'));
+if (process.platform === 'win32') app.setAppUserModelId('org.paso.prototype');
 if (process.env.PASO_DATA_DIR) app.setPath('userData', join(dirname(resolve(dataDir)), 'desktop-profile'));
 // The lock lives in the profile, so a test instance with its own PASO_DATA_DIR never meets the person's Paso.
 if (!claimSingleInstance(app, () => BrowserWindow.getAllWindows()[0])) app.exit(0);
@@ -20,6 +21,7 @@ if (!claimSingleInstance(app, () => BrowserWindow.getAllWindows()[0])) app.exit(
 protocol.registerSchemesAsPrivileged([APP_SCHEME_PRIVILEGES]);
 
 async function start() {
+  await configureLoopbackProxy(session.defaultSession);
   service = await startServer({
     dataDir, port: 0, allowedOrigins: [APP_ORIGIN],
     agent: { mcp: { command: process.execPath, entry: join(root, 'mcp', 'cli.mjs'), electronRunAsNode: true } },

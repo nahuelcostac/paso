@@ -1,20 +1,17 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } from 'electron';
 import { startServer } from '@paso/server';
 import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { createServer as createSocket } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
-import { registerPermissions, windowChrome } from './lib/app-shell.mjs';
+import { desktopDataDirectory } from './lib/data-directory.mjs';
+import { configureLoopbackProxy, registerPermissions, windowChrome } from './lib/app-shell.mjs';
 import { APP_ORIGIN, APP_SCHEME_PRIVILEGES, APP_URL, eventsUrl, hostOf, isAppUrl, isRequestAllowed } from './lib/app-origin.mjs';
 import { forward, serveApp } from './lib/app-protocol.mjs';
 import { createServer as createVite } from '../web/node_modules/vite/dist/node/index.js';
 
 const root = resolve(import.meta.dirname, '../..');
-const dataDir = process.env.PASO_DATA_DIR ?? (process.platform === 'win32'
-  ? join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Paso', 'projects')
-  : process.platform === 'darwin' ? join(homedir(), 'Library', 'Application Support', 'Paso', 'projects')
-    : join(process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share'), 'paso', 'projects'));
+const dataDir = desktopDataDirectory(app.getPath('appData'));
 if (process.env.PASO_DATA_DIR) app.setPath('userData', join(dirname(resolve(dataDir)), 'desktop-profile'));
 // As in the packaged app, the page is at paso://app on every launch, so what it keeps per origin survives a relaunch.
 // Vite still runs on a free port; the page reaches it through the scheme, and its HMR socket directly.
@@ -34,6 +31,7 @@ async function freePort() {
 const dockIcon = join(root, 'apps/desktop/dist/icon/paso.png');
 
 async function start() {
+  await configureLoopbackProxy(session.defaultSession);
   if (app.dock && existsSync(dockIcon)) app.dock.setIcon(dockIcon);
   const port = await freePort();
   service = await startServer({

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, parse, relative, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { startServer } from './server.js';
@@ -186,10 +186,14 @@ describe('the folder explorer', () => {
     expect(JSON.stringify(data)).not.toContain('secreto');
     expect((await api<{ path: string }>('/api/folders')).data.path).toBe(homedir());
     const crumbs = (await api<{ crumbs: Array<{ name: string; path: string }> }>(`/api/folders?path=${encodeURIComponent(join(root, 'Clases'))}`)).data.crumbs;
-    expect(crumbs[0].path).toBe('/');
-    expect(crumbs.at(-1)).toEqual({ name: 'Clases', path: join(root, 'Clases') });
-    expect(crumbs.map((crumb) => crumb.name).slice(1).join('/')).toBe(join(root, 'Clases').slice(1));
-    expect((await api<{ parent: null }>('/api/folders?path=%2F')).data.parent).toBeNull();
+    const target = join(root, 'Clases');
+    const volume = parse(target).root;
+    const fromHome = relative(homedir(), target);
+    const base = fromHome.startsWith('..' + sep) || isAbsolute(fromHome) ? volume : homedir();
+    expect(crumbs[0].path).toBe(base);
+    expect(crumbs.at(-1)).toEqual({ name: 'Clases', path: target });
+    expect(crumbs.map((crumb) => crumb.name).slice(1).join(sep)).toBe(relative(base, target));
+    expect((await api<{ parent: null }>(`/api/folders?path=${encodeURIComponent(volume)}`)).data.parent).toBeNull();
     expect((await api(`/api/folders?path=${encodeURIComponent(join(root, 'nada'))}`)).status).toBe(404);
   });
 

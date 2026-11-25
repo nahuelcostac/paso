@@ -39,6 +39,11 @@ export function registerPermissions(session) {
     isAppUrl(contents?.mainFrame?.url) && isAppUrl(origin) && allowsPermission(permission, details.requestingUrl, details.isMainFrame));
 }
 
+/** The Windows desktop renderer only talks to loopback services. A system proxy or PAC can delay those requests. */
+export async function configureLoopbackProxy(session, platform = process.platform) {
+  if (platform === 'win32') await session.setProxy({ mode: 'direct' });
+}
+
 /** The native buttons start at 10px from the left and 14px from the top. The 14px buttons centre at y=21px. */
 export const TRAFFIC_LIGHTS = { x: 10, y: 14 };
 

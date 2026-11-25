@@ -1,5 +1,7 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { join } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { harnessLaunch, windowsEnv } from './launch.js';
 
 /**
  * Variables a harness process may inherit. Everything else is dropped, so a service started from
@@ -21,7 +23,8 @@ const inheritedNames = [
 export function harnessEnvironment(additions: Record<string, string>, source: NodeJS.ProcessEnv = process.env) {
   const env: Record<string, string> = {};
   for (const name of inheritedNames) {
-    const value = source[name];
+    if (process.platform === 'win32' && name !== name.toUpperCase()) continue;
+    const value = process.platform === 'win32' ? windowsEnv(name, source) : source[name];
     if (value !== undefined) env[name] = value;
   }
   for (const [name, value] of Object.entries(source)) if (name.startsWith('LC_') && value !== undefined) env[name] = value;
@@ -70,11 +73,13 @@ function installExitHandler() {
 function signalGroup(pid: number, signal: NodeJS.Signals | 0) {
   try {
     if (process.platform === 'win32') {
-      if (signal !== 0) spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref();
+      if (signal !== 0) spawn(taskkill, taskkillArgs(pid), { stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref();
     } else process.kill(-pid, signal);
     return true;
   } catch { return false; }
 }
+const taskkill = join(windowsEnv('SYSTEMROOT') ?? 'C:\\Windows', 'System32', 'taskkill.exe');
+const taskkillArgs = (pid: number) => ['/PID', String(pid), '/T', '/F'];
 function groupAlive(pid: number) {
   if (process.platform === 'win32') return false;
   try { process.kill(-pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; }
@@ -83,6 +88,13 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 /** Terminates a whole process group: polite first, forceful after a short grace period. */
 async function terminateTree(pid: number, graceMs = 1500) {
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve) => {
+      execFile(taskkill, taskkillArgs(pid), { windowsHide: true }, () => resolve());
+    });
+    live.delete(pid);
+    return;
+  }
   signalGroup(pid, 'SIGTERM');
   const deadline = Date.now() + graceMs;
   while (groupAlive(pid) && Date.now() < deadline) await delay(25);
@@ -107,8 +119,10 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
   const done = new Promise<ProcessEnd>((resolve) => { settle = resolve; });
   let stderrTail = '';
   try {
-    child = spawn(spec.file, spec.args, {
-      cwd: spec.cwd, env: spec.env, shell: false, windowsHide: true,
+    const launch = harnessLaunch(spec.file, spec.args);
+    if (!launch) throw Object.assign(new Error('Unsupported harness launcher'), { code: 'ENOENT' });
+    child = spawn(launch.file, launch.args, {
+      cwd: spec.cwd, env: { ...spec.env, ...launch.env }, shell: false, windowsHide: true,
       detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'],
     });
   } catch (error) {
@@ -123,7 +137,7 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
   const armIdle = () => { clearTimeout(idle); idle = setTimeout(() => void stop('idle'), options.idleTimeoutMs); };
   function stop(reason: ProcessEnd['reason'] = 'stopped'): Promise<void> {
     wanted ??= reason;
-    stopping ??= pid === undefined ? Promise.resolve() : terminateTree(pid);
+    stopping ??= pid === undefined || (process.platform === 'win32' && child.exitCode !== null) ? Promise.resolve() : terminateTree(pid);
     return stopping;
   }
   const onAbort = () => void stop('aborted');
@@ -169,7 +183,8 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
     options.signal.removeEventListener('abort', onAbort);
     void (async () => {
       // A normal exit can leave helpers behind (such as the MCP server). Remove them too.
-      if (pid !== undefined && groupAlive(pid)) await terminateTree(pid, 500);
+      if (stopping) await stopping;
+      else if (pid !== undefined && groupAlive(pid)) await terminateTree(pid, 500);
       live.delete(pid ?? -1);
       if (!wanted && pending.length) emit(pending.join(''));
       pending = []; pendingLength = 0;

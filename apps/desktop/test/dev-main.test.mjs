@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ handlers: new Map(), ipc: new Map(), windows: [], showOpenDialog: vi.fn(), listen: vi.fn(), schemes: [], protocolHandlers: new Map(), beforeRequest: undefined }));
 
 vi.mock('electron', () => ({
-  app: { setPath: vi.fn(), whenReady: () => Promise.resolve(), on: vi.fn(), quit: vi.fn() },
+  app: { getPath: () => process.cwd(), setPath: vi.fn(), whenReady: () => Promise.resolve(), on: vi.fn(), quit: vi.fn() },
   BrowserWindow: class {
     constructor() {
       this.webContents = { mainFrame: {}, on: vi.fn(), setWindowOpenHandler: vi.fn() };
@@ -16,6 +16,7 @@ vi.mock('electron', () => ({
   net: { fetch: vi.fn() },
   protocol: { registerSchemesAsPrivileged: (schemes) => mocks.schemes.push(...schemes) },
   session: { defaultSession: {
+    setProxy: vi.fn(),
     setPermissionRequestHandler: vi.fn(),
     setPermissionCheckHandler: vi.fn(),
     protocol: { handle: (scheme, handler) => mocks.protocolHandlers.set(scheme, handler) },
