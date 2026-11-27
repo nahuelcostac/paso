@@ -53,6 +53,11 @@ function storedSide(): SidePanel | null {
     return value === 'agent' ? 'agent' : value === 'none' ? null : 'projects';
   } catch { return 'projects'; }
 }
+const LAST_SIDE_KEY = 'paso.last-side-panel';
+/** The panel shown before the sidebar was folded: the toggle opens it again. */
+function storedLastSide(): SidePanel {
+  try { return window.localStorage.getItem(LAST_SIDE_KEY) === 'agent' ? 'agent' : 'projects'; } catch { return 'projects'; }
+}
 
 /**
  * Which panel has the left spot, as in VS Code: projects, the agent's chat, or neither. A choice made with room to dock
@@ -67,12 +72,17 @@ function useSidePanel(narrow: boolean) {
     crossed.current = narrow;
     setSide(narrow ? null : storedSide());
   }, [narrow]);
+  // The panel last shown, so the sidebar toggle brings back the chat when the chat was folded, not the projects.
+  const last = useRef<SidePanel>(storedSide() ?? storedLastSide());
   const choose = useCallback((next: SidePanel | null) => {
     setSide(next);
+    if (next) last.current = next;
+    try { if (next) window.localStorage.setItem(LAST_SIDE_KEY, next); } catch { /* a convenience: it just won't be remembered */ }
     if (window.matchMedia(NARROW).matches) return;
     try { window.localStorage.setItem(SIDE_KEY, next ?? 'none'); } catch { /* a convenience: it just won't be remembered */ }
   }, []);
-  return { side, chooseSide: choose };
+  const lastSide = useCallback(() => last.current, []);
+  return { side, chooseSide: choose, lastSide };
 }
 
 /** `recovery` is where unsaved drafts are kept. It is the browser's IndexedDB unless a host or a test supplies another. */
@@ -103,7 +113,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
   const [creating, setCreating] = useState(false);
   // Under this the panel in the left spot opens over the content, as a drawer.
   const narrow = useMediaQuery(NARROW);
-  const { side, chooseSide } = useSidePanel(narrow);
+  const { side, chooseSide, lastSide } = useSidePanel(narrow);
   const boardMin = BOARD_MIN.storyboard;
   const overview = route.view === 'storyboard';
   // Each panel's width, which the person drags, remembered apart.
@@ -412,7 +422,7 @@ export function App({ config, recovery }: { config: ClientConfig; recovery?: Rec
       <button
         ref={sidebarToggle} type="button" className="icon-btn sidebar-toggle" aria-label={sidebarLabel} title={sidebarLabel}
         aria-expanded={shown !== null} aria-controls={shown ? `${shown}-panel` : undefined}
-        onClick={() => chooseSide(shown ? null : 'projects')}
+        onClick={() => chooseSide(shown ? null : lastSide() === 'agent' && canShowAgent ? 'agent' : 'projects')}
       >
         <PanelLeft className="i" aria-hidden="true" />
       </button>
