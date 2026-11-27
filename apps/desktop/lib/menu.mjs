@@ -9,10 +9,10 @@
  */
 
 /**
- * @param {{ appName?: string, platform?: string, packaged?: boolean, openDataFolder?: () => void }} [options]
+ * @param {{ appName?: string, platform?: string, packaged?: boolean, openDataFolder?: () => void, openLogFolder?: () => void }} [options]
  * @returns {Array<Record<string, unknown>>} An Electron menu template.
  */
-export function menuTemplate({ appName = 'Paso', platform = process.platform, packaged = true, openDataFolder } = {}) {
+export function menuTemplate({ appName = 'Paso', platform = process.platform, packaged = true, openDataFolder, openLogFolder } = {}) {
   const mac = platform === 'darwin';
   const separator = { type: 'separator' };
   const appMenu = {
@@ -72,6 +72,7 @@ export function menuTemplate({ appName = 'Paso', platform = process.platform, pa
     role: 'help',
     submenu: [
       { label: 'Open Data Folder', enabled: typeof openDataFolder === 'function', click: () => openDataFolder?.() },
+      { label: 'Open Log Folder', enabled: typeof openLogFolder === 'function', click: () => openLogFolder?.() },
     ],
   };
   return [...(mac ? [appMenu] : []), file, edit, view, windowMenu, help];

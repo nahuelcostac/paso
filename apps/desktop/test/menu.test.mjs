@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { menuTemplate } from '../lib/menu.mjs';
-import { allowsPermission, claimSingleInstance, focusWindow, registerPermissions } from '../lib/app-shell.mjs';
+import { allowsPermission, claimSingleInstance, focusWindow, registerPermissions, registerSessionBridge } from '../lib/app-shell.mjs';
 
 const items = (menu) => menu.submenu.filter((item) => item.type !== 'separator');
 const byRole = (template, role) => template.flatMap((menu) => menu.submenu).find((item) => item.role === role);
@@ -58,6 +58,18 @@ describe('the application menu', () => {
     expect(menuTemplate({ platform: 'darwin' })[5].submenu[0].enabled).toBe(false);
   });
 
+  it('opens the log folder from Help, on every platform', () => {
+    for (const platform of ['darwin', 'win32']) {
+      const openLogFolder = vi.fn();
+      const help = menuTemplate({ platform, openLogFolder }).find((menu) => menu.label === 'Help');
+      const item = help.submenu.find((candidate) => candidate.label === 'Open Log Folder');
+      expect(item.enabled).toBe(true);
+      item.click();
+      expect(openLogFolder).toHaveBeenCalledOnce();
+    }
+    expect(menuTemplate({ platform: 'win32' }).at(-1).submenu[1]).toMatchObject({ label: 'Open Log Folder', enabled: false });
+  });
+
   it('has no app menu elsewhere and quits from File', () => {
     const template = menuTemplate({ platform: 'win32' });
     expect(template.map((menu) => menu.label)).toEqual(['File', 'Edit', 'View', 'Window', 'Help']);
@@ -90,6 +102,36 @@ describe('one instance', () => {
     focusWindow(window);
     expect(window.restore).not.toHaveBeenCalled();
     expect(window.show).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the session bridge', () => {
+  const bridge = (trusted) => {
+    const ipcMain = { on: vi.fn() };
+    const log = vi.fn();
+    registerSessionBridge({ ipcMain, trusted, session: () => ({ token: 'secret', events: 'ws://127.0.0.1:50124/api/events' }), log });
+    expect(ipcMain.on).toHaveBeenCalledWith('paso-session', expect.any(Function));
+    return { answer: ipcMain.on.mock.calls[0][1], log };
+  };
+
+  it('gives the app’s own page its session', () => {
+    const { answer, log } = bridge(() => true);
+    const event = { senderFrame: { url: 'paso://app/' } };
+    answer(event);
+    expect(event.returnValue).toEqual({ token: 'secret', events: 'ws://127.0.0.1:50124/api/events' });
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('answers anything else with null, so the synchronous request can never freeze the window', () => {
+    const { answer, log } = bridge(() => false);
+    const event = { senderFrame: { url: 'https://example.com/' } };
+    answer(event);
+    expect(Object.hasOwn(event, 'returnValue')).toBe(true);
+    expect(event.returnValue).toBeNull();
+    expect(log).toHaveBeenCalledWith('Refused the session to a frame', { url: 'https://example.com/' });
+    const gone = { senderFrame: null };
+    answer(gone);
+    expect(gone.returnValue).toBeNull();
   });
 });
 

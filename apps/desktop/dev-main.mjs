@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { createServer as createSocket } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
-import { configureLoopbackProxy, registerPermissions, windowChrome } from './lib/app-shell.mjs';
+import { configureLoopbackProxy, registerPermissions, registerSessionBridge, windowChrome } from './lib/app-shell.mjs';
 import { APP_ORIGIN, APP_SCHEME_PRIVILEGES, APP_URL, eventsUrl, hostOf, isAppUrl, isRequestAllowed } from './lib/app-origin.mjs';
 import { forward, serveApp } from './lib/app-protocol.mjs';
 import { createServer as createVite } from '../web/node_modules/vite/dist/node/index.js';
@@ -48,7 +48,7 @@ async function start() {
   serveApp({ session: session.defaultSession, net, serviceUrl: service.url, page: (request, path) => forward(net, request, `${viteUrl}${path}`) });
   const fromPage = (event) => event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
   const window = new BrowserWindow({ width: 1400, height: 900, ...windowChrome(process.platform), webPreferences: { preload: join(root, 'apps/desktop/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
-  ipcMain.on('paso-session', (event) => { if (fromPage(event)) event.returnValue = { token: service.sessionToken, events: eventsUrl(service.url) }; });
+  registerSessionBridge({ ipcMain, trusted: fromPage, session: () => ({ token: service.sessionToken, events: eventsUrl(service.url) }), log: (message, details) => console.warn(message, details) });
   registerFolderBridge({ ipcMain, dialog, parent: () => window, trusted: fromPage });
   const external = (url) => { try { const parsed = new URL(url); if (parsed.protocol === 'https:' || parsed.protocol === 'http:') void shell.openExternal(url); } catch { /* invalid URL */ } };
   window.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) { event.preventDefault(); external(url); } });
