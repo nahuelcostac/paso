@@ -49,6 +49,7 @@ let service: Service;
 let config: ClientConfig;
 let requests: AgentRunRequest[];
 let adapterImpl: (request: AgentRunRequest, signal: AbortSignal) => AsyncIterable<AgentEvent>;
+let afterRun: (() => void) | undefined;
 
 async function call<T = unknown>(method: string, path: string, body?: unknown, revision?: string): Promise<T> {
   const response = await fetch(`${service.url}/api${path}`, {
@@ -127,8 +128,7 @@ async function openPanel() {
  * a time. Returns the chat's panel.
  */
 async function pickScene(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
-  await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
+  await user.click(projectsButton());
   expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
   await user.click(within(await screen.findByRole('list', { name: 'Scenes of Búsqueda binaria' }, patience)).getByRole('button', { name }));
   await user.click(agentButton());
@@ -146,6 +146,7 @@ beforeEach(async () => {
   drawn.calls.length = 0;
   window.innerWidth = 1024;
   requests = [];
+  afterRun = undefined;
   rootDir = await mkdtemp(join(tmpdir(), 'paso-agent-web-'));
   binDir = join(rootDir, 'bin');
   harnessRegistryPath = join(rootDir, 'state', 'harnesses.json');
@@ -165,7 +166,11 @@ beforeEach(async () => {
     dataDir: join(rootDir, 'projects'), port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 80,
     harnessRegistryPath, runsDir: join(rootDir, 'runs'),
     harnessDetection: { searchPaths: [binDir], loginShell: false },
-    agent: { workDir: join(rootDir, 'work'), sessionsPath: join(rootDir, 'state', 'sessions.json'), adapters: { claude: adapter, codex: { ...adapter, id: 'codex' } } },
+    agent: {
+      workDir: join(rootDir, 'work'), sessionsPath: join(rootDir, 'state', 'sessions.json'),
+      adapters: { claude: adapter, codex: { ...adapter, id: 'codex' } },
+      hooks: { afterRun: async () => { afterRun?.(); } },
+    },
   });
   config = { baseUrl: service.url, token };
   await seedProject();
@@ -214,6 +219,25 @@ describe('agent message drafts', () => {
     await waitFor(() => expect(within(panel).getByRole('button', { name: 'Send' })).toBeEnabled(), patience);
     await user.click(within(panel).getByRole('button', { name: 'Send' }));
     expect(input()).toHaveValue('');
+  });
+});
+
+describe('folding the sidebar', () => {
+  it('brings back the panel that was open, the chat as well as the projects', async () => {
+    await call('POST', '/harnesses', { id: 'claude' });
+    const user = userEvent.setup();
+    await openPanel();
+    await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
+    expect(await screen.findByRole('complementary', { name: 'Agent' }, patience)).toBeInTheDocument();
+    expect(agentButton()).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(projectsButton());
+    await user.click(screen.getByRole('button', { name: 'Hide sidebar' }));
+    await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
+    expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
   });
 });
 
@@ -640,7 +664,9 @@ describe('continuing a conversation', () => {
     await user.click(within(panel).getByRole('button', { name: /^Agent and model: / }));
     await user.click(within(within(await screen.findByRole('dialog', { name: 'Choose agent and model' })).getByRole('radiogroup', { name: 'Model' })).getByRole('radio', { name: 'Haiku 5.5' }));
     await user.keyboard('{Escape}');
+    const firstRun = new Promise<void>((resolve) => { afterRun = resolve; });
     await send(panel, user, 'Primero');
+    await firstRun;
     await within(panel).findByText(/· 1 change/, {}, patience);
 
     cleanup();
@@ -758,11 +784,12 @@ describe('narrow windows', () => {
     await user.click(within(status).getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(screen.queryByRole('status', { name: 'Agent working' })).not.toBeInTheDocument(), patience);
 
+    // The drawer comes back with the chat that was closed.
     await user.click(sidebarToggle);
-    const projects = screen.getByRole('complementary', { name: 'Projects and diagrams' });
-    expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
+    const again = await screen.findByRole('complementary', { name: 'Agent' }, patience);
+    expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
     await user.click(sidebarToggle);
-    expect(projects).not.toBeInTheDocument();
+    expect(again).not.toBeInTheDocument();
     expect(sidebarToggle).toHaveFocus();
     expect(window.localStorage.getItem('paso.side-panel')).toBeNull();
   });

@@ -9,12 +9,19 @@ beforeEach(async () => { root = await mkdtemp(join(tmpdir(), 'paso-pnpm-')); });
 afterEach(async () => { vi.unstubAllEnvs(); await rm(root, { recursive: true, force: true }); });
 
 describe('starting pnpm from the scripts', () => {
-  it('runs the pnpm entry it was started from with this Node, on every platform', () => {
-    const env = { npm_execpath: 'C:\\pnpm\\bin\\pnpm.cjs' };
-    for (const platform of ['win32', 'darwin', 'linux']) {
-      expect(pnpmCommand(['exec', 'concurrently'], { env, platform, node: 'node.exe' })).toEqual({ file: 'node.exe', args: ['C:\\pnpm\\bin\\pnpm.cjs', 'exec', 'concurrently'] });
-    }
-    // The standalone pnpm is an executable of its own.
+  it.each(['/opt/pnpm/bin/pnpm.cjs', 'C:\\pnpm\\bin\\pnpm.cjs'])(
+    'runs the pnpm entry %s with this Node, on every platform',
+    (entry) => {
+      const env = { npm_execpath: entry };
+      for (const platform of ['win32', 'darwin', 'linux']) {
+        expect(pnpmCommand(['exec', 'concurrently'], { env, platform, node: 'node.exe' })).toEqual({
+          file: 'node.exe',
+          args: [entry, 'exec', 'concurrently'],
+        });
+      }
+    },
+  );
+  it('runs a standalone pnpm executable directly', () => {
     expect(pnpmCommand(['build'], { env: { npm_execpath: 'C:\\pnpm\\pnpm.exe' }, platform: 'win32' })).toEqual({ file: 'C:\\pnpm\\pnpm.exe', args: ['build'] });
   });
   it('uses pnpm from the PATH outside pnpm on macOS and Linux, and asks for pnpm on Windows', () => {

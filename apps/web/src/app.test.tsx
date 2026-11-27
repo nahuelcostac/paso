@@ -678,8 +678,9 @@ describe('the board and its overview', () => {
     expect(app).toHaveClass('app--folded');
     expect(toggle).toHaveFocus();
     expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
+    // Shown again, the sidebar brings back the chat that was folded, not the projects.
     await user.click(toggle);
-    await user.click(within(panels()).getByRole('button', { name: 'Agent' }));
+    expect(screen.getByRole('complementary', { name: 'Agent' })).toBeInTheDocument();
     expect(window.localStorage.getItem('paso.side-panel')).toBe('agent');
 
     // Remembered across a relaunch.
@@ -690,7 +691,7 @@ describe('the board and its overview', () => {
     expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
   });
 
-  it('opens projects from a folded sidebar after relaunching in Studio', async () => {
+  it('brings back the folded panel after relaunching in Studio, and Projects when there is no chat', async () => {
     const user = userEvent.setup();
     await seed('Uno', 'one');
     await scenes('one', ['Primera']);
@@ -722,11 +723,23 @@ describe('the board and its overview', () => {
     expect(document.querySelector('.app')).toHaveStyle({ '--left': '0px' });
 
     unmount();
-    window.localStorage.setItem('paso.last-side-panel', 'agent');
+    expect(window.localStorage.getItem('paso.last-side-panel')).toBe('agent');
     render(<App config={config} />);
     await screen.findByRole('main', { name: 'Studio' }, patience);
     await user.click(screen.getByRole('button', { name: 'Show sidebar' }));
     expect(screen.getByRole('main', { name: 'Studio' })).toBeInTheDocument();
+    expect(await screen.findByRole('complementary', { name: 'Agent' }, patience)).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Projects and diagrams' })).not.toBeInTheDocument();
+  });
+
+  it('opens Projects from a folded sidebar when no diagram is open for the chat', async () => {
+    const user = userEvent.setup();
+    await seed('Uno', 'one');
+    window.localStorage.setItem('paso.side-panel', 'none');
+    window.localStorage.setItem('paso.last-side-panel', 'agent');
+    window.location.hash = '#/';
+    render(<App config={config} />);
+    await user.click(await screen.findByRole('button', { name: 'Show sidebar' }, patience));
     expect(screen.getByRole('complementary', { name: 'Projects and diagrams' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Agent' })).not.toBeInTheDocument();
   });
