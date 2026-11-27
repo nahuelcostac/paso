@@ -5,6 +5,7 @@ import { build as bundleEntry } from 'esbuild';
 import { Arch, Platform, build } from 'electron-builder';
 import { appIconSvg, buildIcon, defaultIconDir } from './icon/build.mjs';
 import { packagingConfig } from './packaging-config.mjs';
+import { appVersion } from './version.mjs';
 
 const desktop = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(desktop, '../..');
@@ -33,9 +34,9 @@ await cp(join(desktop, 'preload.cjs'), join(stage, 'preload.cjs'));
 await cp(join(desktop, 'lib'), join(stage, 'lib'), { recursive: true });
 await cp(join(repo, 'apps/web/dist'), join(stage, 'web'), { recursive: true });
 await rm(join(stage, 'mcp/renderer/fonts'), { recursive: true, force: true });
-const { version } = JSON.parse(await readFile(join(repo, 'node_modules/electron/package.json'), 'utf8'));
-const { targets, buildOptions } = packagingConfig(platform, icon, output, version);
-const manifest = { name: 'paso-desktop', version: '0.0.0', type: 'module', main: 'main.mjs', build: buildOptions };
+const { version: electronVersion } = JSON.parse(await readFile(join(repo, 'node_modules/electron/package.json'), 'utf8'));
+const { targets, buildOptions } = packagingConfig(platform, icon, output, electronVersion);
+const manifest = { name: 'paso-desktop', version: appVersion, type: 'module', main: 'main.mjs', build: buildOptions };
 await writeFile(join(stage, 'package.json'), JSON.stringify(manifest, null, 2));
 process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
 await build({ projectDir: stage, targets: platform === 'win32'
