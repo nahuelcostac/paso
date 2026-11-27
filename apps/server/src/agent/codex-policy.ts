@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { link, lstat, mkdir, readlink, realpath, rename, symlink, unlink, writeFile } from 'node:fs/promises';
+import { link, lstat, mkdir, readlink, realpath, symlink, unlink, writeFile } from 'node:fs/promises';
+import { atomicRename } from '../atomic-rename.js';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { harnessEnvironment } from './process.js';
@@ -84,7 +85,7 @@ export async function prepareCodex(request: AgentRunRequest, source: NodeJS.Proc
   const tempCatalog = join(home, `.model-${randomUUID()}.tmp`);
   try {
     await writeFile(tempCatalog, JSON.stringify(codexCatalog(model)), { mode: 0o600, flag: 'wx' });
-    await rename(tempCatalog, catalogPath);
+    await atomicRename(tempCatalog, catalogPath);
   } finally { await unlink(tempCatalog).catch(() => {}); }
   const config = codexConfiguration(catalogPath);
   return {

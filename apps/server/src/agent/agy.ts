@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { lstat, mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, rm, writeFile } from 'node:fs/promises';
+import { atomicRename } from '../atomic-rename.js';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { idSchema } from '@paso/shared';
@@ -285,7 +286,7 @@ export async function prepareAgy(request: Pick<AgentRunRequest, 'workDir' | 'boa
   const temp = join(agents, `.${agyAgentName}.${randomBytes(8).toString('hex')}.tmp`);
   try {
     await writeFile(temp, agyAgentFile(request), { mode: 0o600, flag: 'wx' });
-    await rename(temp, file);
+    await atomicRename(temp, file);
   } finally { await rm(temp, { force: true }); }
   return workspace;
 }

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { spawnPnpm } from './pnpm.mjs';
 
 const require = createRequire(import.meta.url);
 const electron = require('electron');
@@ -24,15 +25,15 @@ async function scan(directory = source) {
 }
 const watcher = { close() { clearInterval(timer); } };
 
-function run(command, args) {
+function pnpm(args) {
   return new Promise((resolvePromise, reject) => {
-    const current = spawn(command, args, { cwd: root, stdio: 'inherit' });
+    const current = spawnPnpm(args, { cwd: root, stdio: 'inherit' });
     build = current;
     current.once('error', reject);
     current.once('exit', (code) => {
       if (build === current) build = undefined;
       if (code === 0 || stopping) resolvePromise();
-      else reject(new Error(`${command} exited with ${code}`));
+      else reject(new Error(`pnpm ${args.join(' ')} exited with ${code}`));
     });
   });
 }
@@ -61,7 +62,7 @@ async function rebuild() {
   rebuilding = true;
   try {
     await stopElectron();
-    await run('pnpm', ['--filter', '@paso/server', 'build']);
+    await pnpm(['--filter', '@paso/server', 'build']);
     if (!stopping && !pending) launch();
   } catch (error) { console.error(error); }
   finally {
@@ -73,7 +74,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
   stopping = true; watcher.close(); build?.kill('SIGTERM'); void stopElectron();
 });
 try {
-  await run('pnpm', ['--filter', '@paso/mcp...', 'build']);
+  await pnpm(['--filter', '@paso/mcp...', 'build']);
   // The Dock icon: the packaged app's icon, drawn from the brand mark that was just built in @paso/shared.
   if (process.platform === 'darwin' && !stopping) {
     const { buildIcon } = await import('../apps/desktop/icon/build.mjs');

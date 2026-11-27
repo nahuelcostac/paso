@@ -75,8 +75,14 @@ const stage = () => screen.findByRole('dialog', { name: 'Presentation' });
 const shownImage = () => document.querySelector('.present__page[data-state="current"] img');
 const expectShown = (stepId: string) => waitFor(() => expect(document.querySelector('.present__page[data-state="current"]')).toHaveAttribute('data-step-id', stepId));
 const expectIndicator = (label: string) => waitFor(() => expect(screen.getByRole('status', { name: label })).toBeInTheDocument());
+/**
+ * Waits for the canvas with a plain query. The service runs on this test's thread, and every failed `findBy` attempt
+ * formats the whole page for its error: in a long scene that took the thread from the service on a slow machine, and
+ * the canvas never came.
+ */
+const canvasShown = () => waitFor(() => expect(document.querySelector('[data-testid="canvas"]')).not.toBeNull());
 async function start(user: ReturnType<typeof userEvent.setup>) {
-  await screen.findByTestId('canvas');
+  await canvasShown();
   await waitFor(async () => expect(await present()).toBeEnabled());
   await user.click(await present());
   return stage();
@@ -111,7 +117,7 @@ describe('the Present button', () => {
   it('saves unsaved edits first, so the presentation shows them', async () => {
     const user = userEvent.setup();
     const { projectId, sceneId, steps } = await open([[box('a')], [box('b')]]);
-    await screen.findByTestId('canvas');
+    await canvasShown();
     await user.click(screen.getByRole('button', { name: 'Draw' }));
     await user.click(await present());
     await stage();
@@ -121,7 +127,7 @@ describe('the Present button', () => {
   it('does not present over a conflict, and tells the person', async () => {
     const user = userEvent.setup();
     const { projectId, sceneId, steps } = await open([[box('a')]]);
-    await screen.findByTestId('canvas');
+    await canvasShown();
     await user.click(screen.getByRole('button', { name: 'Draw' }));
     const stored = await api.getStep({ projectId, sceneId, stepId: steps[0] });
     await api.saveStep({ projectId, sceneId, stepId: steps[0] }, stored.revision, { ...stored.document, title: 'externo' });
@@ -136,7 +142,7 @@ describe('the Present button', () => {
   it('does not present when a save fails, and tells the person', async () => {
     const user = userEvent.setup();
     await open([[box('a')]]);
-    await screen.findByTestId('canvas');
+    await canvasShown();
     await waitFor(async () => expect(await present()).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Draw' }));
     const realFetch = globalThis.fetch;
@@ -150,7 +156,7 @@ describe('the Present button', () => {
   it('says so and returns when the scene cannot be read', async () => {
     const user = userEvent.setup();
     const { projectId, sceneId } = await open([[box('a')]]);
-    await screen.findByTestId('canvas');
+    await canvasShown();
     await waitFor(async () => expect(await present()).toBeEnabled());
     const realList = ApiClient.prototype.listSteps;
     ApiClient.prototype.listSteps = async function (project, scene) { if (project === projectId && scene === sceneId) throw new Error('caído'); return realList.call(this, project, scene); };

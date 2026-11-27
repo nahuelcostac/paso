@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
+import { mkdir, open, readFile, unlink } from 'node:fs/promises';
+import { atomicRename } from './atomic-rename.js';
 import { homedir } from 'node:os';
 import { basename, dirname, delimiter, isAbsolute, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -108,7 +109,7 @@ export class HarnessRegistry {
     try {
       const handle = await open(temp, 'wx', 0o600);
       try { await handle.writeFile(JSON.stringify(idsToWrite) + '\n'); await handle.sync(); } finally { await handle.close(); }
-      await rename(temp, this.file);
+      await atomicRename(temp, this.file);
     } finally { await unlink(temp).catch(() => {}); }
   }
   async add(value: unknown) {

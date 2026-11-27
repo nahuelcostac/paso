@@ -1,17 +1,16 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } from 'electron';
-import { startServer } from '@paso/server';
+import { dataDirectory, startServer } from '@paso/server';
 import { existsSync } from 'node:fs';
 import { createServer as createSocket } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { registerFolderBridge } from './lib/folder-bridge.mjs';
-import { desktopDataDirectory } from './lib/data-directory.mjs';
 import { configureLoopbackProxy, registerPermissions, windowChrome } from './lib/app-shell.mjs';
 import { APP_ORIGIN, APP_SCHEME_PRIVILEGES, APP_URL, eventsUrl, hostOf, isAppUrl, isRequestAllowed } from './lib/app-origin.mjs';
 import { forward, serveApp } from './lib/app-protocol.mjs';
 import { createServer as createVite } from '../web/node_modules/vite/dist/node/index.js';
 
 const root = resolve(import.meta.dirname, '../..');
-const dataDir = desktopDataDirectory(app.getPath('appData'));
+const dataDir = dataDirectory({ appData: app.getPath('appData') });
 if (process.env.PASO_DATA_DIR) app.setPath('userData', join(dirname(resolve(dataDir)), 'desktop-profile'));
 // As in the packaged app, the page is at paso://app on every launch, so what it keeps per origin survives a relaunch.
 // Vite still runs on a free port; the page reaches it through the scheme, and its HMR socket directly.

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, readdir, realpath, rename, rm, rmdir } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rm, rmdir } from 'node:fs/promises';
+import { atomicRename } from './atomic-rename.js';
 import { dirname, join, relative, sep } from 'node:path';
 import { LOOSE_PROJECT_FOLDER, LOOSE_PROJECT_ID, idSchema, parseProject, parseScene, parseStep, type Project, type Scene, type Step } from '@paso/shared';
 import { ApiError, isMissing } from './errors.js';
@@ -70,7 +71,7 @@ export class Disk {
       const file = await open(temporary, 'wx', 0o600);
       try { await file.writeFile(bytes); await file.sync(); } finally { await file.close(); }
       await this.path(path);
-      await rename(temporary, target);
+      await atomicRename(temporary, target);
     } finally { await rm(temporary, { force: true }); }
   }
   async remove(path: string) { await rm(await this.path(path), { recursive: true, force: true }); }
@@ -85,7 +86,7 @@ export class Disk {
     if (await this.exists(to)) throw new ApiError(409, 'PATH_COLLISION', 'Destination already exists.');
     await mkdir(dirname(target), { recursive: true });
     await this.path(to);
-    await rename(source, target);
+    await atomicRename(source, target);
   }
 
   async scanProject(projectId: string): Promise<Map<string, RecordFile>> {

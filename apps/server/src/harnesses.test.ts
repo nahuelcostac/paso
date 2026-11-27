@@ -1,4 +1,5 @@
-import { copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
+import { copyFile, mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,7 +55,20 @@ describe('harness detection and registry', () => {
     const path = await fake('agy', "console.log('1.5.3')");
     vi.stubEnv('PATH', windows ? `"${join(root, 'bin')}"` : join(root, 'bin'));
     vi.stubEnv('HOME', root);
-    expect(await detectHarness('agy', { loginShell: false })).toMatchObject({ found: true, path, version: '1.5.3' });
+    // An executable is reported by its real path, links resolved: on macOS the temporary folder under /var is a link
+    // to /private/var. A Windows npm shim keeps its own path, because npm finds its entry beside it.
+    expect(await detectHarness('agy', { loginShell: false })).toMatchObject({ found: true, path: windows ? path : realpathSync(path), version: '1.5.3' });
+  });
+  // POSIX only: Windows reports a shim by its own path, and making a link there needs extra privileges.
+  it.runIf(!windows)('reports the real path when PATH reaches the executable through a link', async () => {
+    const path = await fake('agy', "console.log('1.5.3')");
+    const linked = join(root, 'linked bin');
+    await symlink(join(root, 'bin'), linked);
+    vi.stubEnv('PATH', linked);
+    vi.stubEnv('HOME', root);
+    const found = await detectHarness('agy', { loginShell: false });
+    expect(found).toMatchObject({ found: true, path: realpathSync(path), version: '1.5.3' });
+    expect(found.path).not.toContain('linked bin');
   });
   it('keeps the service responsive while a detection is waiting', async () => {
     await fake('agy', 'setInterval(() => {}, 1000)');

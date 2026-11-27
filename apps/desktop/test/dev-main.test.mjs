@@ -24,7 +24,7 @@ vi.mock('electron', () => ({
   } },
   shell: { openPath: vi.fn(), openExternal: vi.fn() },
 }));
-vi.mock('@paso/server', () => ({ startServer: async () => ({ url: 'http://127.0.0.1:50124', port: 50124, sessionToken: 'test' }) }));
+vi.mock('@paso/server', async (importOriginal) => ({ ...await importOriginal(), startServer: async () => ({ url: 'http://127.0.0.1:50124', port: 50124, sessionToken: 'test' }) }));
 vi.mock('../../web/node_modules/vite/dist/node/index.js', () => ({ createServer: async () => ({ listen: mocks.listen }) }));
 vi.mock('node:net', () => ({ createServer: () => ({
   once() {}, listen(_port, _host, ready) { ready(); }, address: () => ({ port: 50123 }), close(done) { done(); },

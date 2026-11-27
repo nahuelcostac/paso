@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, rm } from 'node:fs/promises';
+import { atomicRename } from './atomic-rename.js';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { idSchema, parseProject, parseScene, parseStep, validateProjectTree, type Project, type ProjectTree, type Scene, type Step } from '@paso/shared';
 import { z } from 'zod';
@@ -302,7 +303,7 @@ export class RunStore {
         await handle.close();
       }
       await this.checkSafePath(relPath);
-      await rename(temp, target);
+      await atomicRename(temp, target);
     } finally {
       await rm(temp, { force: true });
     }
