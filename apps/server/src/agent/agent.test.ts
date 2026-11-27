@@ -11,6 +11,10 @@ import { fakePath, windows, writeFixture } from './testing/launcher.js';
 import { checkWorkDir } from './sessions.js';
 import type { AgentEvent, AgentRunHooks } from './types.js';
 
+// Each test starts real processes: a fake harness and the board MCP. On Windows one turn takes about 2 s, so a test
+// with two or three turns needs more than the default 5 s for a whole test.
+vi.setConfig({ testTimeout: 30_000 });
+
 const token = 'test-session-token-with-at-least-32-characters';
 const fixture = join(import.meta.dirname, 'testing', 'fake-claude.mjs');
 type Service = Awaited<ReturnType<typeof startServer>>;

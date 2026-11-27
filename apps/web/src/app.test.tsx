@@ -10,6 +10,10 @@ import { startServer } from '@paso/server';
 import { App } from './App';
 import type { ClientConfig } from './lib/api';
 
+// Each test crosses the real service many times in a row. On a slow Windows runner that takes 6–9 s, more than
+// the default 5 s for a whole test. Each wait inside keeps its own, shorter limit.
+vi.setConfig({ testTimeout: 30_000 });
+
 // jsdom cannot draw Excalidraw: the Canvas's canvas is a stand-in here, as in the other suites.
 vi.mock('./editor/StepCanvas', () => import('./editor/canvas-stand-in'));
 
