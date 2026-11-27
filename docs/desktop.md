@@ -55,6 +55,12 @@ In ESC-03's session (open a project, draw shapes and text, Present, 30 s idle, q
 
 Support and test Intel or universal builds. Add signing, hardened runtime, notarization and a distribution format. Decide on update delivery and migration. Test upgrades, crash recovery and accessibility, and repeat the checks for multiple instances, external links and offline behavior in a release environment. Windows and Linux need their own packaging, data paths, process handling and verification. Review the desktop security boundary and bundled dependency licenses. The agent's optional image tool needs a packaged compatible renderer or a desktop rendering bridge.
 
+## Windows releases
+
+Set the release version in the root `package.json`. The desktop package reads it for the Electron app and installer filename. A pushed `vX.Y.Z` tag must match that version exactly, including any `-rc.N` or `-beta.N` suffix. GitHub Actions checks the tag, runs the Windows checks and builds the NSIS installer before publishing it with generated release notes. Tags with a suffix publish as prereleases.
+
+Electron Builder packages with `publish: 'never'`. The workflow attaches only the installer. ESC-11 can add the files needed for automatic updates, such as `latest.yml`, to this release process.
+
 ## Desktop development
 
 Run `pnpm dev:desktop` to start the Electron window with Vite hot reload. On macOS it first draws the app icon and shows it in the Dock. It uses the same default data directory as `pnpm dev`. Set `PASO_DATA_DIR` to override it. For an isolated run use, for example, `PASO_DATA_DIR=/tmp/paso-desktop-check/projects pnpm dev:desktop`. This also puts Electron's profile in the temporary parent directory. The service and Vite use separate free loopback ports, leaving 3001 and 5173 available. Server source changes rebuild the service and restart the window. Closing the window stops Vite and the service, including agent processes.

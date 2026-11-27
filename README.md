@@ -6,11 +6,11 @@ The local service API, session authentication, data directory and compiled-serve
 
 The stdio board tools, harness configuration and optional step images are documented in [docs/mcp.md](docs/mcp.md).
 
-## Desktop packaging
+## Install on Windows
 
-Run `pnpm --filter '@paso/desktop' package` on Windows or macOS. On Windows it writes the unsigned Windows 10/11 x64 NSIS installer to
-`apps/desktop/dist/release/Paso-Setup-0.0.0-x64.exe`. The installer runs per user and adds desktop and Start menu shortcuts. Uninstalling
-keeps the projects in `%APPDATA%\Paso\projects`. On macOS the command builds the unsigned arm64 app bundle.
+Download `Paso-Setup-<version>-x64.exe` from [GitHub Releases](https://github.com/nahuelcostac/paso/releases) and run it on Windows 10 or 11 x64. The installer is unsigned. If SmartScreen blocks it, select **More info** → **Run anyway**. The installer runs per user and adds desktop and Start menu shortcuts. Uninstalling keeps the projects in `%APPDATA%\Paso\projects`.
+
+To build from source, run `pnpm --filter '@paso/desktop' package` after installing the dependencies. On Windows the command writes the installer to `apps/desktop/dist/release/`. On macOS it builds an unsigned arm64 app bundle.
 
 Set `PASO_DATA_DIR` before launching the desktop app to use a separate projects directory and profile.
 
