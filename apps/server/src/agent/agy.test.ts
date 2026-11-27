@@ -1,12 +1,16 @@
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startServer } from '../server.js';
 import { agyAdapter, agyAgentFile, agyArguments, agyFailureMessage, agyVersionSupported, agyWorkspace, classifyAgyFailure } from './agy.js';
 import { agyTranscriptPaths, forgetAgy } from './forget.js';
 import type { AgentEvent, AgentRunRequest } from './types.js';
 import { fakePath, writeFixture, writeLauncher } from './testing/launcher.js';
+
+// Each test starts real processes: a fake harness and the board MCP. On Windows one turn takes about 2 s, so a test
+// with two or three turns needs more than the default 5 s for a whole test.
+vi.setConfig({ testTimeout: 30_000 });
 
 let root: string;
 let server: Awaited<ReturnType<typeof startServer>>;

@@ -19,6 +19,7 @@ import type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, Harnes
 
 export type { AgentEvent, AgentRunHooks, AgentRunRequest, HarnessAdapter, HarnessId };
 export type { OpenFolder } from './reveal.js';
+export { dataDirectory, type DataDirectoryOptions } from './data-directory.js';
 
 export type AgentOptions = {
   /** Neutral, empty directory the agents run in. Default: `agent-workspace` next to the projects directory. */

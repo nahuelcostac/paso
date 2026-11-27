@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join, parse, relative, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -108,6 +108,17 @@ describe('workspaces', () => {
     await api(`/api/workspaces/${added.data.id}`, 'DELETE');
     expect(filters((await api<Listing>('/api/workspaces')).data)).toEqual({ default: null });
     expect(JSON.parse(await readFile(join(root, 'app', 'workspaces.json'), 'utf8'))).not.toHaveProperty('filters');
+  });
+
+  it('saves the filter while something else is reading the list file', async () => {
+    const file = join(root, 'app', 'workspaces.json');
+    await api('/api/workspaces/default/filter', 'PUT', { filter: 'tema-1' });
+    // On Windows, replacing a file that another process has open fails until it is closed.
+    const reader = await open(file, 'r');
+    const released = new Promise<void>((resolve) => { setTimeout(() => { void reader.close().then(resolve); }, 200); });
+    expect((await api<Listing>('/api/workspaces/default/filter', 'PUT', { filter: null })).status).toBe(200);
+    await released;
+    expect(JSON.parse(await readFile(file, 'utf8'))).not.toHaveProperty('filters');
   });
 
   it('starts in the default workspace when the open one was deleted, and lists it as unavailable', async () => {

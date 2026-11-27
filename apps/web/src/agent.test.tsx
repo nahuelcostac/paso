@@ -12,6 +12,10 @@ import { ApiClient, type ClientConfig } from './lib/api';
 import { AgentStore } from './state/agent-store';
 import { fakePath, writeLauncher } from '../../server/src/agent/testing/launcher.js';
 
+// Each test starts real processes: a fake harness and the board MCP. On Windows one turn takes about 2 s, so a test
+// with two or three turns needs more than the default 5 s for a whole test.
+vi.setConfig({ testTimeout: 30_000 });
+
 /**
  * The agent panel against a real service on a temporary data folder. Only the harness is fake: an adapter
  * that emits the normalized events and writes to the board through the same API the board tools use.

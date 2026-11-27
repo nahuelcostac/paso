@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, open, readFile, readdir, realpath, rename, rm, unlink } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, realpath, rm, unlink } from 'node:fs/promises';
+import { atomicRename } from '../atomic-rename.js';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { idSchema } from '@paso/shared';
@@ -448,6 +449,6 @@ async function writePrivate(file: string, data: string) {
   try {
     const handle = await open(temp, 'wx', 0o600);
     try { await handle.writeFile(data); await handle.sync(); } finally { await handle.close(); }
-    await rename(temp, file);
+    await atomicRename(temp, file);
   } finally { await unlink(temp).catch(() => {}); }
 }

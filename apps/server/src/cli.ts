@@ -1,16 +1,9 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { startServer } from './server.js';
+import { dataDirectory, startServer } from './server.js';
 
-const defaultDataDir = process.platform === 'win32'
-  ? join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Paso', 'projects')
-  : process.platform === 'darwin'
-    ? join(homedir(), 'Library', 'Application Support', 'Paso', 'projects')
-    : join(process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share'), 'paso', 'projects');
 const port = Number(process.env.PASO_PORT ?? 3001);
 if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid PASO_PORT.');
 const service = await startServer({
-  dataDir: process.env.PASO_DATA_DIR ?? defaultDataDir,
+  dataDir: dataDirectory(),
   harnessRegistryPath: process.env.PASO_HARNESS_REGISTRY_PATH,
   runsDir: process.env.PASO_RUNS_DIR,
   workspacesPath: process.env.PASO_WORKSPACES_PATH,

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { mkdir, readdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
+import { atomicRename } from './atomic-rename.js';
 import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import { idSchema } from '@paso/shared';
 import { z } from 'zod';
@@ -110,7 +111,7 @@ export class WorkspaceRegistry {
       await mkdir(dirname(this.file), { recursive: true });
       const temporary = `${this.file}.${randomUUID()}.tmp`;
       await writeFile(temporary, `${JSON.stringify(data, null, 2)}\n`);
-      await rename(temporary, this.file);
+      await atomicRename(temporary, this.file);
     });
     this.writes = next.catch(() => {});
     return next;

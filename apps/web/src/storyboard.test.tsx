@@ -12,6 +12,10 @@ import type { ClientConfig } from './lib/api';
 import { StepFrame } from './components/StepFrame';
 import { RenderQueue } from './state/render-queue';
 
+// Each test crosses the real service many times in a row. On a slow Windows runner that takes 6–9 s, more than
+// the default 5 s for a whole test. Each wait inside keeps its own, shorter limit.
+vi.setConfig({ testTimeout: 30_000 });
+
 /**
  * The Storyboard runs against a real local service on a temporary data folder. Only drawing is
  * replaced: jsdom has no canvas, so the Excalidraw exporter returns a tiny SVG that records what it was given.

@@ -7,8 +7,10 @@ The web app lists and edits projects through this API.
 For the compiled service, run `pnpm build`, then
 `node apps/server/dist/cli.js`. Set `PASO_DATA_DIR` to a directory containing
 project folders. The default is `~/Library/Application Support/Paso/projects`
-on macOS, `%LOCALAPPDATA%/Paso/projects` on Windows, or
-`${XDG_DATA_HOME:-~/.local/share}/paso/projects` on Linux. `PASO_PORT` defaults
+on macOS, `%APPDATA%\Paso\projects` on Windows, or
+`${XDG_DATA_HOME:-~/.local/share}/paso/projects` on Linux. The desktop app uses
+the same folder (`dataDirectory` in `apps/server/src/data-directory.ts`), so
+both open the same projects. `PASO_PORT` defaults
 to 3001. Run `node scripts/server-smoke.mjs` after building to verify the CLI
 from its `dist` directory against temporary real files.
 

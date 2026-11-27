@@ -3,12 +3,16 @@ import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { fakePath, windows, writeFixture, writeLauncher } from './testing/launcher.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startServer, type AgentOptions } from '../server.js';
 import { maxImageBytes, parseAttachments, sniffImage } from './attachments.js';
 import { claudeInput } from './claude.js';
 import { codexInput } from './codex.js';
 import type { AgentEvent, HarnessAdapter } from './types.js';
+
+// Each test starts real processes: a fake harness and the board MCP. On Windows one turn takes about 2 s, so a test
+// with two or three turns needs more than the default 5 s for a whole test.
+vi.setConfig({ testTimeout: 30_000 });
 
 const token = 'attachments-test-token-with-at-least-32-characters';
 const fixture = join(import.meta.dirname, 'testing', 'fake-claude.mjs');
