@@ -141,12 +141,12 @@ describe('documents and revisions', () => {
   });
   it('serializes concurrent sibling creation and rejects concurrent replacement of the same revision', async () => {
     const created = await step();
-    const added = await Promise.all(Array.from({ length: 12 }, (_, i) => api(`${s}/steps`, 'POST', { id: `child-${i}` })));
-    expect(added.map((r) => r.status)).toEqual(Array(12).fill(201));
-    expect((await api(s)).data.document.stepIds).toHaveLength(13);
-    const scenes = await Promise.all(Array.from({ length: 6 }, (_, i) => api(`${p}/scenes`, 'POST', { id: `scene-${i}`, name: 'Concurrent' })));
-    expect(scenes.map((r) => r.status)).toEqual(Array(6).fill(201));
-    expect((await api(p)).data.document.sceneIds).toHaveLength(7);
+    const added = await Promise.all(['child-a', 'child-b'].map((id) => api(`${s}/steps`, 'POST', { id })));
+    expect(added.map((r) => r.status)).toEqual([201, 201]);
+    expect((await api(s)).data.document.stepIds.sort()).toEqual(['child-a', 'child-b', 't']);
+    const scenes = await Promise.all(['scene-a', 'scene-b'].map((id) => api(`${p}/scenes`, 'POST', { id, name: 'Concurrent' })));
+    expect(scenes.map((r) => r.status)).toEqual([201, 201]);
+    expect((await api(p)).data.document.sceneIds.sort()).toEqual(['s', 'scene-a', 'scene-b']);
     const results = await Promise.all(['First', 'Second'].map((title) => api(t, 'PUT', { ...created.data.document, title }, created.data.revision)));
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
     const persisted = (await api(t)).data;

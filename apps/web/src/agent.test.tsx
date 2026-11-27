@@ -49,6 +49,7 @@ let service: Service;
 let config: ClientConfig;
 let requests: AgentRunRequest[];
 let adapterImpl: (request: AgentRunRequest, signal: AbortSignal) => AsyncIterable<AgentEvent>;
+let afterRun: (() => void) | undefined;
 
 async function call<T = unknown>(method: string, path: string, body?: unknown, revision?: string): Promise<T> {
   const response = await fetch(`${service.url}/api${path}`, {
@@ -145,6 +146,7 @@ beforeEach(async () => {
   drawn.calls.length = 0;
   window.innerWidth = 1024;
   requests = [];
+  afterRun = undefined;
   rootDir = await mkdtemp(join(tmpdir(), 'paso-agent-web-'));
   binDir = join(rootDir, 'bin');
   harnessRegistryPath = join(rootDir, 'state', 'harnesses.json');
@@ -164,7 +166,11 @@ beforeEach(async () => {
     dataDir: join(rootDir, 'projects'), port: 0, sessionToken: token, allowedOrigins: [window.location.origin], pollIntervalMs: 80,
     harnessRegistryPath, runsDir: join(rootDir, 'runs'),
     harnessDetection: { searchPaths: [binDir], loginShell: false },
-    agent: { workDir: join(rootDir, 'work'), sessionsPath: join(rootDir, 'state', 'sessions.json'), adapters: { claude: adapter, codex: { ...adapter, id: 'codex' } } },
+    agent: {
+      workDir: join(rootDir, 'work'), sessionsPath: join(rootDir, 'state', 'sessions.json'),
+      adapters: { claude: adapter, codex: { ...adapter, id: 'codex' } },
+      hooks: { afterRun: async () => { afterRun?.(); } },
+    },
   });
   config = { baseUrl: service.url, token };
   await seedProject();
@@ -658,7 +664,9 @@ describe('continuing a conversation', () => {
     await user.click(within(panel).getByRole('button', { name: /^Agent and model: / }));
     await user.click(within(within(await screen.findByRole('dialog', { name: 'Choose agent and model' })).getByRole('radiogroup', { name: 'Model' })).getByRole('radio', { name: 'Haiku 5.5' }));
     await user.keyboard('{Escape}');
+    const firstRun = new Promise<void>((resolve) => { afterRun = resolve; });
     await send(panel, user, 'Primero');
+    await firstRun;
     await within(panel).findByText(/· 1 change/, {}, patience);
 
     cleanup();

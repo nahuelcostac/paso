@@ -194,6 +194,11 @@ export function startProcess(spec: ProcessSpec, options: ProcessOptions): Manage
   return {
     write: (line) => { if (!wanted && !child.stdin!.destroyed) child.stdin!.write(line + '\n'); },
     endInput: () => { if (!child.stdin!.destroyed) child.stdin!.end(); },
-    stop: () => stop('stopped'), done,
+    async stop() {
+      await stop('stopped');
+      // On Windows taskkill can return before Node reports that the child and its streams have closed.
+      await done;
+    },
+    done,
   };
 }

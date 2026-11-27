@@ -290,12 +290,10 @@ describe('agent run restore points and undo', () => {
     expect((await api(`${p}/scenes/s-other`)).status).toBe(404);
   });
 
-  it('persists across restarts, marks unfinished runs as interrupted, and enforces retention limit', async () => {
-    const { step1 } = await setupProject();
+  it('retains only the latest finished runs up to the configured limit', async () => {
     await service.close();
-
-    // Start server with retentionLimit: 3
     service = await startServer({ dataDir, runsDir, runRetentionLimit: 3, port: 0, sessionToken: token, pollIntervalMs: 80 });
+    await api('/api/projects', 'POST', { id: 'p', name: 'Project' });
 
     // Create 4 finished runs; only the latest 3 should be retained
     for (let i = 1; i <= 4; i++) {
@@ -305,14 +303,17 @@ describe('agent run restore points and undo', () => {
     const listedAfter4 = await api(`${p}/runs`);
     expect(listedAfter4.data.runs.map((r: { id: string }) => r.id)).toEqual(['run-4', 'run-3', 'run-2']);
     expect((await api(`${p}/runs/run-1`)).status).toBe(404);
+  });
 
+  it('restores an unfinished run as interrupted after a restart and can undo it', async () => {
+    const { step1 } = await setupProject();
     // Start an unfinished run, edit step 1, then stop the server without finishing the run
     await api(`${p}/runs`, 'POST', { id: 'run-unfinished' });
     const currentStep1 = (await api(t1)).data;
     await agent(t1, 'PUT', { ...currentStep1.document, title: 'Edited before crash' }, currentStep1.revision);
 
     await service.close();
-    service = await startServer({ dataDir, runsDir, runRetentionLimit: 3, port: 0, sessionToken: token, pollIntervalMs: 80 });
+    service = await startServer({ dataDir, runsDir, port: 0, sessionToken: token, pollIntervalMs: 80 });
 
     // Unfinished run should now be marked interrupted and can be undone
     const recovered = await api(`${p}/runs/run-unfinished`);

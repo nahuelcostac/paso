@@ -12,7 +12,7 @@ function lines(script: string, maxLineBytes = 64 * 1024 * 1024) {
     { file: process.execPath, args: ['-e', script], cwd: tmpdir(), env: { PATH: process.env.PATH ?? '' }, input: '' },
     { onLine: (line) => seen.push(line), idleTimeoutMs: 10_000, maxRunMs: 20_000, maxLineBytes, signal: new AbortController().signal },
   );
-  return { seen, done: child.done };
+  return { seen, ...child };
 }
 
 describe('harness output lines', () => {
@@ -39,6 +39,15 @@ describe('harness output lines', () => {
     const { seen, done } = lines(`process.stdout.write('x'.repeat(5000)); setInterval(() => {}, 1000);`, 1000);
     expect((await done).reason).toBe('line-too-long');
     expect(seen).toEqual([]);
+  });
+
+  it('reports the child as closed before stop resolves', async () => {
+    const child = lines('setInterval(() => {}, 1000);');
+    let closed = false;
+    void child.done.then(() => { closed = true; });
+    await child.stop();
+    expect(closed).toBe(true);
+    expect((await child.done).reason).toBe('stopped');
   });
 });
 
