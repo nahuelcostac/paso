@@ -39,6 +39,21 @@ export function registerPermissions(session) {
     isAppUrl(contents?.mainFrame?.url) && isAppUrl(origin) && allowsPermission(permission, details.requestingUrl, details.isMainFrame));
 }
 
+/**
+ * Gives the page its session token and event stream address. The preload asks with `sendSync`, which blocks the page
+ * until it has an answer, so every request is answered: with the session for the app's own page, with null for
+ * anything else. Left unanswered, a refused request would freeze the window, blank, with nothing logged.
+ * @param {{ ipcMain: { on: Function }; trusted: (event: unknown) => boolean; session: () => { token: string; events: string };
+ *   log?: (message: string, details?: unknown) => void }} options
+ */
+export function registerSessionBridge({ ipcMain, trusted, session, log }) {
+  ipcMain.on('paso-session', (event) => {
+    if (trusted(event)) { event.returnValue = session(); return; }
+    log?.('Refused the session to a frame', { url: event.senderFrame?.url });
+    event.returnValue = null;
+  });
+}
+
 /** The Windows desktop renderer only talks to loopback services. A system proxy or PAC can delay those requests. */
 export async function configureLoopbackProxy(session, platform = process.platform) {
   if (platform === 'win32') await session.setProxy({ mode: 'direct' });

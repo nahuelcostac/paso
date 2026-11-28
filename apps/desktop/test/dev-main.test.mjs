@@ -83,8 +83,12 @@ describe('desktop development folder picker', () => {
     const session = mocks.ipc.get('paso-session');
     const answer = (event) => { session(event); return event.returnValue; };
     expect(answer({ sender: webContents, senderFrame: webContents.mainFrame })).toEqual({ token: 'test', events: 'ws://127.0.0.1:50124/api/events' });
-    expect(answer({ sender: {}, senderFrame: webContents.mainFrame })).toBeUndefined();
-    expect(answer({ sender: webContents, senderFrame: { url: 'paso://app/' } })).toBeUndefined();
+    // Refused, but answered: the preload's synchronous request must never be left waiting.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(answer({ sender: {}, senderFrame: webContents.mainFrame })).toBeNull();
+    expect(answer({ sender: webContents, senderFrame: { url: 'paso://app/' } })).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 
   it('lets the renderer reach only the page, Vite and its service', () => {

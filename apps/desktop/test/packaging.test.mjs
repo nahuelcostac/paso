@@ -1,5 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
-import { packagingConfig } from '../packaging-config.mjs';
+import { NSIS_INCLUDE, packagingConfig } from '../packaging-config.mjs';
 import { appVersion, validateReleaseTag } from '../version.mjs';
 import repoManifest from '../../../package.json' with { type: 'json' };
 
@@ -11,6 +12,19 @@ it('packages an unsigned, per-user Windows x64 installer with shortcuts and keep
     artifactName: 'Paso-Setup-${version}-${arch}.exe', perMachine: false, runAfterFinish: false,
     createStartMenuShortcut: true, createDesktopShortcut: true, deleteAppDataOnUninstall: false,
   });
+});
+
+it('installs to Programs\\Paso, also over 0.1.0-rc.1 in Programs\\paso-desktop, and keeps no installer copy', async () => {
+  const { buildOptions } = packagingConfig('win32', 'paso.svg', 'release', '45.4.1');
+  expect(buildOptions.nsis.include).toBe(NSIS_INCLUDE);
+  const script = await readFile(NSIS_INCLUDE, 'utf8');
+  const macro = (name) => script.match(new RegExp(`!macro ${name}\\r?\\n([\\s\\S]*?)!macroend`))?.[1] ?? '';
+  // The default folder (from the package name) and the one rc.1 recorded both end in paso-desktop.
+  expect(macro('customInit')).toMatch(/\$\{GetFileName\} "\$INSTDIR" \$R0\s+\$\{If\} \$R0 == "paso-desktop"\s+\$\{GetParent\} "\$INSTDIR" \$R1\s+StrCpy \$INSTDIR "\$R1\\Paso"/);
+  expect(macro('customInstall')).toContain('Delete "$LOCALAPPDATA\\${APP_INSTALLER_STORE_FILE}"');
+  // RMDir without /r only removes the folder when nothing else is in it.
+  expect(macro('customInstall')).toMatch(/RMDir "\$R0"/);
+  expect(script).not.toMatch(/RMDir \/r/);
 });
 
 it('uses the Paso version and NSIS target architecture in the installer name', () => {
@@ -26,6 +40,10 @@ it('keeps the macOS directory target and icon', () => {
   expect(targets).toEqual(['dir']);
   expect(buildOptions.mac).toEqual({ target: ['dir'], identity: null, icon: 'Paso.icns' });
   expect(buildOptions.nsis).toBeUndefined();
+  expect(buildOptions).toEqual({
+    electronVersion: '45.4.1', appId: 'org.paso.prototype', productName: 'Paso', electronLanguages: ['en'],
+    asar: false, directories: { output: 'release' }, files: ['**/*'], mac: buildOptions.mac,
+  });
 });
 
 it('accepts the tag for the current repository version', () => {

@@ -1,3 +1,8 @@
+import { join } from 'node:path';
+
+/** Paso's additions to the NSIS installer: the install folder and no kept installer copy (installer.nsh). */
+export const NSIS_INCLUDE = join(import.meta.dirname, 'installer.nsh');
+
 export function packagingConfig(platform, icon, output, electronVersion) {
   const common = {
     electronVersion, appId: 'org.paso.prototype', productName: 'Paso', electronLanguages: ['en'],
@@ -16,6 +21,7 @@ export function packagingConfig(platform, icon, output, electronVersion) {
         artifactName: 'Paso-Setup-${version}-${arch}.exe',
         perMachine: false, oneClick: true, runAfterFinish: false, deleteAppDataOnUninstall: false,
         createStartMenuShortcut: true, createDesktopShortcut: true, shortcutName: 'Paso',
+        include: NSIS_INCLUDE,
       },
     },
   };
