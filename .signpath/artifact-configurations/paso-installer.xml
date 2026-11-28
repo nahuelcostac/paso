@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration "paso-installer": the NSIS installer, which GitHub uploads as a zip.
+  The workflow builds it from the app that "paso-app" already signed, so the installed Paso.exe
+  carries that signature too.
+  Paste this into SignPath (Project > Artifact configurations > paso-installer). docs/windows-signing.md
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="Paso-Setup-${version}-x64.exe" product-name="Paso" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

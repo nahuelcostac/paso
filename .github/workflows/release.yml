@@ -1,5 +1,12 @@
 name: Windows release
 
+# A vX.Y.Z tag builds the Windows installer and publishes it on GitHub Releases. When the SignPath
+# secret and variables are set, Paso.exe and the installer are Authenticode signed first:
+#   build (unsigned app + installer) -> sign Paso.exe -> build the installer from the signed app
+#   -> sign the installer -> publish. Each signing request waits for manual approval in SignPath.
+# Without them, as in forks, the unsigned installer is published with a warning.
+# Setup and the reasons for this order: docs/windows-signing.md
+
 on:
   push:
     tags: ['v*']
@@ -7,27 +14,192 @@ on:
 permissions:
   contents: read
 
+env:
+  SIGNING_PUBLISHER: SignPath Foundation
+
 jobs:
+  signing:
+    name: Signing setup
+    runs-on: ubuntu-latest
+    # The SignPath secret and variables live in this environment, which only v* tags may use.
+    environment: signpath
+    outputs:
+      enabled: ${{ steps.mode.outputs.enabled }}
+      version: ${{ steps.mode.outputs.version }}
+      windows-version: ${{ steps.mode.outputs.windows-version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Decide whether this release is signed
+        id: mode
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          # Only whether the secret exists reaches this step, never its value.
+          SIGNPATH_API_TOKEN_SET: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+        run: node apps/desktop/signing.mjs
+
   installer:
+    needs: signing
     uses: ./.github/workflows/windows.yml
     with:
       release-tag: ${{ github.ref_name }}
+      upload-app: ${{ needs.signing.outputs.enabled == 'true' }}
+
+  sign-app:
+    name: Sign Paso.exe
+    environment: signpath
+    needs: [signing, installer]
+    if: needs.signing.outputs.enabled == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 300
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/verify-authenticode.ps1
+          sparse-checkout-cone-mode: false
+      - name: Submit the app to SignPath and wait for approval
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: paso-app
+          github-artifact-id: ${{ needs.installer.outputs.app-artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 14400
+          output-artifact-directory: signed-app
+          parameters: |
+            windowsVersion: ${{ toJSON(needs.signing.outputs.windows-version) }}
+      - name: Check the signature of Paso.exe
+        shell: pwsh
+        run: ./scripts/verify-authenticode.ps1 -Publisher $env:SIGNING_PUBLISHER -Path signed-app/Paso.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Paso-Windows-x64-app-signed
+          path: signed-app/
+          if-no-files-found: error
+          retention-days: 1
+
+  installer-from-signed-app:
+    name: Build the installer from the signed app
+    needs: sign-app
+    runs-on: windows-latest
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter '@paso/shared' build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Paso-Windows-x64-app-signed
+          path: signed-app
+      - name: Check the signature of Paso.exe
+        shell: pwsh
+        run: ./scripts/verify-authenticode.ps1 -Publisher $env:SIGNING_PUBLISHER -Path signed-app/Paso.exe
+      - run: node apps/desktop/package.mjs --prepackaged signed-app
+      - id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Paso-Windows-x64-installer-unsigned
+          path: apps/desktop/dist/release/Paso-Setup-*-x64.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-installer:
+    name: Sign the installer
+    environment: signpath
+    needs: [signing, installer-from-signed-app]
+    runs-on: windows-latest
+    timeout-minutes: 300
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/verify-authenticode.ps1
+          sparse-checkout-cone-mode: false
+      - name: Submit the installer to SignPath and wait for approval
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: paso-installer
+          github-artifact-id: ${{ needs.installer-from-signed-app.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 14400
+          output-artifact-directory: signed-installer
+          parameters: |
+            version: ${{ toJSON(needs.signing.outputs.version) }}
+      - name: Check the signature of the installer
+        shell: pwsh
+        env:
+          INSTALLER: signed-installer/Paso-Setup-${{ needs.signing.outputs.version }}-x64.exe
+        run: ./scripts/verify-authenticode.ps1 -Publisher $env:SIGNING_PUBLISHER -Path $env:INSTALLER
+      - name: Install silently and check the installed Paso.exe
+        shell: pwsh
+        env:
+          INSTALLER: signed-installer/Paso-Setup-${{ needs.signing.outputs.version }}-x64.exe
+        run: |
+          $process = Start-Process -FilePath $env:INSTALLER -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "The installer exited with $($process.ExitCode)" }
+          $installed = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter Paso.exe | Select-Object -First 1
+          if (-not $installed) { throw 'Paso.exe was not installed under %LOCALAPPDATA%\Programs' }
+          ./scripts/verify-authenticode.ps1 -Publisher $env:SIGNING_PUBLISHER -Path $installed.FullName
+          # electron-builder writes the uninstaller during the NSIS build, so it is not signed (docs/windows-signing.md).
+          Get-ChildItem $installed.DirectoryName -Filter 'Uninstall*.exe' | ForEach-Object {
+            "$($_.Name): $((Get-AuthenticodeSignature -FilePath $_.FullName).Status)"
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Paso-Windows-x64-signed
+          path: signed-installer/Paso-Setup-*-x64.exe
+          if-no-files-found: error
 
   publish:
-    needs: installer
+    needs: [signing, installer, sign-installer]
+    # sign-installer is skipped when signing is off; it must have succeeded when signing is on.
+    if: >-
+      !cancelled() && needs.installer.result == 'success' &&
+      (needs.signing.outputs.enabled != 'true' || needs.sign-installer.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: Paso-Windows-x64
+          name: ${{ needs.signing.outputs.enabled == 'true' && 'Paso-Windows-x64-signed' || 'Paso-Windows-x64' }}
           path: artifacts
       - name: Publish the installer on GitHub Releases
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
+          SIGNED: ${{ needs.signing.outputs.enabled }}
+          POLICY_URL: ${{ github.server_url }}/${{ github.repository }}#code-signing-policy
         shell: bash
         run: |
           installer="artifacts/Paso-Setup-${RELEASE_TAG#v}-x64.exe"
@@ -41,6 +213,16 @@ jobs:
             flags+=(--prerelease)
           fi
 
-          gh release create "$RELEASE_TAG" "$installer" --verify-tag --generate-notes \
-            --notes 'The Windows installer is unsigned. If Windows SmartScreen blocks it, select **More info** → **Run anyway**.' \
-            "${flags[@]}"
+          if [[ "$SIGNED" == 'true' ]]; then
+            notes="The Windows installer and Paso.exe are signed. Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). [Code signing policy]($POLICY_URL)"
+          else
+            notes="The Windows installer is unsigned. If Windows SmartScreen blocks it, select **More info** → **Run anyway**. [Code signing policy]($POLICY_URL)"
+            {
+              echo '### Unsigned release'
+              echo
+              echo "> [!WARNING]"
+              echo "> $RELEASE_TAG was published without code signing, because the SignPath secret and variables are not set."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          gh release create "$RELEASE_TAG" "$installer" --verify-tag --generate-notes --notes "$notes" "${flags[@]}"

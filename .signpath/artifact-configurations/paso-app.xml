@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration "paso-app": the unpacked Windows app (electron-builder's win-unpacked
+  folder), which GitHub uploads as a zip. It signs Paso.exe, the program people run. Electron's own
+  DLLs are upstream binaries, so they stay as Electron ships them: SignPath Foundation's conditions
+  allow unsigned upstream libraries inside a signed package, and forbid signing binaries the project
+  does not build. Every other file passes through unchanged.
+  Paste this into SignPath (Project > Artifact configurations > paso-app). docs/windows-signing.md
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="windowsVersion" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="Paso.exe" product-name="Paso" product-version="${windowsVersion}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
