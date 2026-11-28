@@ -59,7 +59,7 @@ Support and test Intel or universal builds. Add signing, hardened runtime, notar
 
 Set the release version in the root `package.json`. The desktop package reads it for the Electron app and installer filename. A pushed `vX.Y.Z` tag must match that version exactly, including any `-rc.N` or `-beta.N` suffix. GitHub Actions checks the tag, runs the Windows checks and builds the NSIS installer before publishing it with generated release notes. Tags with a suffix publish as prereleases.
 
-Electron Builder packages with `publish: 'never'`. The workflow attaches only the installer. ESC-11 can add the files needed for automatic updates, such as `latest.yml`, to this release process.
+Electron Builder packages with `publish: 'never'`. The workflow attaches only the installer. When the SignPath settings exist, `Paso.exe` and the installer are signed before publishing. Otherwise the installer is published unsigned with a warning. See [windows-signing.md](windows-signing.md). ESC-11 can add the files needed for automatic updates, such as `latest.yml`, to this release process.
 
 ## Desktop development
 
